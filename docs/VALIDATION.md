@@ -1,24 +1,23 @@
-# Local validation report
+# Validation — v0.2.0-alpha.1
 
-Validation date: 2026-09-18.
+Validation date: 2026-09-18. Base: `c9ef6376f3373d47c81f2e19cb86bf8b3209e901`.
 
-| Check | Result |
+| Check | Result in the development container |
 | --- | --- |
-| Node.js | v22.16.0 |
-| TypeScript | 5.8.3 |
-| `npm run typecheck` | Passed |
-| `npm test` | 45 passed; 0 failed; 0 skipped |
-| `npm run demo` | Passed; mock-only, offline |
-| `npm run publish:github -- --dry-run` | Passed; no GitHub writes |
-| Real Jev inference | Not run; no authorized API key supplied |
-| Remote GitHub repository creation/push | Repository created by the owner; source prepared for publication through the connected GitHub writer |
-| GitHub Actions on this repository | Not run; CI definition supplied only |
-| Fresh npm dependency download | Not verified: npm registry DNS unavailable in the local execution container |
+| Node | 22.16.0; built-in experimental `node:sqlite` available |
+| Compiler | Installed TypeScript 5.8.3, matching the pinned dependency |
+| `npm run check` | Typecheck/build and **79 tests passed**, zero failures/skips |
+| `npm run demo` | Passed, existing offline synthetic fixture demo |
+| `npm run demo:durable` | Passed, SQLite reopen + one provider invocation + policy-only replay |
+| Original regressions | All 45 original tests retained and passing |
+| Durable kernel | Independent connections, simultaneous OS processes, real SIGKILL before/after action start, fencing, conflicts and unknown tombstones |
+| Protocol processes | Actual spawned Node MCP STDIO and Claude hook CLIs with fixture input |
+| DeepSeek integration | Callback contract fixtures matched to reviewed official tools source; no installed host run |
+| Codex / Claude Code applications | Not installed or run; their protocol-facing subprocesses were tested instead |
+| Real Jev inference | Not run; no authorized key supplied |
+| Fresh `npm ci` in container | Not run successfully; external registry DNS unavailable |
+| GitHub CI for this change | Consult the PR check run; this static report does not predeclare its result |
 
-The installed global compiler was exactly TypeScript 5.8.3, matching the pinned development dependency. Build/typecheck/tests actually ran; this report does not imply `npm ci` successfully contacted the registry. The package-lock integrity was obtained from the official npm registry metadata.
+The 34 new tests include portable authoring, exact action/outcome binding, separate observation/label provenance, replay without execution, provider binding changes, unknown SQLite schema, initialized MCP framing, UTF-8/size limits and shadow permission abstention.
 
-Test coverage includes all three provider primitives, probability mass/label validation, unsafe policy rejection, default shadow mode, explicit authorization, blocked writes, tenant mismatch, in-flight coalescing, conflicting duplicate IDs, bounded capacity, provider/action deadlines, before/after-action audit failures, immutable snapshots, actual tool-argument assessment, JSONL ordering, HTTP contract fixtures, speculation constraints, calibration math and publication argument parsing.
-
-A mocked HTTP transport validates request/response handling, not the actual service, model accuracy or pricing. Mock demo labels are synthetic and must not be presented as benchmark results.
-
-The publication helper's GitHub creation path was not used for this repository; its dry-run and option parsing are tested. The initial source publication is performed through the connected GitHub writer. The helper remains useful for forks or renamed deployments using an authenticated local GitHub CLI.
+Mock probabilities and outcomes are test fixtures, **not model quality or latency benchmarks**. Passing process-kill tests is evidence for the implemented failure cases, not a proof of arbitrary distributed exactly-once effects. No full external security audit, load/soak test, encrypted-retention test, live-host installation test or provider calibration experiment has been completed.

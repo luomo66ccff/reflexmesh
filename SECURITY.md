@@ -15,3 +15,7 @@ ReflexMesh v0.1 is an experimental library. It has not undergone an external sec
 - Current decision thresholds are demonstration values without real-data calibration. Do not use high model confidence as a substitute for permission or independent evidence.
 
 For a security report, avoid publishing sensitive exploit data or credentials in a public issue. Use the repository owner's private reporting channel once the actual repository is established.
+
+## v0.2 optional durable/shadow layer
+
+The v0.1 cautions above still apply to the original in-memory runtime. The optional `DurableMesh` + `SqliteKernel` wrapper persists admission/metadata and conservatively retains unknown execution states. It does not add write permissions, raw-output caching, encryption, external exactly-once effects or automatic recovery. The three harness-facing adapters are shadow/advisory only and do not replace host authorization. See `docs/DURABLE-SHADOW.md#limits` before connecting real data or tools.

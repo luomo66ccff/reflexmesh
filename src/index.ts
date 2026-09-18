@@ -8,3 +8,5 @@ export * from './providers/mock.js';
 export * from './providers/jev.js';
 export * from './packs/index.js';
 export * from './scheduler/speculation.js';
+export * from './core/portable.js';
+export * from './integrations/boundary.js';

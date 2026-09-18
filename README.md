@@ -1,156 +1,103 @@
 # ReflexMesh
 
-**把概率式语义判断，接到可审计、默认不执行的工作流中。**
+**把同一份语义决策契约，跨 Agent 宿主变成可持久化、可追溯、可回放的证据。**
 
-A provider-neutral, event-driven semantic decision runtime for AI agents and services.
+A provider-neutral semantic decision runtime: **one contract, durable evidence, multiple harnesses**.
 
-> **Status: v0.1 development prototype, not a production security boundary.**
-> The initial runtime is implemented and locally validated. The repository is now published at `luomo66ccff/reflexmesh`; live Jev inference and remote CI still require verification.
-
-## What runs today
+> **v0.2.0-alpha.1 — Durable Shadow Protocol.** Experimental, not a production security boundary.
+> We extend Codex, Claude Code and DeepSeek Harness; we do not replace their agent loops or permission systems.
 
 ```text
-Event -> versioned Decision Pack -> Jev / Mock Provider
-                                      |
-                               validated answers
-                                      |
-                              deterministic Policy
-                                      |
-                 shadow / block / assess / authorized read
-                                      |
-                                audit Outcome
+Codex STDIO MCP       Claude Code hooks       DeepSeek Harness hooks
+   advisory              shadow observer          shadow observer
+       \                      |                       /
+                 normalized HarnessCall
+                           |
+              SQLite admission + deployment binding
+                           |
+               versioned Pack -> Provider -> Policy
+                           |
+                Decision evidence <-> Host outcome
+                           |
+             independent labels / policy-only replay
 ```
 
-| Module | Implemented scope |
-| --- | --- |
-| Runtime | In-process event processing, immutable snapshots, explicit deadlines, default shadow mode |
-| Decision Packs | Typed `noul`, `choice`, `score`; versioned rules; fail-closed fallback |
-| Jev provider | Server-side HTTP adapter, strict response validation, bounded response size, abort propagation |
-| Memory Governor | Admission recommendations: propose persistent/temporary storage, drop, privacy review, conflict escalation |
-| Tool preflight | Intent assessment plus **separate host authorization**; only registered reads execute in v0.1 |
-| Audit | Memory ledger and single-process append-only JSONL sink; raw state/arguments omitted by runtime |
-| Idempotency | In-flight coalescing and retained tombstones **within one runtime instance only** |
-| Speculation | Cost/latency-aware **planner**, not an executing prefetch/cache system |
-| Calibration | Brier score and binned ECE for explicit externally labeled datasets; no automatic policy tuning |
+## Run the current branch
 
-Not implemented: distributed event bus, persistent idempotency, actual memory database integration, live prefetch/cache reuse, human approval protocol, Saga execution/compensation, MCP server, HTTP gateway, dashboard, or production benchmarks. See [ROADMAP](docs/ROADMAP.md).
-
-## Run locally
-
-Requirements: Node.js **22+** and npm. Runtime has **zero external runtime dependencies**; the sole build dependency is pinned TypeScript 5.8.3.
+Node.js **22.16+**, npm. TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages are required. The new adapter uses Node's built-in, experimental `node:sqlite` API on a **single machine / local filesystem**.
 
 ```bash
 npm ci --ignore-scripts
 npm run check
 npm run demo
+npm run demo:durable
 ```
 
-The default demo is entirely offline. Its probabilities and evaluation labels are **synthetic fixtures**, not Jev predictions. It demonstrates memory admission in shadow mode, an explicitly authorized local read, duplicate coalescing, a speculation plan, and a JSONL audit log.
+The demos use explicitly labeled synthetic fixtures, not real Jev predictions. The durable demo closes and reopens SQLite, reuses the decision without another model call, and tests a stricter policy without executing any tool. Generated `dist/` is ignored by Git; build before running adapter entrypoints.
 
-The source archive may include `dist/` for a dependency-free preview:
+## What is implemented
 
-```bash
-node examples/workflow.mjs
+| Capability | Scope in this alpha |
+| --- | --- |
+| Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision + host authorization/toolset revisions |
+| Durable admission | SQLite WAL, transactional uniqueness, leases and fencing epochs; separate-process tests and real process-kill tests |
+| Recovery | Pre-execution expired admission can be reclaimed; an execution with unknown outcome is **never automatically retried** |
+| Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
+| Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
+| Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
+| DeepSeek Harness | Source-matched `tools/pre-execute` + `tools/result` observer; preserves `next()` and supports disposal |
+| Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
+| Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
+| Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
+
+**Verification:** 79 offline tests passed during this change, including spawned MCP/Claude protocol processes and SQLite process-kill/race tests. Actual Codex, Claude Code and DeepSeek applications were **not installed or exercised** in that environment. Real Jev inference was **not run**. See [validation](docs/VALIDATION.md).
+
+## Connect a harness
+
+First build, then configure the **absolute Node entrypoint**, not an npm command that prints build banners onto protocol stdout.
+
+Codex example (`config.toml`; replace the path):
+
+```toml
+[mcp_servers.reflexmesh]
+command = "node"
+args = ["/absolute/path/to/reflexmesh/adapters/mcp-server.mjs"]
+env = { REFLEXMESH_PROVIDER = "abstain", REFLEXMESH_SCOPE = "my-project" }
 ```
 
-`dist/` is generated, ignored by Git, and rebuilt by CI. Do not edit it.
+This installs **advisory** tools: `reflexmesh_assess`, `reflexmesh_observe_outcome`, `reflexmesh_replay_policy`, `reflexmesh_inspect_pack`. The model may choose not to call them. It does not gain or lose native tool permissions.
 
-## Minimal application integration
+Claude hook configuration, DeepSeek observer wiring, generic function-call middleware, shared configuration and limitations are documented in [DURABLE-SHADOW.md](docs/DURABLE-SHADOW.md). No installer edits your settings or credentials.
 
-```js
-import {
-  ReflexMesh, MemoryLedger, MockProvider, toolPreflightPack,
-} from './dist/index.js';
+### Honest default: abstain, not fabricated confidence
 
-const provider = new MockProvider(() => ({
-  model: 'fixture-not-real-jev',
-  answers: {
-    intentMatch: { type: 'noul', noul: 0.98 },
-    injection: { type: 'noul', noul: 0.01 },
-  },
-}));
-
-const mesh = new ReflexMesh({ provider, ledger: new MemoryLedger() })
-  .registerPack(toolPreflightPack);
-
-const result = await mesh.run({
-  id: crypto.randomUUID(),
-  type: 'tool.requested',
-  source: 'example-app',
-  tenantId: 'example-tenant',
-  time: new Date().toISOString(),
-  state: { userIntent: 'Read the project README.' },
-}, {
-  packId: 'tool-preflight',
-  action: { toolId: 'files.read', args: { path: 'README.md' } },
-});
-
-console.log(result.status); // shadow: no tool execution
-```
-
-For active reads, the host must explicitly select `mode: 'active'`, register the tool, supply a trusted principal, and implement `authorize`. An `allow` model policy verdict **does not authorize an action**. Writes/destructive tools remain blocked regardless of scores or host authorization in v0.1.
-
-The event state is untrusted evidence, not policy. Actual tool ID/arguments supplied to `run()` are included separately in the provider state, and registered tool capabilities come from trusted host code.
-
-## Use real Jev
-
-Only run this after obtaining your own TypeSafe access and considering which data may leave your application. Keys never go into the browser, source tree, or GitHub issue text.
-
-PowerShell:
-
-```powershell
-$env:TYPESAFE_API_KEY = "your-key-kept-locally"
-$env:TYPESAFE_MODEL = "jev-latest"
-npm run demo:jev
-```
-
-Bash:
-
-```bash
-export TYPESAFE_API_KEY='your-key-kept-locally'
-export TYPESAFE_MODEL='jev-latest'
-npm run demo:jev
-```
-
-`jev-latest` is an experimental alias, not a pin. Use a model ID supported by your account and validate it against a labeled dataset before any production use. This adapter does not automatically load `.env`, does not retry, and rejects cross-origin redirects. The runtime supplies the overall decision deadline.
-
-**Verification boundary:** the HTTP shape was checked against TypeSafe's official SDK source. Offline injected-transport tests pass. No real TypeSafe key was supplied during preparation, so successful live inference, pricing, latency, model availability and calibration have **not** been established. See [SOURCES](docs/SOURCES.md).
-
-## Repository
-
-Canonical repository: `https://github.com/luomo66ccff/reflexmesh`
-
-The included `scripts/publish-github.mjs` is retained as a guarded bootstrap helper for forks or renamed deployments. It refuses to overwrite an existing target repository.
-
-## Project layout
+With no provider configuration, events are recorded but the judgment escalates as **provider unavailable**. No fake probability and no external network request is substituted. For explicit Jev use, configure server-side environment variables:
 
 ```text
-src/core/             contracts, validation, canonicalization, policy
-src/runtime/          event execution and deadlines
-src/providers/        mock and Jev HTTP adapters
-src/packs/            memory admission and tool preflight
-src/observability/    memory ledger and calibration statistics
-src/scheduler/        speculative planning only
-adapters/             local JSONL audit adapter
-examples/             offline and explicit live-Jev examples
-test/                 offline tests
-scripts/              guarded GitHub publication
-.github/workflows/    CI configuration
-docs/                 architecture, roadmap, sources, verification
+REFLEXMESH_PROVIDER=jev
+REFLEXMESH_ALLOW_REMOTE=true
+TYPESAFE_API_KEY=<your local secret, never commit>
+TYPESAFE_MODEL=<account-supported model ID>
+REFLEXMESH_PROVIDER_REVISION=<your evaluated deployment revision>
+REFLEXMESH_SCOPE=<project scope>
 ```
 
-One package first, with module boundaries preserved. A multi-package monorepo should follow real independent consumers, not precede a working runtime.
+The returned model must match the binding. An alias that resolves to a different model will fail closed rather than silently inheriting old thresholds. Full provider-capability negotiation, calibration fitting and automatic model migration are **not shipped**. Switching binding for the same event ID raises a conflict; start a separately named shadow deployment for comparisons.
 
-## Safety and reliability limits
+## Design boundaries
 
-Read [SECURITY.md](SECURITY.md) before connecting any real tools or private data. In particular:
+The original `ReflexMesh` class remains an in-memory runtime. **Only `DurableMesh` with `SqliteKernel` adds persistence.** SQLite replays decision/status metadata, not previous raw tool outputs: this is not a cross-session tool-output cache.
 
-- A classifier is not an authorization system, and high confidence is not proof of correctness.
-- JSONL persistence does **not** make the in-memory idempotency store durable. A process restart loses deduplication.
-- A timed-out tool may still finish; the runtime reports `recovery_required` and does not retry it automatically.
-- Memory directives are suggestions, not permission to retain sensitive data; enforce consent, expiry and deletion in host code.
-- No incident after execution is not a valid ground-truth label that an action was safe.
+All harness adapters in this alpha are **shadow/advisory**. They observe host-owned tools, including host-permitted writes, but never execute or authorize them. Active execution through the library remains limited to explicitly registered, host-authorized reads. No write approvals, compensators or speculation executor have been added.
 
-## License
+An epoch fences admission and journal writes, not an arbitrary external API. A process can die after an external action succeeds but before recording its result. We preserve that uncertainty; we do not promise external exactly-once effects or ACID rollback. No automatic UNKNOWN resolution or administrative recovery UI is provided yet.
 
-MIT. This prototype is not affiliated with or endorsed by TypeSafe AI. No Jev model weights are included.
+Tenant/session keys separate records but are not authentication. Use trusted ingress and a private local database directory. The ledger is not encrypted or tamper-proof; hashes and model labels may still reveal information. Read [SECURITY.md](SECURITY.md) and the [alpha safety limits](docs/DURABLE-SHADOW.md#limits).
+
+## Development direction
+
+The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). Next priorities are full provider conformance, real-host compatibility tests, bounded recovery/retention tooling and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
+
+Repository: https://github.com/luomo66ccff/reflexmesh
+
+MIT. No Jev weights are included; no affiliation with or endorsement by the model or harness vendors is implied.
