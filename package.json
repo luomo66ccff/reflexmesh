@@ -1,11 +1,11 @@
 {
   "name": "reflexmesh",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "description": "Provider-neutral semantic decision runtime with deterministic policy and auditable outcomes",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.16"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -14,7 +14,10 @@
     "demo": "npm run build && node examples/workflow.mjs",
     "demo:jev": "npm run build && node examples/jev.mjs",
     "check": "npm run typecheck && npm test",
-    "publish:github": "node scripts/publish-github.mjs"
+    "publish:github": "node scripts/publish-github.mjs",
+    "demo:durable": "npm run build && node examples/durable-shadow.mjs",
+    "mcp:stdio": "node adapters/mcp-server.mjs",
+    "hook:claude": "node adapters/claude-hook.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"
