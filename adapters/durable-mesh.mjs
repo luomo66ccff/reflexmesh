@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ReflexMesh, canonical, snapshot, validateEvent, validatePack, ContractError, evaluatePolicy, validateResult } from '../dist/index.js';
 import { digest } from './sqlite-kernel.mjs';
+import { taskReceiptFromState, INTENT_POLICY } from './task-evidence.mjs';
 
 export const eventKey = event => digest([event.tenantId, event.source, event.id]);
 /** Reuses the v0.1 execution/policy engine; adds durable admission and evidence, not another agent loop. */
@@ -48,10 +49,11 @@ export class DurableMesh {
     } catch (e) { return Promise.reject(e); }
   }
   async #run(event, options, pack, key, requestDigest) {
+    const taskEvidence = this.#binding.taskEvidencePolicy === INTENT_POLICY ? taskReceiptFromState(event.state) : undefined;
     const admission = this.#kernel.claim({ key, requestDigest, owner: randomUUID(), leaseMs: this.#options.leaseMs,
       evidence: { schemaVersion: 1, eventId: event.id, tenantId: event.tenantId, source: event.source, eventType: event.type,
         inputDigest: requestDigest, actionDigest: digest(options.action ?? event.state?.proposedAction ?? null), pack: { id: pack.id, version: pack.version, digest: digest(pack), questionsDigest: digest(pack.questions) },
-        binding: this.#binding, mode: this.#options.mode },
+        binding: this.#binding, mode: this.#options.mode, ...(taskEvidence ? { taskEvidence } : {}) },
     });
     if (admission.kind === 'replay') return snapshot({ ...admission.result, replayed: true });
     if (admission.kind !== 'claimed') return snapshot({ eventId: event.id, status: admission.kind === 'busy' ? 'in_flight' : 'recovery_required', verdict: { effect: 'escalate', ruleId: 'durable_admission' }, reasonCode: admission.kind });
