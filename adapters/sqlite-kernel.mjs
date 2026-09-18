@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { configureJournal } from './sqlite-startup.mjs';
 import { createHash } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
 import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
@@ -29,7 +30,7 @@ export class SqliteKernel {
       requireValue([0, 1, 2].includes(version) && (!readOnly || version > 0), 'Unsupported kernel schema');
       this.#schemaVersion = version;
       if (readOnly) return; // No DDL, migration, mode changes or application writes from an inspector.
-      this.#db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
+      configureJournal(this.#db, { busyTimeoutMs, inMemory: path === ':memory:' });
       this.#transaction(() => {
         // Recheck under the write lock: a concurrent opener may have migrated since the first read.
         const lockedVersion = this.#db.prepare('PRAGMA user_version').get().user_version;

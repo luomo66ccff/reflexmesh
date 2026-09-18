@@ -27,3 +27,11 @@ The local container could not resolve GitHub/npm for a full fresh checkout/insta
 | Labels | Stored question/pack identity, own-property checks and binary/choice/ordinal target domains |
 
 Mock results, synthetic clocks and operator declarations are explicitly test fixtures. This work does not measure classifier quality, real provider latency, actual host compatibility, load/soak resilience or externally authenticated human evidence. No Codex/Claude Code/DeepSeek application, real Jev account or production database was connected in this validation. No external security audit was performed.
+
+## CI-discovered startup race follow-up
+
+The first full PR run (CI #4) had 110 passing tests and one cancelled test: the existing simultaneous admission fixture timed out. Reproduction with visible child stderr exposed `SQLITE_BUSY` while concurrent fresh openers switched to WAL; the old worker exited before its ready IPC message, which the parent waited for without seeing the error. This was not treated as a passing run or fixed by merely increasing its timeout.
+
+The follow-up limits retries to journal setup on numeric SQLITE_BUSY codes (including extended BUSY codes), under the original monotonic total contention budget. It restores the caller's busy timeout and verifies the returned journal mode. No transaction, model call, admission or tool execution is automatically retried. Worker initialization failures now produce an explicit error reply so the existing assertion fails diagnostically rather than hanging.
+
+Six additional regression tests exercise transient/permanent errors, zero/exhausted budgets, mode verification and repeated simultaneous fresh opens across four OS processes. The focused local suite now has **83 passing tests** (45 original +32 recovery/label +6 startup); a separate 100-round/four-process startup check completed without the reproduced startup error. These are fixture-level checks, not a production load test or complete local rerun of the 34 other alpha tests. All **117** tests must still pass together in remote CI. See the latest PR check for the actual outcome.
