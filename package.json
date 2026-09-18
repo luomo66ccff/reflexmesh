@@ -17,7 +17,9 @@
     "publish:github": "node scripts/publish-github.mjs",
     "demo:durable": "npm run build && node examples/durable-shadow.mjs",
     "mcp:stdio": "node adapters/mcp-server.mjs",
-    "hook:claude": "node adapters/claude-hook.mjs"
+    "hook:claude": "node adapters/claude-hook.mjs",
+    "recovery": "node adapters/recovery-cli.mjs",
+    "demo:recovery": "npm run build && node examples/recovery-review.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"
