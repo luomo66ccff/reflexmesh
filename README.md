@@ -31,6 +31,7 @@ npm ci --ignore-scripts
 npm run check
 npm run demo
 npm run demo:durable
+npm run demo:recovery
 ```
 
 The demos use explicitly labeled synthetic fixtures, not real Jev predictions. The durable demo closes and reopens SQLite, reuses the decision without another model call, and tests a stricter policy without executing any tool. Generated `dist/` is ignored by Git; build before running adapter entrypoints.
@@ -41,7 +42,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | --- | --- |
 | Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision + host authorization/toolset revisions |
 | Durable admission | SQLite WAL, transactional uniqueness, leases and fencing epochs; separate-process tests and real process-kill tests |
-| Recovery | Pre-execution expired admission can be reclaimed; an execution with unknown outcome is **never automatically retried** |
+| Recovery | Durable UNKNOWN tombstones plus local, preview-first operator reviews; conclusions never enable replay or retries |
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
 | Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
 | Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
@@ -50,7 +51,25 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 
-**Verification:** 79 offline tests passed during this change, including spawned MCP/Claude protocol processes and SQLite process-kill/race tests. Actual Codex, Claude Code and DeepSeek applications were **not installed or exercised** in that environment. Real Jev inference was **not run**. See [validation](docs/VALIDATION.md).
+**Initial alpha verification:** 79 offline tests passed before the recovery-review change, including spawned MCP/Claude protocol processes and SQLite process-kill/race tests. Actual Codex, Claude Code and DeepSeek applications were **not installed or exercised** in that environment. Real Jev inference was **not run**. See the [initial validation](docs/VALIDATION.md) and [recovery validation scope](docs/VALIDATION-RECOVERY.md).
+
+## Review an unknown execution
+
+The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.
+
+```bash
+node adapters/recovery-cli.mjs list --db /private/path/shadow.sqlite
+node adapters/recovery-cli.mjs inspect --db /private/path/shadow.sqlite --key RUN_KEY
+node adapters/recovery-cli.mjs review --db /private/path/shadow.sqlite --file review.json
+# Only after checking external evidence and quiescing the original executor:
+node adapters/recovery-cli.mjs review --db /private/path/shadow.sqlite --file review.json --apply
+```
+
+**A reviewed action remains `unknown` for execution purposes.** Review conclusions are separate administrative evidence, not replayable successes, new permissions, automatic retries or calibration labels. Review tools are deliberately not added to MCP. Actor references are operator-provided identifiers, not authentication; protect management access separately from same-user shell-capable agents.
+
+Writable opens migrate SQLite schema 1 to 2 transactionally. Read-only inspection/preview can open schema 1 without migration. Stop old workers and back up the database before upgrading; old binaries reject schema 2. See the migration/runbook in [RECOVERY.md](docs/RECOVERY.md).
+
+New label admissions also validate against the stored question contract: binary targets are `0/1`, choices must be declared, and ordinal targets are rubric indices. Inherited properties and undeclared fields are rejected. Existing historical labels are not rewritten.
 
 ## Connect a harness
 
@@ -90,13 +109,13 @@ The original `ReflexMesh` class remains an in-memory runtime. **Only `DurableMes
 
 All harness adapters in this alpha are **shadow/advisory**. They observe host-owned tools, including host-permitted writes, but never execute or authorize them. Active execution through the library remains limited to explicitly registered, host-authorized reads. No write approvals, compensators or speculation executor have been added.
 
-An epoch fences admission and journal writes, not an arbitrary external API. A process can die after an external action succeeds but before recording its result. We preserve that uncertainty; we do not promise external exactly-once effects or ACID rollback. No automatic UNKNOWN resolution or administrative recovery UI is provided yet.
+An epoch fences admission and journal writes, not an arbitrary external API. A process can die after an external action succeeds but before recording its result. We preserve that uncertainty; we do not promise external exactly-once effects or ACID rollback. Local recovery reviews now record operator conclusions without removing UNKNOWN tombstones; no automatic resolution/retry or administrative UI is provided.
 
 Tenant/session keys separate records but are not authentication. Use trusted ingress and a private local database directory. The ledger is not encrypted or tamper-proof; hashes and model labels may still reveal information. Read [SECURITY.md](SECURITY.md) and the [alpha safety limits](docs/DURABLE-SHADOW.md#limits).
 
 ## Development direction
 
-The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). Next priorities are full provider conformance, real-host compatibility tests, bounded recovery/retention tooling and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
+The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). Next priorities are full provider conformance, real-host compatibility tests, retention tooling and independently verified recovery evidence and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
 
 Repository: https://github.com/luomo66ccff/reflexmesh
 
