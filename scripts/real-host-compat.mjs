@@ -202,13 +202,20 @@ export function runBounded(executable, args, {
       }
       // A descendant can keep inherited handles open even after the direct
       // child is gone. Never let close-event delivery defeat the deadline.
-      settleTimer = setTimeout(() => finish({ ok: false, kind: reason }), 2_000);
+      settleTimer = setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch {}
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        finish({ ok: false, kind: reason });
+      }, 2_000);
     };
     timer = setTimeout(() => terminate('timeout'), timeoutMs);
     timer.unref?.();
     child.stdout.on('data', chunk => {
+      if (abortReason || settled) return;
       stdoutBytes += chunk.length;
-      if (stdoutBytes > stdoutLimitBytes && !abortReason) {
+      if (stdoutBytes > stdoutLimitBytes) {
         overflow = 'stdout_limit';
         terminate(overflow);
         return;
@@ -216,8 +223,9 @@ export function runBounded(executable, args, {
       stdout.push(chunk);
     });
     child.stderr.on('data', chunk => {
+      if (abortReason || settled) return;
       stderrBytes += chunk.length;
-      if (stderrBytes > stderrLimitBytes && !abortReason) {
+      if (stderrBytes > stderrLimitBytes) {
         overflow = 'stderr_limit';
         terminate(overflow);
       }

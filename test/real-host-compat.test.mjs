@@ -121,6 +121,17 @@ test('child failures expose only fixed codes and never raw stdout, stderr, or se
   assert.equal(publicError, '{"status":"failed","reason":"host_exit_nonzero"}');
 });
 
+test('output overflow stops buffering and settles within the termination bound', { timeout: 7000 }, async () => {
+  const flood = "const chunk = 'x'.repeat(8192); setInterval(() => process.stdout.write(chunk), 0);";
+  const started = Date.now();
+  const result = await runBounded(process.execPath, ['-e', flood], {
+    cwd: process.cwd(), env: process.env, timeoutMs: 5000,
+    stdoutLimitBytes: 4096, stderrLimitBytes: 4096,
+  });
+  assert.deepEqual(result, { ok: false, kind: 'stdout_limit' });
+  assert.ok(Date.now() - started < 4000);
+});
+
 test('host deadline settles even when a descendant inherits the output handles', { timeout: 7000 }, async () => {
   const nested = [
     "const { spawn } = require('node:child_process');",
