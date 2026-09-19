@@ -1,6 +1,6 @@
 # Roadmap / 研究结论驱动的工程路线
 
-Updated for **v0.2.0-alpha.1**, 2026-09-18. See [ADR-0001](ADR-0001.md) for positioning and [DURABLE-SHADOW](DURABLE-SHADOW.md) for the implemented protocol. Version labels describe scope, not promised delivery dates.
+Updated for **v0.2.0-alpha.1**, 2026-09-19. See [ADR-0001](ADR-0001.md) for positioning and [DURABLE-SHADOW](DURABLE-SHADOW.md) for the implemented protocol. Version labels describe scope, not promised delivery dates.
 
 ## Implemented alpha slice
 
@@ -16,12 +16,15 @@ Updated for **v0.2.0-alpha.1**, 2026-09-18. See [ADR-0001](ADR-0001.md) for posi
 - [x] Add local, preview-first recovery reviews with epoch/digest compare-and-set; preserve UNKNOWN tombstones.
 - [x] Add read-only inspection, transactional schema-2 migration and typed label validation.
 - [x] Add 32 focused recovery/label tests and a credential-free recovery demo; see [validation scope](VALIDATION-RECOVERY.md).
-- [ ] Run actual Codex, Claude Code and DeepSeek Harness applications with pinned versions.
+- [x] Add an isolated real-host probe and exercise pinned Codex and Claude smoke paths; see [validation](VALIDATION-REAL-HOSTS.md).
+- [ ] Load the observer through the actual DeepSeek Harness plugin lifecycle; current evidence is version discovery only.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 
 ## Next: v0.2 alpha hardening
 
 **First gate: actual host compatibility and useful evidence.** Run each real host against the adapter, including cancellation, parallel tools, agent identity and shutdown. Record which CLI/plugin revision passed. Capture host-owned task intent through an explicit minimization policy rather than treating tool-only evidence as a complete task description. Do not silently read full transcripts or inherit credentials.
+
+The first real-host baseline now covers one Codex MCP smoke and one Claude prompt/hook/read/outcome path. DeepSeek E2E, cancellation, parallel tools, subagents and restart remain open; a discovered executable is not counted as an exercised host.
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 
