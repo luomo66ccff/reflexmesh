@@ -25,6 +25,8 @@ Updated for **v0.2.0-alpha.1**, 2026-09-18. See [ADR-0001](ADR-0001.md) for posi
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 
+The proposed capability schema and rejection/conformance matrix are recorded in [PROVIDER-CONFORMANCE.md](PROVIDER-CONFORMANCE.md). This is a design boundary only; capability negotiation and a second non-fixture provider are not implemented yet.
+
 **Third gate: recovery and retention.** Local operator review is now available ([runbook](RECOVERY.md)), including read-only preview, atomic review/audit and schema-1 migration tests. It records conclusions without authorizing retries or rewriting execution truth. Remaining work: independently authenticated operator evidence, crash-safe retention that preserves action tombstones, lease-budget validation and cancellation propagation. Audit storage and idempotency storage remain distinct concepts. No external exactly-once claim.
 
 ## v0.3: memory governance and calibrated comparison
