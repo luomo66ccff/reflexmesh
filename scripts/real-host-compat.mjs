@@ -163,10 +163,13 @@ export function runBounded(executable, args, {
     const stdout = [];
     let child;
     let timer;
+    let settleTimer;
+    let abortReason = null;
     const finish = result => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(settleTimer);
       resolveResult(result);
     };
     try {
@@ -174,34 +177,52 @@ export function runBounded(executable, args, {
         cwd,
         env,
         shell: false,
+        detached: process.platform !== 'win32',
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch {
       return finish({ ok: false, kind: 'spawn_error' });
     }
-    timer = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, timeoutMs);
+    const terminate = reason => {
+      if (abortReason) return;
+      abortReason = reason;
+      timedOut = reason === 'timeout';
+      if (process.platform === 'win32' && child.pid) {
+        try {
+          const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+            shell: false, windowsHide: true, stdio: 'ignore',
+          });
+          killer.once('error', () => { try { child.kill('SIGKILL'); } catch {} });
+          killer.unref();
+        } catch { try { child.kill('SIGKILL'); } catch {} }
+      } else if (child.pid) {
+        try { process.kill(-child.pid, 'SIGKILL'); }
+        catch { try { child.kill('SIGKILL'); } catch {} }
+      }
+      // A descendant can keep inherited handles open even after the direct
+      // child is gone. Never let close-event delivery defeat the deadline.
+      settleTimer = setTimeout(() => finish({ ok: false, kind: reason }), 2_000);
+    };
+    timer = setTimeout(() => terminate('timeout'), timeoutMs);
     timer.unref?.();
     child.stdout.on('data', chunk => {
       stdoutBytes += chunk.length;
-      if (stdoutBytes > stdoutLimitBytes) {
+      if (stdoutBytes > stdoutLimitBytes && !abortReason) {
         overflow = 'stdout_limit';
-        child.kill();
+        terminate(overflow);
         return;
       }
       stdout.push(chunk);
     });
     child.stderr.on('data', chunk => {
       stderrBytes += chunk.length;
-      if (stderrBytes > stderrLimitBytes) {
+      if (stderrBytes > stderrLimitBytes && !abortReason) {
         overflow = 'stderr_limit';
-        child.kill();
+        terminate(overflow);
       }
     });
-    child.once('error', () => finish({ ok: false, kind: 'spawn_error' }));
+    child.once('error', () => finish({ ok: false, kind: abortReason ?? 'spawn_error' }));
     child.once('close', code => {
       if (timedOut) return finish({ ok: false, kind: 'timeout' });
       if (overflow) return finish({ ok: false, kind: overflow });
@@ -282,7 +303,8 @@ export function evaluateCodexJsonl(text, marker = CODEX_MARKER) {
       if (!allowed) unexpected = true;
       if (allowed && (record.type === 'item.completed' || item.status === 'completed')) {
         allowedCompleted = true;
-        allowedSucceeded = item.error == null && item.result?.isError !== true;
+        const hasResult = Object.hasOwn(item, 'result') && item.result != null;
+        allowedSucceeded = hasResult && item.error == null && item.result?.isError !== true;
       }
     } else if (forbiddenTypes.has(itemType)) unexpected = true;
     if (record.type === 'item.completed' && itemType === 'agent_message' && typeof item.text === 'string') {

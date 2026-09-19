@@ -61,6 +61,25 @@ test('Codex analyzer requires a structured completed MCP call and exact final ma
   const unexpected = `${valid}\n${codexLine({ type: 'item.completed', item: { id: 'three', type: 'command_execution', command: 'echo no' } })}`;
   assert.equal(evaluateCodexJsonl(unexpected).passed, false);
   assert.equal(evaluateCodexJsonl(unexpected).reason, 'unexpected_tool_call');
+
+  const missingResult = codexLine({ type: 'item.completed', item: {
+    id: 'one', type: 'mcp_tool_call', server: 'reflexmesh', tool: 'reflexmesh_inspect_pack',
+  } });
+  const missing = evaluateCodexJsonl(missingResult);
+  assert.equal(missing.passed, false);
+  assert.equal(missing.reason, 'mcp_tool_call_failed');
+  for (const item of [
+    { id: 'one', type: 'mcp_tool_call', server: 'reflexmesh', tool: 'reflexmesh_inspect_pack', result: null },
+    { id: 'one', type: 'mcp_tool_call', server: 'reflexmesh', tool: 'reflexmesh_inspect_pack', result: { isError: true } },
+    { id: 'one', type: 'mcp_tool_call', server: 'reflexmesh', tool: 'reflexmesh_inspect_pack', result: {}, error: { message: 'fixture' } },
+  ]) {
+    const failed = evaluateCodexJsonl([
+      { type: 'item.completed', item },
+      { type: 'item.completed', item: { type: 'agent_message', text: 'REFLEXMESH_CODEX_COMPAT_OK' } },
+    ].map(codexLine).join('\n'));
+    assert.equal(failed.passed, false);
+    assert.equal(failed.reason, 'mcp_tool_call_failed');
+  }
 });
 
 test('Codex analyzer cannot be fooled by prompt or assistant text naming mcp_tool_call', () => {
@@ -100,6 +119,21 @@ test('child failures expose only fixed codes and never raw stdout, stderr, or se
   const publicError = JSON.stringify({ status: 'failed', reason: processFailureReason({ ...result, stderr: 'API_KEY_SECRET' }) });
   assert.equal(publicError.includes('SECRET'), false);
   assert.equal(publicError, '{"status":"failed","reason":"host_exit_nonzero"}');
+});
+
+test('host deadline settles even when a descendant inherits the output handles', { timeout: 7000 }, async () => {
+  const nested = [
+    "const { spawn } = require('node:child_process');",
+    "spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: ['ignore', 'inherit', 'inherit'] });",
+    'setInterval(() => {}, 1000);',
+  ].join(' ');
+  const started = Date.now();
+  const result = await runBounded(process.execPath, ['-e', nested], {
+    cwd: process.cwd(), env: process.env, timeoutMs: 200,
+    stdoutLimitBytes: 4096, stderrLimitBytes: 4096,
+  });
+  assert.deepEqual(result, { ok: false, kind: 'timeout' });
+  assert.ok(Date.now() - started < 4000);
 });
 
 test('invalid CLI output is one fixed JSON object and does not echo input', async () => {
