@@ -2,7 +2,7 @@
 
 This report records a narrow compatibility milestone, not production
 certification. The final probe runs below used committed adapter code at
-`f4b5ee681c98` (`reflexmesh` `0.2.0-alpha.1`) on 2026-09-19.
+`5c830acb942b` (`reflexmesh` `0.2.0-alpha.1`) on 2026-09-19.
 
 ## Environment and isolation
 
@@ -31,9 +31,9 @@ isolation from arbitrary user or managed configuration.
 | Claude Code | 2.1.263 | **passed** | Actual CLI delivered `UserPromptSubmit -> PreToolUse -> Read -> PostToolUse`; the isolated SQLite ledger contained a run, ready task-evidence receipt, succeeded outcome, and zero labels. |
 | DeepSeek Harness | 0.1.2-rc.1 | **discovered, not exercised** | The installed native package entrypoint returned its version. No plugin was loaded and no `tools/pre-execute` or `tools/result` event was exercised. |
 
-Final sanitized timestamps were `2026-09-19T09:25:06.854Z` for Codex,
-`2026-09-19T09:27:11.589Z` for Claude, and
-`2026-09-19T09:27:32.129Z` for DeepSeek discovery.
+Final sanitized timestamps were `2026-09-19T09:33:02.945Z` for Codex,
+`2026-09-19T09:33:33.687Z` for Claude, and
+`2026-09-19T09:34:07.783Z` for DeepSeek discovery.
 
 ## What the passing probes establish
 
@@ -94,7 +94,7 @@ is on `PATH`.
 
 On the same committed code:
 
-- `npm run check`: 171 tests, 170 passed, 0 failed, 1 skipped. The skip is the
+- `npm run check`: 172 tests, 171 passed, 0 failed, 1 skipped. The skip is the
   Windows unprivileged recovery-input symlink case; it is not reported as a
   pass.
 - `node examples/workflow.mjs`: passed.
@@ -118,6 +118,11 @@ new remote jobs have not run because this local branch has not been pushed.
   authentication, then narrows the tool surface and applies an exact-path
   guard. This does not prove isolation from every possible user environment or
   managed setting.
+- A timed-out child could leave inherited output handles open, and output
+  overflow could continue buffering while termination was in progress. The
+  probe now bounds final settlement, stops buffering after abort, destroys its
+  pipes at the fallback boundary, and has regressions for both cases. Returning
+  on time does not prove that every descendant process was terminated.
 
 Only the final runs in the result matrix count as passing evidence.
 
@@ -132,6 +137,8 @@ Only the final runs in the result matrix count as passing evidence.
 - real Jev inference, independent provider conformance and any calibration
   claim
 - remote CI results for the new Windows matrix
+- complete descendant-process termination proof across supported operating
+  systems
 - production authorization, OS isolation, retention, load and privacy testing
 
 Decision completion must not be confused with host execution completion. A
