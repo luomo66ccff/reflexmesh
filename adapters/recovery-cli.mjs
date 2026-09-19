@@ -2,9 +2,9 @@
 import { open, lstat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
 import { ContractError } from '../dist/index.js';
+import { isDirectRun } from './direct-run.mjs';
 import { SqliteKernel } from './sqlite-kernel.mjs';
 import { validateRecoveryReview } from './recovery-contract.mjs';
 
@@ -89,7 +89,7 @@ export async function recoveryMain(argv, output = process.stdout) {
     output.write(JSON.stringify(result, null, 2) + '\n');
   } finally { kernel?.close(); }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isDirectRun(import.meta.url)) {
   try { await recoveryMain(process.argv.slice(2)); }
   catch (error) {
     process.stderr.write(`ReflexMesh recovery: ${error instanceof ContractError ? error.message : 'database or input unavailable'}.\n`);

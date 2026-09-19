@@ -123,7 +123,7 @@ test('path alias collision and nonregular intent database are refused', async t 
   const dir = await temporary(t), p = join(dir, 'db.sqlite');
   assert.throws(() => cacheOptions({ REFLEXMESH_INTENT_MODE: 'explicit-summary', REFLEXMESH_INTENT_DB: p, REFLEXMESH_DB: p }), /different files/);
   await mkdir(p); assert.throws(() => new IntentCache(p, { tenantId: 't', scope: 'p' }));
-  const link = join(dir, 'link'); await symlink(p, link); assert.throws(() => new IntentCache(link, { tenantId: 't', scope: 'p' }));
+  const link = join(dir, 'link'); await symlink(p, link, process.platform === 'win32' ? 'junction' : undefined); assert.throws(() => new IntentCache(link, { tenantId: 't', scope: 'p' }));
 });
 // Provider gate and durable identity.
 test('missing/withheld/expired intent skips provider even when it would answer confidently', async t => {

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtemp, rm, writeFile, access, symlink } from 'node:fs/promises';
@@ -13,9 +13,11 @@ import { validateRecoveryReview, RECOVERY_RESOLUTIONS } from '../adapters/recove
 import { parseRecoveryOptions, readRecoveryFile } from '../adapters/recovery-cli.mjs';
 import { event, result, requestOptions, readTool } from './helpers.mjs';
 
-async function directory(t) {
+const temporaryDirectories = new Set();
+after(async () => { for (const dir of temporaryDirectories) await rm(dir, { recursive: true, force: true }); });
+async function directory() {
   const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-recovery-'));
-  t.after(() => rm(dir, { recursive: true, force: true })); return dir;
+  temporaryDirectories.add(dir); return dir;
 }
 function fixture(t, path = ':memory:') {
   let now = 0;
@@ -235,9 +237,10 @@ test('two actual OS processes cannot accept conflicting reviews at the same epoc
   const children = ['first','second'].map(id => fork(new URL('./fixtures/review-racer.mjs', import.meta.url), [path,f,id], { stdio: ['ignore','ignore','ignore','ipc'] }));
   t.after(() => children.forEach(c => { if (c.exitCode === null) c.kill('SIGKILL'); }));
   await Promise.all(children.map(c => once(c,'message')));
-  const replies = children.map(c => once(c,'message')); children.forEach(c => c.send('go'));
+  const replies = children.map(c => once(c,'message')), exits = children.map(c => once(c,'exit')); children.forEach(c => c.send('go'));
   const statuses = (await Promise.all(replies)).map(([r]) => r.status).sort();
   assert.deepEqual(statuses, ['accepted','conflict']);
+  await Promise.all(exits);
   sql(path, db => assert.equal(db.prepare('SELECT count(*) n FROM recovery_reviews').get().n, 1));
 });
 

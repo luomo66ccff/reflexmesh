@@ -134,9 +134,10 @@ test('simultaneous separate OS processes obtain only one admission', { timeout: 
   const children = Array.from({ length: 2 }, () => fork(new URL('./fixtures/admission-racer.mjs', import.meta.url), [path], { stdio: ['ignore','ignore','ignore','ipc'] }));
   t.after(() => children.forEach(c => { if (c.exitCode === null) c.kill('SIGKILL'); }));
   await Promise.all(children.map(c => once(c, 'message')));
-  const replies = children.map(c => once(c, 'message'));
+  const replies = children.map(c => once(c, 'message')), exits = children.map(c => once(c, 'exit'));
   children.forEach(c => c.send('go'));
   const kinds = (await Promise.all(replies)).map(([r]) => r.kind).sort(); assert.deepEqual(kinds, ['busy','claimed']);
+  await Promise.all(exits);
 });
 test('unknown SQLite schema is rejected rather than silently migrated', async t => {
   const { DatabaseSync } = await import('node:sqlite');

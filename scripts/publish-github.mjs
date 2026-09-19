@@ -2,7 +2,8 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { isDirectRun } from '../adapters/direct-run.mjs';
 
 export function parseOptions(argv) {
   const options = { owner: 'luomo66ccff', name: 'reflexmesh', visibility: 'private', dryRun: false, help: false };
@@ -90,6 +91,6 @@ export function main(argv = process.argv.slice(2)) {
   console.log('Repository created and initial push completed:');
   console.log(verified.stdout.trim());
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isDirectRun(import.meta.url)) {
   try { main(); } catch (error) { console.error(error instanceof Error ? error.message : 'Publication failed'); process.exitCode = 1; }
 }
