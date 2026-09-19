@@ -2,7 +2,7 @@
 
 This report records a narrow compatibility milestone, not production
 certification. The final probe runs below used committed adapter code at
-`0af1c055b13d` (`reflexmesh` `0.2.0-alpha.1`) on 2026-09-19.
+`f4b5ee681c98` (`reflexmesh` `0.2.0-alpha.1`) on 2026-09-19.
 
 ## Environment and isolation
 
@@ -19,7 +19,9 @@ uses temporary databases/settings and removes them after each run. It does not
 edit host configuration or copy credentials. The hosts still use their own
 existing authentication, and Claude's tested OAuth setup requires its user
 settings source; that is part of the tested environment, not a portable auth
-claim.
+claim. Loading that source can also load existing user environment/settings or
+hooks. The tested user settings had no hooks, but the probe does not certify
+isolation from arbitrary user or managed configuration.
 
 ## Result matrix
 
@@ -29,9 +31,9 @@ claim.
 | Claude Code | 2.1.263 | **passed** | Actual CLI delivered `UserPromptSubmit -> PreToolUse -> Read -> PostToolUse`; the isolated SQLite ledger contained a run, ready task-evidence receipt, succeeded outcome, and zero labels. |
 | DeepSeek Harness | 0.1.2-rc.1 | **discovered, not exercised** | The installed native package entrypoint returned its version. No plugin was loaded and no `tools/pre-execute` or `tools/result` event was exercised. |
 
-Final sanitized timestamps were `2026-09-19T09:10:46.520Z` for Codex,
-`2026-09-19T09:11:26.074Z` for Claude, and
-`2026-09-19T09:11:55.710Z` for DeepSeek discovery.
+Final sanitized timestamps were `2026-09-19T09:25:06.854Z` for Codex,
+`2026-09-19T09:27:11.589Z` for Claude, and
+`2026-09-19T09:27:32.129Z` for DeepSeek discovery.
 
 ## What the passing probes establish
 
@@ -92,7 +94,7 @@ is on `PATH`.
 
 On the same committed code:
 
-- `npm run check`: 170 tests, 169 passed, 0 failed, 1 skipped. The skip is the
+- `npm run check`: 171 tests, 170 passed, 0 failed, 1 skipped. The skip is the
   Windows unprivileged recovery-input symlink case; it is not reported as a
   pass.
 - `node examples/workflow.mjs`: passed.
