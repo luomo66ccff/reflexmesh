@@ -16,6 +16,7 @@
     "check": "npm run typecheck && npm test",
     "publish:github": "node scripts/publish-github.mjs",
     "demo:durable": "npm run build && node examples/durable-shadow.mjs",
+    "compat:hosts": "npm run build && node scripts/real-host-compat.mjs",
     "mcp:stdio": "node adapters/mcp-server.mjs",
     "hook:claude": "node adapters/claude-hook.mjs",
     "recovery": "node adapters/recovery-cli.mjs",
