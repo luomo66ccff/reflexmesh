@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { fromClaudeHook } from '../dist/index.js';
+import { isDirectRun } from './direct-run.mjs';
 import { oneJson } from './stdio.mjs';
 import { openLocalBoundary } from './local-config.mjs';
 
@@ -23,4 +22,4 @@ export async function main(input = process.stdin, output = process.stdout, error
   finally { kernel?.close(); }
   output.write('{}\n'); // Shadow failures do not change the host's existing permissions or tool result.
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();
+if (isDirectRun(import.meta.url)) await main();
