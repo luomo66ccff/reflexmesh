@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { record, validateCall } from '../dist/index.js';
+import { isDirectRun } from './direct-run.mjs';
 import { jsonLines } from './stdio.mjs';
 import { openLocalBoundary } from './local-config.mjs';
 
@@ -78,4 +77,4 @@ export async function serve(input = process.stdin, output = process.stdout, erro
   } catch { errors.write('ReflexMesh STDIO stopped: invalid input or local configuration/storage unavailable.\n'); process.exitCode = 1; }
   finally { kernel?.close(); }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await serve();
+if (isDirectRun(import.meta.url)) await serve();

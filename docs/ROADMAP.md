@@ -12,7 +12,10 @@ Updated for **v0.2.0-alpha.1**, 2026-09-18. See [ADR-0001](ADR-0001.md) for posi
 - [x] Normalize harness events and bind reported outcomes to exact action arguments.
 - [x] Add Codex advisory STDIO, Claude shadow hooks, source-matched DeepSeek observers and generic function-call middleware.
 - [x] Separate observations from independently supplied labels; add pure policy-only replay.
-- [x] Run 79 offline tests and both offline demos locally.
+- [x] Initial alpha baseline: 79 offline tests and both offline demos passed.
+- [x] Add local, preview-first recovery reviews with epoch/digest compare-and-set; preserve UNKNOWN tombstones.
+- [x] Add read-only inspection, transactional schema-2 migration and typed label validation.
+- [x] Add 32 focused recovery/label tests and a credential-free recovery demo; see [validation scope](VALIDATION-RECOVERY.md).
 - [ ] Run actual Codex, Claude Code and DeepSeek Harness applications with pinned versions.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 
@@ -22,7 +25,7 @@ Updated for **v0.2.0-alpha.1**, 2026-09-18. See [ADR-0001](ADR-0001.md) for posi
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 
-**Third gate: recovery and retention.** Add bounded operator reconciliation for UNKNOWN, crash-safe retention that preserves action tombstones, database migration tests, lease-budget validation and cancellation propagation. Audit storage and idempotency storage remain distinct concepts. No external exactly-once claim.
+**Third gate: recovery and retention.** Local operator review is now available ([runbook](RECOVERY.md)), including read-only preview, atomic review/audit and schema-1 migration tests. It records conclusions without authorizing retries or rewriting execution truth. Remaining work: independently authenticated operator evidence, crash-safe retention that preserves action tombstones, lease-budget validation and cancellation propagation. Audit storage and idempotency storage remain distinct concepts. No external exactly-once claim.
 
 ## v0.3: memory governance and calibrated comparison
 
