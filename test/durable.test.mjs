@@ -117,16 +117,27 @@ test('store rejects orphan outcomes', () => {
 
 for (const stage of ['admitted','executing']) test(`real process kill after ${stage} preserves admission safety`, { timeout: 7000 }, async t => {
   const path = await disk(t), marker = `${path}.effects`;
-  const child = fork(new URL('./fixtures/durable-worker.mjs', import.meta.url), [path, marker, stage], { stdio: ['ignore','ignore','ignore','ipc'] });
-  t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
-  await Promise.race([once(child, 'message'), once(child, 'exit').then(() => { throw new Error('Worker exited early'); })]);
-  child.kill('SIGKILL'); await once(child, 'exit'); await new Promise(r => setTimeout(r, 130));
-  const k = new SqliteKernel(path); let calls = 0;
-  const m = setup(k, { mode: 'active', authorize: () => true, leaseMs: 100 }).registerTool(readTool(async () => { calls++; return {}; }));
-  const r = await m.run(event({ id: 'crash-case' }), requestOptions());
-  if (stage === 'admitted') { assert.equal(r.status, 'succeeded'); assert.equal(calls, 1); }
-  else { assert.equal(r.status, 'recovery_required'); assert.equal(calls, 0); assert.equal((await readFile(marker, 'utf8')).trim(), 'one-effect'); }
-  k.close();
+  // A shared logical clock keeps scheduler latency from consuming either worker's lease.
+  // Advance it only after the real process kill to exercise the intended expiry transition.
+  const initialNow = 1_000_000, leaseMs = 100;
+  const child = fork(new URL('./fixtures/durable-worker.mjs', import.meta.url), [path, marker, stage, String(initialNow), String(leaseMs)], { stdio: ['ignore','ignore','ignore','ipc'] });
+  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
+  const [ready] = await Promise.race([once(child, 'message'), once(child, 'exit').then(() => { throw new Error('Worker exited early'); })]);
+  assert.equal(ready.where, stage === 'admitted' ? 'provider' : 'tool-body');
+  child.kill('SIGKILL'); await once(child, 'exit');
+  let now = initialNow;
+  const k = new SqliteKernel(path, { clock: () => now }); let calls = 0;
+  try {
+    const crashEvent = event({ id: 'crash-case' }), key = eventKey(crashEvent);
+    const crashed = k.recoverySnapshot(key);
+    assert.equal(crashed.state, stage); assert.equal(crashed.leaseExpired, false);
+    now = crashed.leaseUntil + 1;
+    assert.equal(k.recoverySnapshot(key).leaseExpired, true);
+    const m = setup(k, { mode: 'active', authorize: () => true, leaseMs }).registerTool(readTool(async () => { calls++; return {}; }));
+    const r = await m.run(crashEvent, requestOptions());
+    if (stage === 'admitted') { assert.equal(r.status, 'succeeded'); assert.equal(calls, 1); }
+    else { assert.equal(r.status, 'recovery_required'); assert.equal(calls, 0); assert.equal((await readFile(marker, 'utf8')).trim(), 'one-effect'); }
+  } finally { k.close(); }
 });
 
 test('simultaneous separate OS processes obtain only one admission', { timeout: 10000 }, async t => {

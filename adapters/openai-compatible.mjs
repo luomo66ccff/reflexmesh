@@ -1,9 +1,14 @@
 import { fromOpenAICompatible } from '../dist/index.js';
+import { resolveHostIntent } from './task-evidence.mjs';
 /** Host-owned execution remains exactly where it was. Observer errors never trigger retries. */
-export async function observeFunctionCall({ boundary, call, identity, execute, onError = () => {} }) {
+export async function observeFunctionCall({ boundary, call, identity, resolveIntent, execute, onError = () => {} }) {
   let normalized;
   const warn = () => { try { onError('reflexmesh_shadow_observation_failed'); } catch {} };
-  try { normalized = fromOpenAICompatible(call, identity); await boundary.before(normalized); } catch { warn(); }
+  try {
+    normalized = fromOpenAICompatible(call, identity);
+    const intent = resolveHostIntent(resolveIntent, normalized);
+    await boundary.before(normalized, intent);
+  } catch { warn(); }
   let output;
   try { output = await execute(); }
   catch (original) {

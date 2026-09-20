@@ -54,7 +54,11 @@ export function createMcpHandler(boundary) {
       if (tool.name !== 'reflexmesh_inspect_pack') validateCall(args.call);
       let result;
       switch (tool.name) {
-        case 'reflexmesh_assess': result = await boundary.before(args.call, args.userIntent ?? null); break;
+        case 'reflexmesh_assess':
+          result = typeof boundary.beforeReported === 'function'
+            ? await boundary.beforeReported(args.call, args.userIntent ?? null)
+            : await boundary.before(args.call, args.userIntent ?? null);
+          break;
         case 'reflexmesh_observe_outcome': result = await boundary.after(args.call, args.status, args.evidence, 'model-reported'); break;
         case 'reflexmesh_replay_policy': result = boundary.replay(args.call, args.candidatePack); break;
         default: result = boundary.inspectPack();

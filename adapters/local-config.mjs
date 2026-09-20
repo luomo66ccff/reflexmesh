@@ -4,9 +4,12 @@ import { homedir } from 'node:os';
 import { JevProvider, toolPreflightPack, ContractError } from '../dist/index.js';
 import { SqliteKernel } from './sqlite-kernel.mjs';
 import { ShadowBoundary } from './shadow-boundary.mjs';
+import { TaskAwareBoundary } from './task-boundary.mjs';
 
 /** Default is honest abstention: no key, network, synthetic probabilities or fabricated judgments. */
-export function openLocalBoundary(env = process.env) {
+export function openLocalBoundary(env = process.env, { taskAware = env.REFLEXMESH_TASK_EVIDENCE === 'true' } = {}) {
+  if (typeof taskAware !== 'boolean') throw new ContractError('Invalid task evidence mode');
+  if (env.REFLEXMESH_TASK_EVIDENCE !== undefined && !['true','false'].includes(env.REFLEXMESH_TASK_EVIDENCE)) throw new ContractError('Invalid task evidence configuration');
   const kind = env.REFLEXMESH_PROVIDER ?? 'abstain';
   let provider, modelId, revision;
   if (kind === 'abstain') {
@@ -22,7 +25,8 @@ export function openLocalBoundary(env = process.env) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const kernel = new SqliteKernel(path);
   try {
-    const boundary = new ShadowBoundary({ kernel, provider,
+    const Boundary = taskAware ? TaskAwareBoundary : ShadowBoundary;
+    const boundary = new Boundary({ kernel, provider,
       binding: { providerId: provider.id, modelId, revision, calibrationRef: null, authorizationRevision: 'host-owned-shadow', toolsetRevision: 'host-owned-shadow' },
       pack: toolPreflightPack, tenantId: env.REFLEXMESH_TENANT ?? 'local', scope: env.REFLEXMESH_SCOPE ?? 'default',
     });
