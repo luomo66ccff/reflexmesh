@@ -194,7 +194,8 @@ test('oversized new hook input invalidates stale context across processes', asyn
   assert.equal(cache.current(scope()).summary, 'FIRST'); cache.close();
   const oversized = JSON.stringify(hook('UserPromptSubmit', { prompt: `ReflexMesh-Intent: SECOND\n${'x'.repeat(270000)}` }));
   assert.ok(Buffer.byteLength(oversized) > 270000);
-  const rejected = runHook(env, oversized);
+  // Isolate the adapter's stderr contract from Node 22's experimental SQLite warning.
+  const rejected = runHook({ ...env, NODE_NO_WARNINGS: '1' }, oversized);
   assert.equal(rejected.status, 0, rejected.stderr); assert.deepEqual(JSON.parse(rejected.stdout), {});
   assert.equal(rejected.stderr, 'ReflexMesh task observation unavailable; host behavior unchanged.\n');
   const observed = runHook(env, hook()); assert.equal(observed.status, 0, observed.stderr);
