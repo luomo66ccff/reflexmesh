@@ -2,8 +2,8 @@
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { pathToFileURL } from 'node:url';
 import { ContractError, record, fromClaudeHook } from '../dist/index.js';
+import { isDirectRun } from './direct-run.mjs';
 import { oneJson } from './stdio.mjs';
 import { openLocalBoundary } from './local-config.mjs';
 import { IntentCache } from './intent-cache.mjs';
@@ -72,4 +72,4 @@ export async function main(input = process.stdin, output = process.stdout, error
   }
   output.write('{}\n');
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();
+if (isDirectRun(import.meta.url)) await main();
