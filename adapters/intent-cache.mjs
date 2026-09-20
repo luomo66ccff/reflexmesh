@@ -72,6 +72,7 @@ export class IntentCache {
     });
   }
   clear(scope) { const key = this.#key(scope); return this.#tx(() => this.#db.prepare('DELETE FROM intents WHERE key=?').run(key).changes); }
+  clearNamespace() { return this.#tx(() => this.#db.prepare('DELETE FROM intents WHERE namespace=?').run(this.#namespace()).changes); }
   clearSession(scope) {
     const identity = validateIntentScope(scope);
     return this.#tx(() => this.#db.prepare('DELETE FROM intents WHERE namespace=? AND session_digest=?').run(this.#namespace(), this.#session(identity)).changes);

@@ -186,11 +186,27 @@ test('invalid new prompt clears previous context across processes', async t => {
   runHook(env, hook('UserPromptSubmit', { prompt: 'New task without explicit selection' })); runHook(env, hook());
   const { boundary, kernel } = openLocalBoundary(env, { taskAware: true }); assert.equal(boundary.inspect(call()).evidence.taskEvidence.status, 'missing'); kernel.close();
 });
+test('oversized new hook input invalidates stale context across processes', async t => {
+  const dir = await temporary(t), env = environment(dir);
+  const first = runHook(env, hook('UserPromptSubmit', { prompt: 'ReflexMesh-Intent: FIRST' }));
+  assert.equal(first.status, 0, first.stderr);
+  let cache = new IntentCache(env.REFLEXMESH_INTENT_DB, { tenantId: 't', scope: 'p' });
+  assert.equal(cache.current(scope()).summary, 'FIRST'); cache.close();
+  const oversized = JSON.stringify(hook('UserPromptSubmit', { prompt: `ReflexMesh-Intent: SECOND\n${'x'.repeat(270000)}` }));
+  assert.ok(Buffer.byteLength(oversized) > 270000);
+  const rejected = runHook(env, oversized);
+  assert.equal(rejected.status, 0, rejected.stderr); assert.deepEqual(JSON.parse(rejected.stdout), {});
+  assert.equal(rejected.stderr, 'ReflexMesh task observation unavailable; host behavior unchanged.\n');
+  const observed = runHook(env, hook()); assert.equal(observed.status, 0, observed.stderr);
+  const { boundary, kernel } = openLocalBoundary(env, { taskAware: true }); const row = boundary.inspect(call());
+  assert.equal(row.evidence.taskEvidence.status, 'missing'); assert.equal(row.result.provider, undefined); kernel.close();
+});
 test('malformed, oversized or unknown task-hook input never prints payload or changes host permissions', async t => {
   const env = environment(await temporary(t));
   for (const payload of ['SECRET_NOT_JSON', 'x'.repeat(270000), hook('UnknownHook', { prompt: 'SECRET' })]) {
     const r = runHook(env, payload); assert.equal(r.status, 0); assert.deepEqual(JSON.parse(r.stdout), {}); assert.ok(!r.stderr.includes('SECRET'));
   }
+  await assert.rejects(readFile(env.REFLEXMESH_INTENT_DB), { code: 'ENOENT' });
 });
 test('failure and session-end lifecycle clears only configured scope', async t => {
   const dir = await temporary(t), env = environment(dir);
