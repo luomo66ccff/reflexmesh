@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -24,7 +24,9 @@ function fixture(t, scope = 'project') {
   const boundary = new ShadowBoundary({ kernel, provider: new MockProvider(result), binding, pack: toolPreflightPack, tenantId: 'tenant', scope });
   return { kernel, boundary };
 }
-const disk = async t => { const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-adapters-')); t.after(() => rm(dir, { recursive: true, force: true })); return join(dir, 'state.sqlite'); };
+const temporaryDirectories = new Set();
+after(async () => { for (const dir of temporaryDirectories) await rm(dir, { recursive: true, force: true }); });
+const disk = async () => { const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-adapters-')); temporaryDirectories.add(dir); return join(dir, 'state.sqlite'); };
 const envFor = path => ({ PATH: process.env.PATH, REFLEXMESH_DB: path, REFLEXMESH_PROVIDER: 'abstain', REFLEXMESH_TENANT: 'test', REFLEXMESH_SCOPE: 'test' });
 const rpc = (id, method, params) => ({ jsonrpc: '2.0', id, method, ...(params ? { params } : {}) });
 const initialize = rpc(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'fixture', version: '1' } });
