@@ -62,6 +62,14 @@ indefinitely defer the defining question: does ReflexMesh still stand without Je
 
 **Third gate: recovery and retention.** Local operator review is now available ([runbook](RECOVERY.md)), including read-only preview, atomic review/audit and schema-1 migration tests. It records conclusions without authorizing retries or rewriting execution truth. Remaining work: independently authenticated operator evidence, crash-safe retention that preserves action tombstones, lease-budget validation and cancellation propagation. Audit storage and idempotency storage remain distinct concepts. No external exactly-once claim.
 
+**2026-09-22 operational increment:** independently labeled paired report tooling
+is now available, with a real same-route synthetic workflow smoke rather than a
+quality claim. The new [storage diagnostics](STORAGE-DIAGNOSTICS.md) provide
+bounded read-only table/state/pair-only coverage and file/page metadata before
+any retention design. Neither diagnostic closes the broader host, quality or
+operational gate. Actual reclamation and verified restore must preserve admission
+and pairing guards; no automatic deletion or UNKNOWN retry is introduced.
+
 ## v0.3: memory governance and calibrated comparison
 
 Connect the existing Memory Engine through an adapter, not a new memory database. Add read-time relevance/staleness/conflict assessment; enforce consent, tenant namespace, TTL and deletion in host code. Preserve competing facts and provenance rather than overwriting them on a model's opinion.

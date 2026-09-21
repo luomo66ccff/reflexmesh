@@ -382,7 +382,7 @@ head and its own CI before any merge.
   [validation t001](VALIDATION-INDEPENDENT-PROVIDER-T001.md) retain migration,
   model-alias, latency, quality and full-host exclusions. No paid demo in CI.
 
-## Current increment: paired provider comparison
+## Reviewed increment: paired provider comparison
 
 `feat/provider-comparison` is based on PR #15's
 `102bb5bd31ac08e61a61b7ed483956b2a752977b`, not merged main. That exact base's
@@ -416,6 +416,40 @@ evidence, not the new branch's CI. No existing PR is merged or retargeted.
   comparison. See [guide](PROVIDER-COMPARISON.md) and
   [validation t001](VALIDATION-PROVIDER-COMPARISON-T001.md).
 
+Published as [PR #16](https://github.com/luomo66ccff/reflexmesh/pull/16).
+Exact head `d6c23c439093da984b5a6e55d2a94dc5e7888dd7` passed
+[CI 35650186762](https://github.com/luomo66ccff/reflexmesh/actions/runs/35650186762):
+Ubuntu/Node 22 **676/676**, Windows/Node 22 and 24 **675 passed, one expected
+skip** each, plus all five offline demos. This remains historical base evidence
+for the next branch, not its CI.
+
+## Current increment: read-only storage diagnostics
+
+`feat/storage-diagnostics` is based on PR #16's `d6c23c4`, not merged main.
+No existing PR is merged or retargeted. Verify the new published head's own CI.
+
+- `evidence storage --db PATH [--scan-limit N] [--json]` reports one bounded
+  schema-1/2/3 SQL snapshot, run/pair-only state samples and separate main/WAL/
+  SHM logical file lengths. Truncated totals and unsupported schema tables are
+  null, never invented zero counts; reusable pages are not reclaimable bytes.
+- Single read transactions, projection-error rollback, fixed metadata-only
+  queries and unchanged application rows/admission guards are regression-tested.
+  File observations are explicitly non-atomic with SQL, read-only does not
+  imply filesystem immutability, and lstat does not attest SQLite's own access.
+- `demo:storage` provides an account-free synthetic completed/reviewed-UNKNOWN/
+  pair-only lesson with optional new-only retained ledger. A real Windows/npm
+  space-path forwarding failure was retained; direct quoted Node entrypoints
+  work and are documented/tested rather than reconstructing split arguments.
+- Windows Node 22.23.2 and 24.19.0 full checks: **699 tests, 698 passed, zero
+  failed, one expected skip** each. **23/23 new regressions**, six offline demos
+  on each Node version, clean `b1a42a9` focused tests and public persisted-ledger
+  readback passed. Scoped independent review/root verification found no P1/P2
+  within the new boundaries. No paid requests or real user-ledger cleanup ran.
+- This is diagnostic capability, not garbage collection, space reclamation,
+  authenticated review, backup/restore or closure of the operational gate.
+  [Guide](STORAGE-DIAGNOSTICS.md) and
+  [validation t001](VALIDATION-STORAGE-DIAGNOSTICS-T001.md) preserve exclusions.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
@@ -423,13 +457,14 @@ evidence, not the new branch's CI. No existing PR is merged or retargeted.
 | Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
-| Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
+| Safe operations | Read-only schema/table/pair-only storage diagnostics are implemented with explicit truncation and filesystem limits. Actual retention/space reclamation preserving idempotency and pairing guards, verified backup/restore, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing remain open. |
 | Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 The independently labeled, separately bound comparison/report workflow is now
 implemented with an explicit provenance and descriptive-only boundary. Next,
-prioritize safe operational retention/review and remaining lifecycle evidence;
+prioritize safe operational retention/review beyond the implemented diagnostics
+and remaining lifecycle evidence;
 newly discovered lifecycle blockers take priority. Real comparative quality
 requires suitable independent labels and distinct approved provider routes,
 not repeated same-model synthetic calls. This sequence does not certify the broad host gate
