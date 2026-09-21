@@ -63,6 +63,13 @@ the new-directory-only create/verify workflow. Whole-file checks retain UNKNOWN
 and pairing evidence but never authorize replacing a current ledger or retrying
 an action. See the [backup guide](docs/LEDGER-BACKUP.md).
 
+Need to reclaim already-free SQLite pages without losing history?
+`npm run demo:compaction` shows backup-bound preview and explicit maintenance,
+with all seven logical tables and no-retry guards preserved. It is physical
+compaction, not age-based deletion or secure erasure. Use
+`node adapters/compaction-cli.mjs --help` and the
+[compaction guide](docs/LEDGER-COMPACTION.md) before a real local rewrite.
+
 Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 [read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
 installation and configuration prerequisites and prints a configuration snippet
@@ -130,6 +137,7 @@ that concurrency; this setting does not serialize the production runtime.
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Storage diagnostics | Read-only schema-1/2/3 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
 | Consistent ledger archives | Native SQLite online backup into a new private directory, offline integrity/hash verification and synthetic isolated restore/no-retry lesson; no production overwrite restore |
+| Ledger compaction | Backup-bound preview, exclusive maintenance and complete logical-content verification; explicit local VACUUM, no historical row deletion or automatic retry |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 

@@ -13,6 +13,7 @@ import { openLocalBoundary } from '../adapters/local-config.mjs';
 import plugin from '../adapters/deepseek-loader-plugin.mjs';
 import { fromClaudeHook } from '../dist/index.js';
 import { createLedgerBackup } from '../adapters/backup.mjs';
+import { applyLedgerCompaction } from '../adapters/compaction.mjs';
 
 assert.equal(process.versions.node, '22.16.0', 'Use the pinned affected Node only');
 const runtime = inspectSqliteRuntime();
@@ -48,6 +49,10 @@ try {
   const archiveDir = join(root, 'blocked-backup');
   await assert.rejects(createLedgerBackup({ dbPath: historical, outDir: archiveDir }), blocked);
   assert.equal(existsSync(archiveDir), false); assertions++;
+  const compactionDir = join(root, 'blocked-compaction');
+  await assert.rejects(applyLedgerCompaction({ dbPath: historical, backupDirectory: archiveDir,
+    planDirectory: compactionDir, quiescent: true }), blocked);
+  assert.equal(existsSync(compactionDir), false); assert.deepEqual(readFileSync(historical), bytes); assertions++;
 
   const run = (entry, args = [], extra = {}) => spawnSync(process.execPath,
     [fileURLToPath(new URL(`../adapters/${entry}`, import.meta.url)), ...args],

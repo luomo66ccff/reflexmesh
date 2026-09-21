@@ -84,6 +84,22 @@ This is not production restore authorization, authenticated freshness or closure
 of the operational gate. Next: design retention/review that preserves admission
 and pairing guards; never overwrite a live ledger or discard newer tombstones.
 
+**2026-09-22 all-record compaction:** an explicit backup-bound preview/apply
+workflow now reclaims existing free pages/fragmentation under exclusive local
+maintenance while retaining all logical rows and no-retry/pairing guards.
+[Guide](LEDGER-COMPACTION.md) and [validation](VALIDATION-LEDGER-COMPACTION-T001.md)
+separate actual synthetic main-file shrinkage from physical allocation, secure
+erasure and historical deletion. No schema migration is needed for this step.
+
+**Next retention dependency:** introduce explicit archival coverage and batch
+receipts before pruning any logical evidence. Start with audit archival, then
+design ID/body/version tombstones wherever observations, labels, reviews or packs
+currently reject duplicate/conflicting admissions. Runs/results and pair-only
+guards cannot simply expire. Schema/readers/backup/recovery must distinguish
+archived evidence from never-recorded evidence before an actual-delete command
+is shipped. Compaction provides maintenance locking and verification, not a
+substitute for this still-open product capability.
+
 ## v0.3: memory governance and calibrated comparison
 
 Connect the existing Memory Engine through an adapter, not a new memory database. Add read-time relevance/staleness/conflict assessment; enforce consent, tenant namespace, TTL and deletion in host code. Preserve competing facts and provenance rather than overwriting them on a model's opinion.

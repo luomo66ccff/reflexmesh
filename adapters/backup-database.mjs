@@ -75,7 +75,7 @@ function indexColumns(db, name) {
 }
 
 /** Metadata/constraint recognition only; never parses user evidence or claims semantic correctness. */
-function recognizedSchema(db) {
+export function recognizedSchema(db) {
   const version = db.prepare('PRAGMA user_version').get()?.user_version;
   check([1, 2, 3].includes(version), 'backup_schema_unrecognized');
   const expected = tableNames(version);

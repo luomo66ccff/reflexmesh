@@ -5,6 +5,10 @@ must not be casually discarded?” without a cleanup or retry command. This
 is an operational retention diagnostic, **not implemented garbage collection
 or a claim that space can safely be reclaimed**.
 
+For a separate explicit maintenance operation, the [compaction workflow](LEDGER-COMPACTION.md)
+can reclaim already-free pages while preserving every logical record. Storage
+diagnostics themselves remain read-only and do not authorize that rewrite.
+
 ## Start without an account
 
 ```bash
@@ -136,5 +140,7 @@ can themselves be sensitive: protect the database and reports with local ACLs.
 For actual space pressure, an independently designed, authorized retention/
 backup plan must preserve idempotency and pairing guards. Do not copy only a
 live WAL database's main file, remove sidecars, reset schema versions or discard
-UNKNOWN to make storage appear healthy. Space reclamation, verified backup/
-restore, authenticated recovery and full load/privacy acceptance remain open.
+UNKNOWN to make storage appear healthy. Consistent backup/verification and
+explicit all-record compaction now have separate workflows; production restore,
+historical retention, authenticated recovery and full load/privacy acceptance
+remain open.
