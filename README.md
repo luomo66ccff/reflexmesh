@@ -56,6 +56,13 @@ from disk-space reclamation. `npm run demo:storage` explains it without an
 account. This is read-only diagnosis, not cleanup; see the
 [storage guide](docs/STORAGE-DIAGNOSTICS.md).
 
+Need a consistent archive before an operational change? `npm run demo:backup`
+shows a live-WAL synthetic backup, isolated restore and a stale-snapshot
+counterexample without an account. `node adapters/backup-cli.mjs --help` gives
+the new-directory-only create/verify workflow. Whole-file checks retain UNKNOWN
+and pairing evidence but never authorize replacing a current ledger or retrying
+an action. See the [backup guide](docs/LEDGER-BACKUP.md).
+
 Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 [read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
 installation and configuration prerequisites and prints a configuration snippet
@@ -122,6 +129,7 @@ that concurrency; this setting does not serialize the production runtime.
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Storage diagnostics | Read-only schema-1/2/3 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
+| Consistent ledger archives | Native SQLite online backup into a new private directory, offline integrity/hash verification and synthetic isolated restore/no-retry lesson; no production overwrite restore |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 

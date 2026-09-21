@@ -36,6 +36,7 @@ jobs:
       - run: npm run demo:evidence
       - run: npm run demo:comparison
       - run: npm run demo:storage
+      - run: npm run demo:backup
   affected-runtime-negative:
     strategy:
       fail-fast: false

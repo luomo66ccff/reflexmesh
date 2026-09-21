@@ -12,6 +12,7 @@ import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { openLocalBoundary } from '../adapters/local-config.mjs';
 import plugin from '../adapters/deepseek-loader-plugin.mjs';
 import { fromClaudeHook } from '../dist/index.js';
+import { createLedgerBackup } from '../adapters/backup.mjs';
 
 assert.equal(process.versions.node, '22.16.0', 'Use the pinned affected Node only');
 const runtime = inspectSqliteRuntime();
@@ -44,6 +45,9 @@ try {
   const pluginDir = join(root, 'loader');
   await assert.rejects(plugin.apply({}, { dbPath: join(pluginDir, 'ledger.sqlite'), tenantId: 'synthetic', scope: 'runtime' }), blocked);
   assert.equal(existsSync(pluginDir), false); assertions++;
+  const archiveDir = join(root, 'blocked-backup');
+  await assert.rejects(createLedgerBackup({ dbPath: historical, outDir: archiveDir }), blocked);
+  assert.equal(existsSync(archiveDir), false); assertions++;
 
   const run = (entry, args = [], extra = {}) => spawnSync(process.execPath,
     [fileURLToPath(new URL(`../adapters/${entry}`, import.meta.url)), ...args],

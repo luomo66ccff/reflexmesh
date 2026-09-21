@@ -76,8 +76,13 @@ version probe now blocks affected/unknown persistent writers before ledger
 creation/migration, while preserving read-only diagnosis. Both doctors and a
 build-free [runtime preflight](SQLITE-RUNTIME.md) explain manual upgrade/restart.
 Pinned old-runtime negative tests complement supported Node 22/24 suites.
-Next: consistent backup and isolated restore verification before retention;
-never overwrite a live ledger or lose newer admission tombstones.
+The subsequent [consistent backup increment](LEDGER-BACKUP.md) captures a pinned
+WAL snapshot into a new standalone archive, verifies it offline and exercises
+isolated synthetic restoration with replay/UNKNOWN/pairing guards intact.
+It also demonstrates that a valid old archive lacks newer admission tombstones.
+This is not production restore authorization, authenticated freshness or closure
+of the operational gate. Next: design retention/review that preserves admission
+and pairing guards; never overwrite a live ledger or discard newer tombstones.
 
 ## v0.3: memory governance and calibrated comparison
 

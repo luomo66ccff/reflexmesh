@@ -2,6 +2,11 @@
 
 This follow-up to Durable Shadow Protocol adds **operator review**, not automatic retry, rollback, compensation or a replacement for authorization. It is an alpha feature for a private local SQLite database. The original in-memory runtime and the Codex/Claude/DeepSeek shadow boundaries are unchanged.
 
+For a consistent local archive before an operational change, use the separate
+[ledger backup create/verify workflow](LEDGER-BACKUP.md). It never overwrites a
+current ledger or turns a valid older snapshot into restoration authority;
+newer admission/pairing guards and external effects still require reconciliation.
+
 ## Operational meaning
 
 Two facts remain separate:
