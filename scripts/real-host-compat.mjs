@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 import { AGENT_EVIDENCE, evaluateAgentProbeOutput } from './deepseek-agent-contract.mjs';
+import { LIFECYCLE_EVIDENCE, evaluateLifecycleProbeOutput } from './deepseek-lifecycle-contract.mjs';
 
 const HOSTS = new Set(['codex', 'claude', 'deepseek', 'all']);
 const CODEX_MARKER = 'REFLEXMESH_CODEX_COMPAT_OK';
@@ -94,8 +95,8 @@ export function parseArgs(argv, defaults = {}) {
     else parsed[scalar] = current.value;
   }
   if (!HOSTS.has(parsed.host)) throw new Error('invalid_host');
-  if (!['native', 'agent-cli'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
-  if (parsed.deepseekMode === 'agent-cli' && !parsed.deepseekPackageRoot) throw new Error('deepseek_package_root_required');
+  if (!['native', 'agent-cli', 'lifecycle-matrix'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
+  if (parsed.deepseekMode !== 'native' && !parsed.deepseekPackageRoot) throw new Error('deepseek_package_root_required');
   parsed.timeoutMs = boundedInteger(String(parsed.timeoutMs), 'timeout_ms', 1_000, 600_000);
   parsed.versionTimeoutMs = boundedInteger(String(parsed.versionTimeoutMs), 'version_timeout_ms', 500, 60_000);
   parsed.stdoutLimitBytes = boundedInteger(String(parsed.stdoutLimitBytes), 'stdout_limit_bytes', 1_024, 16 * 1024 * 1024);
@@ -653,13 +654,17 @@ export function evaluateDeepSeekProbeOutput(stdout) {
 async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   const host = 'deepseek';
   const agentMode = options.deepseekMode === 'agent-cli';
-  const requestedLevel = agentMode ? 'cli_agent_loop' : 'native_tool_pipeline';
-  const extra = { ...(agentMode ? AGENT_EVIDENCE : { agentE2E: false, classification: 'synthetic_classification' }),
+  const lifecycleMode = options.deepseekMode === 'lifecycle-matrix';
+  const agentLike = agentMode || lifecycleMode;
+  const requestedLevel = lifecycleMode ? 'cli_agent_lifecycle_matrix' : agentMode ? 'cli_agent_loop' : 'native_tool_pipeline';
+  const extra = { ...(lifecycleMode ? LIFECYCLE_EVIDENCE : agentMode ? AGENT_EVIDENCE
+    : { agentE2E: false, classification: 'synthetic_classification' }),
     evidenceLevel: 'none', requestedEvidenceLevel: requestedLevel,
-    ...(agentMode ? { agentLoopExercised: false } : {}) };
+    ...(agentLike ? { agentLoopExercised: false } : {}) };
   const spec = processSpec(options.nodeCommand, options.nodeCommandArgs, 'node', process.env);
   if (!spec) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'node_command_not_found', [], started, extra);
-  const script = agentMode ? 'deepseek-agent-probe.mjs' : 'deepseek-runtime-probe.mjs';
+  const script = lifecycleMode ? 'deepseek-lifecycle-probe.mjs'
+    : agentMode ? 'deepseek-agent-probe.mjs' : 'deepseek-runtime-probe.mjs';
   const child = await runBounded(spec.executable, [...spec.prefixArgs, join(options.repoRoot, 'scripts', script), options.deepseekPackageRoot], {
     cwd: options.repoRoot,
     env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR },
@@ -671,13 +676,14 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   if (!child.ok && !(child.kind === 'nonzero_exit' && typeof child.stdout === 'string')) {
     return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', processFailureReason(child), [], started, extra);
   }
-  const assessed = agentMode ? evaluateAgentProbeOutput(child.stdout) : evaluateDeepSeekProbeOutput(child.stdout);
+  const assessed = lifecycleMode ? evaluateLifecycleProbeOutput(child.stdout)
+    : agentMode ? evaluateAgentProbeOutput(child.stdout) : evaluateDeepSeekProbeOutput(child.stdout);
   if (!assessed) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_output_invalid', [], started, extra);
   if (child.ok !== (assessed.status === 'passed')) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_exit_mismatch', [], started, extra);
   const hostVersion = assessed.version === 'unknown' ? 'unknown' : `DeepSeek Harness ${assessed.version}`;
   return hostReport(host, testedAt, hostVersion, adapterVersion, assessed.status, assessed.reason, assessed.assertions, started,
     { ...extra, evidenceLevel: assessed.status === 'passed' ? requestedLevel : 'none',
-      ...(agentMode ? { agentLoopExercised: assessed.status === 'passed' } : {}) });
+      ...(agentLike ? { agentLoopExercised: assessed.status === 'passed' } : {}) });
 }
 
 async function runDeepSeek(options, adapterVersion) {

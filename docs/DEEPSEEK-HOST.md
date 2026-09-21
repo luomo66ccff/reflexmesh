@@ -59,6 +59,12 @@ At most 256 accepted observations are tracked at once. Overflow emits a fixed
 diagnostic and skips that observation while still delegating to host policy.
 Unpaired result events are ignored; they cannot invent an admission record.
 
+At result notification, current identity and a bounded private result copy are
+captured synchronously; later listener changes cannot rewrite the queued
+observation. Native post-dispatch `ABORTED` is recorded as reported unknown,
+not proof of an effect-free failure. See the [lifecycle guide](DEEPSEEK-LIFECYCLE.md)
+for the mapping, migration boundary and optional installed-host scenarios.
+
 Duplicate calls can reuse a semantic decision and deduplicate observations.
 They **do not** prevent DeepSeek from executing a tool twice: this is a shadow
 observer, not a host execution lock.

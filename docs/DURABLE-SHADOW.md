@@ -131,6 +131,14 @@ await observer.dispose();
 
 `tools/pre-execute(exec,next)` observes `exec.callId`, `exec.name`, **`exec.arguments`**, then delegates with `next()`; it does not return a replacement allow decision. `tools/result(exec,result)` is a synchronous final-outcome observer, not the post-execute waterfall. It queues bounded observation work and exposes `flush`/`dispose`. Host result and permission decisions remain owned by DeepSeek. Errors are reported using fixed diagnostic codes. Queue overflow records a diagnostic and drops that observation instead of growing without bound.
 
+The observer captures current identity, normalized call and a private bounded
+result snapshot inside that synchronous notification, before later host
+listeners can change them. Native `isError:true` with `error.info.code:ABORTED`
+means post-dispatch cancellation and is recorded as harness-reported `unknown`.
+Other host error results remain reported failures, not proof of no side
+effects. Existing historical rows are not rewritten. See
+[DeepSeek lifecycle checks](DEEPSEEK-LIFECYCLE.md).
+
 The host must resolve authenticated session/agent identity. We deliberately do not guess a version-dependent `exec.agent.session` field or serialize the live context. Callback fixtures cover the reviewed tools source (Git blob `6be7be61e257cd9e38c8a3122298316bf3df9892`). A separate [Cordis plugin wrapper and opt-in probe](DEEPSEEK-HOST.md) now exercise the installed 0.1.2-rc.1 native tool pipeline; classification remains synthetic. CLI profile loading, actual Agent identity propagation, and model E2E remain release gates. The observer does not automatically extract the user request from the agent context; supply such evidence explicitly before evaluating intent-match quality.
 
 ## Generic function-call harnesses

@@ -60,9 +60,14 @@ on Ubuntu/Node 22 and Windows/Node 22/24 after a test-only SQLite-warning fix.
 - Setup and honest evidence limits: [guide](DEEPSEEK-AGENT.md) and
   [validation](VALIDATION-AGENT-LIFECYCLE.md). Earlier reports remain unchanged.
 
-## Current increment: first-run diagnosis and isolated real-model evidence
+## Reviewed increment: first-run diagnosis and isolated real-model evidence
 
-`feat/first-run-doctor` is based on PR #5's `a3dfe39` head, not merged main.
+[PR #6](https://github.com/luomo66ccff/reflexmesh/pull/6),
+`feat/first-run-doctor`, is based on PR #5's `a3dfe39` head, not merged main.
+Exact head `7811d35a6ebe5565c80c614fe896906d7a9f0294` passed
+[CI 35613953280](https://github.com/luomo66ccff/reflexmesh/actions/runs/35613953280):
+Ubuntu/Node 22 passed 220/220 tests; Windows/Node 22 and 24 each passed 219 with
+one expected symlink skip. All four offline demos passed in all three jobs.
 
 - New `npm run doctor -- --help` entrypoint works before build, checks explicit
   installation/configuration, and prints a safely escaped Loader insertion.
@@ -83,11 +88,33 @@ on Ubuntu/Node 22 and Windows/Node 22/24 after a test-only SQLite-warning fix.
   one isolated model-driven tool round trip, not the whole lifecycle gate or
   a second ReflexMesh decision provider.
 
+## Current increment: DeepSeek cancellation-safe lifecycle evidence
+
+`feat/deepseek-lifecycle-matrix` is based on PR #6's `7811d35`, not main.
+
+- Native post-dispatch `ABORTED` now produces harness-reported unknown instead
+  of collapsing cancellation into plain failure. Current identity/call/result are captured during
+  synchronous result notification, before later listeners can change them.
+- Doctor warns for unknown host outcomes even when a shadow decision has
+  completed. No execution permission, automatic retry, labels or historical
+  data migration were added.
+- Root reproduced three observer ordering/classification failures and one
+  missing diagnostic before fixing them; independent review checked the fixes.
+- New installed CLI/Agent `lifecycle-matrix` probe passed **17/17** after review:
+  overlapping tools and a single task replacement; body-entry cancellation,
+  unknown observation and followup in a new turn; exact bindings and cleanup.
+  Transport is synthetic, not a new real-model or default-profile claim.
+- Local full suite: **231 tests, 230 passed, 0 failed, 1 expected Windows skip**;
+  four offline demos passed. Previous installed probes passed 13/13 and 12/12.
+- [Lifecycle guide](DEEPSEEK-LIFECYCLE.md) and
+  [validation report](VALIDATION-DEEPSEEK-LIFECYCLE.md) record exact scope,
+  review corrections, migration limits and untested paths.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. Both isolated synthetic and one authorized real-model DeepSeek CLI/Agent paths are covered, not the full gate. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup coverage plus one separate authorized real-model round trip. Restart, subagents, timeout policy and the full cross-host gate remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |

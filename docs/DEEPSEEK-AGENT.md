@@ -141,3 +141,9 @@ passed one isolated Agent/tool round trip on the exact PR #5 baseline. It used
 the official DeepSeek adapter, two bounded remote requests and a synthetic
 in-memory reader. That one-off test does not change the account-free probe
 above, enable remote calls in doctor/CI, or certify an arbitrary user profile.
+
+For two additional installed-host scenarios covering concurrent tool bodies,
+task replacement, cancellation and followup, use the
+[lifecycle-matrix guide](DEEPSEEK-LIFECYCLE.md). These scenarios deliberately use
+synthetic model transport, retain zero labels and keep the full lifecycle gate
+open.

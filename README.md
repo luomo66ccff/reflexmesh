@@ -75,6 +75,12 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 
 **DeepSeek increments:** the installed 0.1.2-rc.1 native tool pipeline and isolated CLI/profile/Agent loop have been exercised. The reproducible repository probe uses a synthetic adapter and remains account-free. A separate authorized [real-model validation](docs/VALIDATION-DEEPSEEK-REAL-MODEL-T001.md) passed one isolated tool round trip using the official `deepseek-v4-flash` route (11/11 assertions, two requests). ReflexMesh itself remains abstaining; this is neither a second decision provider nor a default-profile or complete lifecycle certification. The [Loader setup guide](docs/DEEPSEEK-AGENT.md) avoids custom identity/lifecycle callbacks; the [programmatic plugin](docs/DEEPSEEK-HOST.md) remains available. See the [synthetic Agent-loop validation](docs/VALIDATION-AGENT-LIFECYCLE.md), [first-run doctor validation](docs/VALIDATION-FIRST-RUN.md), and [open acceptance gates](docs/ITERATION-STATE.md).
 
+DeepSeek post-dispatch cancellation now retains an unknown reported outcome.
+The optional [lifecycle check](docs/DEEPSEEK-LIFECYCLE.md) also exercises actual
+parallel tool bodies, task replacement and followup through the installed
+Agent loop with synthetic model transport. See its
+[dated verification and exclusions](docs/VALIDATION-DEEPSEEK-LIFECYCLE.md).
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.

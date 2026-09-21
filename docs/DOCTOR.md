@@ -60,6 +60,10 @@ assessment or permission. A completed decision is not a tool result, reported
 success is not a truth label, and conflicting/UNKNOWN outcomes never imply it
 is safe to retry.
 
+A completed shadow decision and an unknown reported host outcome can coexist.
+Doctor warns about that unknown outcome even when the decision row is completed;
+it does not turn the row into an execution tombstone or enable recovery/retry.
+
 ## Machine-readable output and limitations
 
 Add `--json` for the versioned report; use direct `node` or `npm run --silent`

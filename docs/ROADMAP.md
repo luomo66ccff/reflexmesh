@@ -25,6 +25,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Exercise DeepSeek's CLI profile Loader and actual Agent loop with an isolated synthetic model adapter, bound task receipt and observed plugin cleanup; see [validation](VALIDATION-AGENT-LIFECYCLE.md).
 - [x] Exercise one authorized isolated real-model DeepSeek Agent/tool round trip with bounded official transport; see [t001 evidence and limits](VALIDATION-DEEPSEEK-REAL-MODEL-T001.md).
 - [x] Add read-only DeepSeek first-run doctor separating prerequisites, historical evidence and unverified live loading; see [guide](DOCTOR.md).
+- [x] Preserve native DeepSeek post-dispatch cancellation as unknown and verify fixed installed-host parallel/task-replacement/cancel/followup scenarios with synthetic model transport; see [validation](VALIDATION-DEEPSEEK-LIFECYCLE.md).
 - [ ] Exercise default-profile compatibility and the broader lifecycle matrix; one isolated real-model result does not close this gate.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 

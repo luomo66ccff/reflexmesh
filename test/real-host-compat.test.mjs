@@ -41,7 +41,10 @@ test('argument parser accepts host and command/path overrides without command st
   assert.equal(parseArgs(['--host', 'deepseek']).deepseekPackageRoot, null);
   assert.equal(parseArgs(['--host', 'deepseek']).deepseekMode, 'native');
   assert.equal(parseArgs(['--host', 'deepseek', '--deepseek-mode', 'agent-cli', '--deepseek-package-root', '.']).deepseekMode, 'agent-cli');
+  assert.equal(parseArgs(['--host', 'deepseek', '--deepseek-mode', 'lifecycle-matrix', '--deepseek-package-root', '.']).deepseekMode,
+    'lifecycle-matrix');
   assert.throws(() => parseArgs(['--deepseek-mode', 'agent-cli']), /deepseek_package_root_required/);
+  assert.throws(() => parseArgs(['--deepseek-mode', 'lifecycle-matrix']), /deepseek_package_root_required/);
   assert.throws(() => parseArgs(['--deepseek-mode', 'guess']), /invalid_deepseek_mode/);
   assert.throws(() => parseArgs(['--host', 'other']), /invalid_host/);
   assert.throws(() => parseArgs(['--timeout-ms', '999999999']), /invalid_timeout_ms/);
