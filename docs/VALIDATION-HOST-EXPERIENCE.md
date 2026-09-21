@@ -88,8 +88,9 @@ complete the host lifecycle, retain their original task/next/cancellation
 assertions and bound test duration. No assertion was removed or timeout increased
 to disguise the wait. The final full run above passed.
 
-Exact-head remote CI is pending publication of this increment. Earlier baseline
-CI is not evidence for these changes.
+Exact-head remote CI is published on [PR #4 checks](https://github.com/luomo66ccff/reflexmesh/pull/4/checks).
+Match the check run's commit to the reviewed head before relying on its result;
+earlier baseline CI is not evidence for these changes.
 
 ## Explicit exclusions
 

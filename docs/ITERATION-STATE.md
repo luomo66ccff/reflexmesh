@@ -25,6 +25,10 @@ from what a host reports happened. Replaying policy must never run a tool.
 
 ## Current increment: host evidence experience
 
+Published for review as [PR #4](https://github.com/luomo66ccff/reflexmesh/pull/4).
+The original development worktree remains preserved; integration lives on
+`feat/host-evidence-experience`. Check the PR's exact-head CI before merging.
+
 - Read-only, bounded evidence `list` / `inspect`, including explanations,
   task coverage, outcome provenance, and recovery uncertainty.
 - Credential-free `demo:evidence` walkthrough, explicitly synthetic.
