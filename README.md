@@ -41,6 +41,12 @@ installation and configuration prerequisites and prints a configuration snippet
 without changing your profile or loading credentials. Historical ledger evidence
 is kept separate from the still-unverified live connection.
 
+Already have Claude Code 2.1.263 on Windows? `npm run compat:claude-local`
+checks a real native Read and hook/ledger lifecycle with **local synthetic
+Messages, no account and no model inference**. It also checks that an injected
+duplicate observer delivery blocks ambiguous evidence without stopping the
+native Read. See [setup, pinned support and isolation limits](docs/CLAUDE-LOCAL-LOOP.md).
+
 For the full development checks and other offline examples:
 
 ```bash
@@ -102,6 +108,9 @@ Repeated, missing, interrupted or conflicting observed pre-hooks cannot silently
 attach a later result to an older decision. Ambiguous historical reports remain
 visible with a pairing warning. This requires trusted host IDs and has explicit
 pre-reservation limits; see the [pairing and upgrade guide](docs/CLAUDE-HOOK-PAIRING.md).
+The installed Claude application has also been rechecked against this pairing
+protocol using the account-free [local transport probe](docs/VALIDATION-CLAUDE-LOCAL-LOOP.md).
+This is narrow actual-host evidence, not real-model or default-profile certification.
 
 ## Review an unknown execution
 

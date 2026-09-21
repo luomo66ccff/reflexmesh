@@ -66,6 +66,12 @@ invocation IDs and observable ordered hook delivery; that is an engineering
 assumption, not host-authentication proof. A current prompt identifier is not a
 replacement for an invocation nonce and must not reject legitimate late results.
 
+For a repeatable account-free check, the [installed-host local loop](CLAUDE-LOCAL-LOOP.md)
+uses real Claude 2.1.263 hook processes and native Read with synthetic localhost
+Messages. Its duplicate-delivery injection verifies ambiguity rejection without
+stopping the native action. It does not close default-profile, cancellation,
+subagent, parallel-tool or restart acceptance gates.
+
 Malformed/oversized JSON, invalid configuration, unavailable storage, a hook
 that never starts, or process death **before durable reservation** may leave no
 new marker. An unseen reused invocation cannot be detected from a later matching
