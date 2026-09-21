@@ -23,7 +23,7 @@ from what a host reports happened. Replaying policy must never run a tool.
 - Historical narrow Codex/Claude live probes remain dated evidence in
   [VALIDATION-REAL-HOSTS.md](VALIDATION-REAL-HOSTS.md), not a full host matrix.
 
-## Current increment: host evidence experience
+## Reviewed increment: host evidence experience
 
 Published for review as [PR #4](https://github.com/luomo66ccff/reflexmesh/pull/4).
 The original development worktree remains preserved; integration lives on
@@ -37,11 +37,31 @@ The original development worktree remains preserved; integration lives on
 - Actual validation, regressions found and evidence limits are recorded in
   [VALIDATION-HOST-EXPERIENCE.md](VALIDATION-HOST-EXPERIENCE.md).
 
+## Current increment: DeepSeek CLI and Agent-loop integration
+
+Integration continues on `feat/deepseek-agent-lifecycle`, based on the reviewed
+host-evidence branch. Do not assume either branch has merged; verify the current
+PR base, exact head and checks before any merge.
+
+- Loader-ready product entrypoint owns its ledger and awaits accepted outcomes
+  before closing it. No custom identity callback or implicit provider credential
+  lookup is needed. It remains shadow and abstain-only.
+- Default task capture is off. Explicit mode projects only a selected first-line
+  summary from the current producer-declared user inbox claim, scoped to the
+  actual Agent/session/turn/signal and bounded by TTL/capacity.
+- Root verification exercised the installed 0.1.2-rc.1 CLI, profile Loader, Agent
+  loop and ToolRuntime using a synthetic model adapter and fixed in-memory tool:
+  12/12 assertions, including actual Loader binding and exit-time cleanup proof.
+- Windows/Node 24 local check: 208 tests, 207 passed, one intentional symlink
+  skip. Real-model inference remains untested, not implied by this result.
+- Setup and honest evidence limits: [guide](DEEPSEEK-AGENT.md) and
+  [validation](VALIDATION-AGENT-LIFECYCLE.md). Earlier reports remain unchanged.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | DeepSeek CLI profile + Agent loop; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. |
+| Actual host lifecycle | Authorized DeepSeek real-model E2E and default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. The isolated synthetic CLI/Agent path is now covered, not the full gate. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |

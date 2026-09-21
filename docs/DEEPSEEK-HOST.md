@@ -4,6 +4,10 @@ The observer can be mounted as a Cordis plugin. It leaves permission decisions
 and tool execution with DeepSeek. It neither changes an agent loop nor installs
 itself into a user's profile.
 
+For an opt-in profile entrypoint that owns its ledger and resolves actual Agent
+identity without custom callbacks, see [CLI/Agent integration](DEEPSEEK-AGENT.md).
+The programmatic integration and native tool-only probe below remain distinct.
+
 ## Explicit, host-owned wiring
 
 Build ReflexMesh first. Inside trusted host integration code, provide an

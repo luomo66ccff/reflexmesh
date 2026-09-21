@@ -57,7 +57,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
 | Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
 | Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
-| DeepSeek Harness | Cordis plugin + `tools/pre-execute` / `tools/result` observer; preserves `next()` and supports async disposal; native tool pipeline tested, Agent E2E still open |
+| DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; native CLI/Agent loop tested using a synthetic model adapter; real-model E2E still open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
@@ -67,7 +67,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 
 **Historical CLI baseline (2026-09-19):** Codex CLI 0.155.0-alpha.9.2 passed an isolated STDIO MCP smoke, and Claude Code 2.1.263 passed a prompt/hook/read/outcome path with zero labels. Those paths were not rerun for this increment. See [VALIDATION-REAL-HOSTS.md](docs/VALIDATION-REAL-HOSTS.md) for exact assertions and untested boundaries. Codex/Claude opt-in probes may invoke a logged-in host/model; they are not part of offline CI.
 
-**DeepSeek increment:** the installed 0.1.2-rc.1 native tool pipeline can now load the observer via Cordis and exercise a synthetic task without loading a user profile or model. This is **not CLI/Agent/model E2E**. See the [plugin guide](docs/DEEPSEEK-HOST.md), [increment validation](docs/VALIDATION-HOST-EXPERIENCE.md), and [open acceptance gates](docs/ITERATION-STATE.md).
+**DeepSeek increments:** the installed 0.1.2-rc.1 native tool pipeline and isolated CLI/profile/Agent loop have been exercised. The latter uses an in-memory synthetic model adapter and fixed-value tool, with ReflexMesh abstaining: **no real model inference or real-model E2E claim**. The [Loader setup guide](docs/DEEPSEEK-AGENT.md) avoids custom identity/lifecycle callbacks; the [programmatic plugin](docs/DEEPSEEK-HOST.md) remains available. See the [Agent-loop validation](docs/VALIDATION-AGENT-LIFECYCLE.md), [earlier tool-pipeline validation](docs/VALIDATION-HOST-EXPERIENCE.md), and [open acceptance gates](docs/ITERATION-STATE.md).
 
 ## Review an unknown execution
 

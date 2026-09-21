@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { AGENT_ASSERTIONS, AGENT_EVIDENCE, evaluateAgentProbeOutput } from '../scripts/deepseek-agent-contract.mjs';
 import {
   evaluateClaudeJsonl,
   evaluateCodexJsonl,
@@ -38,6 +39,10 @@ test('argument parser accepts host and command/path overrides without command st
   const deepseek = parseArgs(['--host', 'deepseek', '--deepseek-package-root', '.']);
   assert.equal(deepseek.deepseekPackageRoot, process.cwd());
   assert.equal(parseArgs(['--host', 'deepseek']).deepseekPackageRoot, null);
+  assert.equal(parseArgs(['--host', 'deepseek']).deepseekMode, 'native');
+  assert.equal(parseArgs(['--host', 'deepseek', '--deepseek-mode', 'agent-cli', '--deepseek-package-root', '.']).deepseekMode, 'agent-cli');
+  assert.throws(() => parseArgs(['--deepseek-mode', 'agent-cli']), /deepseek_package_root_required/);
+  assert.throws(() => parseArgs(['--deepseek-mode', 'guess']), /invalid_deepseek_mode/);
   assert.throws(() => parseArgs(['--host', 'other']), /invalid_host/);
   assert.throws(() => parseArgs(['--timeout-ms', '999999999']), /invalid_timeout_ms/);
   assert.throws(() => parseArgs(['--unknown', 'secret-value']), /unknown_option/);
@@ -63,6 +68,32 @@ test('DeepSeek runtime evidence parser rejects claims without exact native pipel
   assert.equal(evaluateDeepSeekProbeOutput('not-json'), null);
 });
 
+test('CLI Agent-loop receipt cannot claim real inference or forward unverified child fields', () => {
+  const report = { schemaVersion: 1, ...AGENT_EVIDENCE, agentLoopExercised: true,
+    hostVersion: '0.1.2-rc.1', status: 'passed', reason: 'cli_agent_loop_passed',
+    assertions: AGENT_ASSERTIONS.map(name => ({ name, passed: true, debug: 'DO_NOT_FORWARD' })),
+    rawPrompt: 'DO_NOT_FORWARD',
+  };
+  const assessed = evaluateAgentProbeOutput(JSON.stringify(report));
+  assert.equal(assessed.status, 'passed');
+  assert.equal(JSON.stringify(assessed).includes('DO_NOT_FORWARD'), false);
+  for (const replacement of [
+    { agentE2E: true }, { modelInference: true }, { agentLoopExercised: false },
+    { classification: 'calibrated' }, { modelTransport: 'real_model' },
+    { evidenceLevel: 'native_tool_pipeline' }, { hostVersion: '0.1.3' },
+    { assertions: report.assertions.slice(1) },
+    { assertions: [...report.assertions, { name: 'extra', passed: true }] },
+    { assertions: report.assertions.map((item, i) => i === 3 ? { ...item, passed: false } : item) },
+  ]) assert.equal(evaluateAgentProbeOutput(JSON.stringify({ ...report, ...replacement })), null);
+  assert.equal(evaluateAgentProbeOutput('not-json'), null);
+  assert.equal(evaluateAgentProbeOutput(JSON.stringify({ ...report, status: 'failed', reason: 'PRIVATE_ERROR' })), null);
+  const failed = evaluateAgentProbeOutput(JSON.stringify({ ...report, status: 'failed', reason: 'agent_loop_failed' }));
+  assert.equal(failed.status, 'failed');
+  assert.ok(failed.assertions.every(item => item.passed === false));
+  assert.equal(evaluateAgentProbeOutput(JSON.stringify({ ...report, status: 'failed', reason: 'host_load_failed',
+    hostVersion: 'DO_NOT_FORWARD' })).version, 'unknown');
+});
+
 test('DeepSeek opt-in fails clearly for absent package without discovering or starting a model', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'rm-deepseek-absent-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -77,6 +108,46 @@ test('DeepSeek opt-in fails clearly for absent package without discovering or st
   const standalone = spawnSync(process.execPath, [script, join(directory, 'missing')], { encoding: 'utf8', timeout: 5000 });
   assert.equal(standalone.status, 1);
   assert.equal(JSON.parse(standalone.stdout).reason, 'host_package_missing');
+});
+
+test('Agent CLI mode keeps fixed missing-package diagnostics without a model claim', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'rm-agent-package-absent-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const report = await runCompatibilityProbe(parseArgs(['--host', 'deepseek', '--deepseek-mode', 'agent-cli',
+    '--deepseek-package-root', join(directory, 'missing'), '--node-command', process.execPath]));
+  assert.equal(report.status, 'failed');
+  assert.equal(report.reason, 'host_package_missing');
+  assert.equal(report.evidenceLevel, 'none');
+  assert.equal(report.results[0].requestedEvidenceLevel, 'cli_agent_loop');
+  assert.equal(report.agentLoopExercised, false);
+  assert.equal(report.agentE2E, false);
+  assert.equal(report.modelInference, false);
+  assert.equal(report.classification, 'abstain');
+});
+
+test('synthetic Agent receipt transport requires exit/status consistency and strips private fields', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'rm-agent-receipt-transport-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'synthetic-receipt.mjs');
+  const receipt = { schemaVersion: 1, ...AGENT_EVIDENCE, agentLoopExercised: true,
+    hostVersion: '0.1.2-rc.1', status: 'passed', reason: 'cli_agent_loop_passed',
+    assertions: AGENT_ASSERTIONS.map(name => ({ name, passed: true })), private: 'DO_NOT_FORWARD' };
+  const options = () => parseArgs(['--host', 'deepseek', '--deepseek-mode', 'agent-cli',
+    '--deepseek-package-root', directory, '--node-command', process.execPath, '--node-command-arg', path]);
+  // These are transport fixtures, not evidence that an installed Agent ran.
+  for (const [value, exitCode, expected] of [
+    [receipt, 0, 'cli_agent_loop_passed'], [receipt, 1, 'probe_exit_mismatch'],
+    [{ ...receipt, status: 'failed', reason: 'agent_loop_failed' }, 1, 'agent_loop_failed'],
+    [{ ...receipt, modelInference: true }, 0, 'probe_output_invalid'],
+  ]) {
+    await writeFile(path, `process.stdout.write(${JSON.stringify(JSON.stringify(value))}); process.exitCode=${exitCode};`);
+    const report = await runCompatibilityProbe(options());
+    assert.equal(report.reason, expected);
+    assert.equal(report.agentE2E, false);
+    assert.equal(report.modelInference, false);
+    assert.equal(JSON.stringify(report).includes('DO_NOT_FORWARD'), false);
+    if (expected !== 'cli_agent_loop_passed') assert.equal(report.evidenceLevel, 'none');
+  }
 });
 
 test('DeepSeek opt-in rejects an unsupported package version before loading modules', async t => {
