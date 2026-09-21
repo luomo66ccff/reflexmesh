@@ -77,6 +77,16 @@ start with `npm run demo:deepseek -- --help` and the
 without `--execute` and explicit remote/key/model/revision configuration. This
 is separate from the DeepSeek Harness Loader, which still abstains by default.
 
+Comparing providers? `npm run demo:comparison` explains how a candidate can
+appear better simply by failing harder cases. Keep editable inputs with
+`npm run demo:comparison -- --out-dir comparison-lesson`. The new
+`npm run evaluation -- --help` workflow separates datasets, independently
+supplied labels and separately bound prediction runs. Its main delta uses the
+same labeled, both-successful cases, with missing/failure coverage beside it.
+Validate and compare stay offline; paid runs need explicit opt-in and budgets.
+See the [paired comparison guide](docs/PROVIDER-COMPARISON.md). No automatic
+winner, calibration transfer, model promotion or tool execution is implied.
+
 The test runner processes independent test files sequentially to limit unrelated
 resource contention. Tests that explicitly spawn competing OS processes retain
 that concurrency; this setting does not serialize the production runtime.
@@ -87,6 +97,7 @@ that concurrency; this setting does not serialize the production runtime.
 | --- | --- |
 | Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision/capabilities digest + host authorization/toolset revisions |
 | Independent decision providers | Jev and independent DeepSeek binary JSON estimates, immutable capability declarations and fail-before-egress conformance; no calibration or automatic fallback |
+| Paired evaluation | Versioned datasets, separate label files, independently bound prediction artifacts and per-question paired metrics/coverage; descriptive only, no automatic promotion |
 | Durable admission | SQLite WAL, transactional uniqueness, leases and fencing epochs; separate-process tests and real process-kill tests |
 | Recovery | Durable UNKNOWN tombstones plus local, preview-first operator reviews; conclusions never enable replay or retries |
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
