@@ -53,6 +53,8 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 
 **Initial alpha verification:** 79 offline tests passed before the recovery-review change, including spawned MCP/Claude protocol processes and SQLite process-kill/race tests. Actual Codex, Claude Code and DeepSeek applications were **not installed or exercised** in that environment. Real Jev inference was **not run**. See the [initial validation](docs/VALIDATION.md) and [recovery validation scope](docs/VALIDATION-RECOVERY.md).
 
+**Current real-host baseline (2026-09-19):** Codex CLI 0.155.0-alpha.9.2 passed an actual isolated STDIO MCP smoke, and Claude Code 2.1.263 passed an actual prompt/hook/read/outcome path with zero labels. DeepSeek Harness 0.1.2-rc.1 was discovered but **not exercised end to end**. See [VALIDATION-REAL-HOSTS.md](docs/VALIDATION-REAL-HOSTS.md) for exact assertions and untested boundaries. The opt-in probe may invoke a logged-in host/model; it is not part of offline CI.
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.
@@ -115,7 +117,7 @@ Tenant/session keys separate records but are not authentication. Use trusted ing
 
 ## Development direction
 
-The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). Next priorities are full provider conformance, real-host compatibility tests, retention tooling and independently verified recovery evidence and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
+The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). The proposed second-provider capability boundary is documented in [PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md); it is not implemented yet. Next priorities are deeper real-host compatibility, provider conformance, retention tooling, independently verified recovery evidence and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
 
 Repository: https://github.com/luomo66ccff/reflexmesh
 
