@@ -118,6 +118,12 @@ The installed Claude application has also been rechecked against this pairing
 protocol using the account-free [local transport probe](docs/VALIDATION-CLAUDE-LOCAL-LOOP.md).
 This is narrow actual-host evidence, not real-model or default-profile certification.
 
+Claude failure hooks now preserve an explicit interruption as a reported
+`unknown` outcome, separate from completed shadow decisions. The account-free
+`npm run compat:claude-failure` check exercises an actual overlapping success
+and failure through isolated MCP tools and direct production hooks. Real host
+cancellation is not implied; see [failure evidence and limits](docs/CLAUDE-FAILURE-EVIDENCE.md).
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.

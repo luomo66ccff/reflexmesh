@@ -241,11 +241,15 @@ The stack remains unmerged; no existing PR is retargeted by this increment.
   document the observed bare-mode hook omission, version-specific handshake,
   fixture-wrapper boundary and lack of OS sandbox/full host certification.
 
-## Current increment: Claude first-run diagnosis and direct generated setup
+## Reviewed increment: Claude first-run diagnosis and direct generated setup
 
 `feat/claude-first-run` is based on PR #11's `36b7320`, not merged main. This
-increment does not merge or retarget any existing PR. Check its published exact
-head and remote CI separately from the earlier stack members.
+increment does not merge or retarget any existing PR. Published as
+[PR #12](https://github.com/luomo66ccff/reflexmesh/pull/12). Exact head
+`967e714356e0e9f7b18b878c09d9583a4b5d1496` passed
+[CI 35635660652](https://github.com/luomo66ccff/reflexmesh/actions/runs/35635660652):
+Ubuntu/Node 22 passed 406/406; Windows/Node 22 and 24 each passed 405 with one
+expected symlink skip. All four offline demos passed in all three jobs.
 
 - `npm run doctor:claude -- --help` works before build. Explicit native Windows
   executable, ledger and namespace choices generate a reviewable seven-event
@@ -272,11 +276,41 @@ head and remote CI separately from the earlier stack members.
   was broadened. [Guide](CLAUDE-FIRST-RUN.md) and
   [validation](VALIDATION-CLAUDE-FIRST-RUN.md) record exclusions and reproduction.
 
+## Current increment: trustworthy Claude failure and interruption evidence
+
+`fix/claude-interrupted-outcomes` is based on PR #12's `967e714`, not merged
+main. No existing PR is merged or retargeted; verify this increment's exact
+published head and CI independently.
+
+- Root reproduced an explicit Claude interruption flag being collapsed into
+  ordinary failure. The optional boolean now maps true to harness-reported
+  unknown, absent/false to failed, and invalid types to rejected observation.
+  Completed shadow decisions, execution UNKNOWN, recovery, retry and labels
+  remain separate; historical outcomes are not retroactively reclassified.
+- Both actual Node hook CLI entrypoints pass source-shaped pre/failure process
+  regressions, including conflicting reports, provenance/digests and doctor
+  warnings. A late old interruption does not clear or inherit a new summary.
+  These tests are not actual-host cancellation evidence.
+- New `npm run compat:claude-failure` passed **19/19** on installed Windows
+  Claude Code 2.1.263 with Node 22.23.2 and 24.19.0. Two fixed synthetic MCP
+  bodies overlap at a barrier; real success and failure hooks bind separately
+  to exact call/action/task/result evidence. Generated production hooks are
+  unchanged, transport is synthetic localhost, and labels remain zero.
+- Omitted-settings actual-host control correctly failed despite native tool
+  completion. Full local suites on both Node versions: **482 tests, 481 passed,
+  zero failed, one expected Windows symlink skip**. All 76 new tests, four
+  offline demos and prior generated-setup scenarios (**17/17** each) passed.
+- Scoped independent review found no remaining blocker; root verified actual
+  results. [Semantics/usage](CLAUDE-FAILURE-EVIDENCE.md) and
+  [validation](VALIDATION-CLAUDE-FAILURE-EVIDENCE.md) retain cancellation,
+  default-profile, restart, platform and operational exclusions. No paid model
+  calls or user settings changes were made.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop and injected duplicate-observer rejection now pass with local synthetic transport; broader Claude concurrency/cancellation/subagents, forked/resumed children, restart and timeout policy remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection and actual overlapping fixed MCP success/failure pass with local synthetic transport. Real cancellation/missing-hook paths, broader concurrency/subagents, forked/resumed children, restart and timeout policy remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |

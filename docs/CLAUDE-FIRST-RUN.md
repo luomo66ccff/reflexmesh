@@ -126,6 +126,10 @@ real-model certification or proof of every descendant's termination on timeout.
 See [local transport limits](CLAUDE-LOCAL-LOOP.md) and the
 [dated validation](VALIDATION-CLAUDE-FIRST-RUN.md).
 
+For an additional actual overlapping success/failure check, use
+[compat:claude-failure](CLAUDE-FAILURE-EVIDENCE.md). It uses two fixed synthetic
+MCP calls; its ordinary failure result is not proof of real cancellation.
+
 ## Inspect historical evidence deliberately
 
 Add `--key KEY_FROM_EVIDENCE_LIST --json` to the doctor command for a selected

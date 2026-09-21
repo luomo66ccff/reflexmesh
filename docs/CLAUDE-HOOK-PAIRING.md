@@ -6,6 +6,11 @@ install both, duplicate a matching hook, or run old and new hook versions
 together. Their stdout remains `{}` and their observation errors remain fixed
 stderr diagnostics. They never approve, deny, retry or replace a host tool.
 
+Failure hooks distinguish a normal reported error from an explicit interruption:
+`is_interrupt: true` becomes reported `unknown`, without changing the completed
+shadow decision or enabling recovery/retry. See [failure evidence](CLAUDE-FAILURE-EVIDENCE.md)
+for historical limits and an actual mixed-outcome concurrency check.
+
 This closes a specific evidence gap: a rejected or ambiguous pre-observation
 must not let a later post-observation attach a new invocation's outcome to an
 older same-ID decision. It does not authenticate the host or make tools
