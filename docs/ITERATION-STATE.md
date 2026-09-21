@@ -12,6 +12,33 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current milestone: reviewed stack integrated into main
+
+On 2026-09-22 (Asia/Shanghai), Amahane-Hikari integrated PRs #4–#21 through
+[PR #21](https://github.com/luomo66ccff/reflexmesh/pull/21), using merge commit
+`d5457ca594a3a134764a68262b1974ad5046711f`. Its tree exactly matches the reviewed
+and tested tip `f0a0a62085e5c01a2e6980719b24b7f3ca1da420`; all original commits
+and branches remain. GitHub marks #4 and #21 merged. PRs #5–#20 are closed as
+already integrated, with an explanatory comment on each; they are not claimed
+to have separate merge events.
+
+The scoped integration review covered all 85 generated changed-source items
+without overlap and found no reportable security candidate or concrete P1/P2
+functional blocker. Fresh-clone installation/typecheck passed, followed by
+811 tests (809 passes, two existing local symlink-privilege skips) and all nine
+offline demos on Windows Node 24.19.0 / SQLite 3.53.3. These are bounded internal
+checks, not proof of production safety or absence of all bugs.
+
+Main CI [35668506115](https://github.com/luomo66ccff/reflexmesh/actions/runs/35668506115)
+passed all five jobs against the exact merge commit: Ubuntu/Node 22 had 811
+passes; Windows/Node 22 and 24 each had 810 passes and one existing skip; all
+nine offline demos and both affected-runtime 14-group negative jobs passed.
+See [integration validation t001](VALIDATION-STACK-INTEGRATION-T001.md).
+The historical increment notes below describe the state at each increment's
+publication; this milestone
+supersedes their earlier pending-merge status, not their validation limits.
+All unfinished acceptance gates below remain open.
+
 ## Completed foundation
 
 - Recovery review and task-evidence PRs #2 and #3 are merged. Their final main
@@ -24,6 +51,9 @@ from what a host reports happened. Replaying policy must never run a tool.
   [VALIDATION-REAL-HOSTS.md](VALIDATION-REAL-HOSTS.md), not a full host matrix.
 
 ## Reviewed increment: host evidence experience
+
+Historical increment notes from here onward are retained as of publication.
+Their old pending-merge wording is superseded by the current milestone above.
 
 Published for review as [PR #4](https://github.com/luomo66ccff/reflexmesh/pull/4).
 The original development worktree remains preserved; integration lives on
@@ -547,10 +577,11 @@ Ubuntu/Node 22 **777/777**, Windows/Node 22/24 **776 passed, one existing skip**
 each, all eight offline demos and both old-runtime **13-group** negative jobs.
 This is historical base evidence, not archival CI.
 
-## Current increment: explicit audit archival and verified lookup
+## Reviewed increment: explicit audit archival and verified lookup
 
-`feat/audit-archival` is based on PR #20's exact `c4471de`, not merged main.
-No existing PR is merged or retargeted; verify this branch's own published CI.
+At publication, `feat/audit-archival` was based on PR #20's exact `c4471de`,
+not then-merged main. It is now included in the integration milestone above;
+the following implementation and validation details remain historical evidence.
 
 - Explicit backup-bound preview/apply removes selected historical audit rows
   only. Schema 4 and per-run/batch coverage are committed atomically with the
@@ -591,11 +622,13 @@ No existing PR is merged or retargeted; verify this branch's own published CI.
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 The independently labeled, separately bound comparison/report workflow is now
-implemented with an explicit provenance and descriptive-only boundary. Next,
-prioritize independent stacked-PR integration and a release-candidate first-run
-check so implemented features reach the default checkout. Audit archival/lookup
-is now implemented, while other evidence-body retention and broader operational
-acceptance remain open, alongside remaining lifecycle evidence;
+implemented with an explicit provenance and descriptive-only boundary. The
+reviewed stack now reaches the default branch, with a fresh-clone offline
+first-run check. Next prioritize bounded host shutdown/cancellation and isolated
+first-run gaps within the existing adapters, keeping actual-host evidence
+separate from synthetic checks. Audit archival/lookup is implemented, while
+other evidence-body retention and broader operational acceptance remain open,
+alongside remaining lifecycle evidence;
 newly discovered lifecycle blockers take priority. Real comparative quality
 requires suitable independent labels and distinct approved provider routes,
 not repeated same-model synthetic calls. This sequence does not certify the broad host gate
