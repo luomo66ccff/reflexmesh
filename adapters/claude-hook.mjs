@@ -6,8 +6,8 @@ import { openLocalBoundary } from './local-config.mjs';
 
 export async function observeClaude(payload, boundary) {
   const event = fromClaudeHook(payload);
-  if (event.phase === 'before') await boundary.before(event.call);
-  else await boundary.after(event.call, event.status, event.evidence, 'harness-reported');
+  if (event.phase === 'before') await boundary.beforeClaudeHook(event.call);
+  else await boundary.afterClaudeHook(event.call, event.status, event.evidence);
   // Empty output abstains. A model score must NEVER emit permissionDecision: allow.
   return {};
 }

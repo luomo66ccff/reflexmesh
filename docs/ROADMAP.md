@@ -28,6 +28,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Preserve native DeepSeek post-dispatch cancellation as unknown and verify fixed installed-host parallel/task-replacement/cancel/followup scenarios with synthetic model transport; see [validation](VALIDATION-DEEPSEEK-LIFECYCLE.md).
 - [x] Preserve model-reported provenance for delegated DeepSeek summaries and verify official sequential spawn isolation with repeated call IDs and per-call result digests; see [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md).
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
+- [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [ ] Exercise default-profile compatibility and the broader lifecycle matrix; one isolated real-model result does not close this gate.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 

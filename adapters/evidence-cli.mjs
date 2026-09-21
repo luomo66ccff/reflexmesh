@@ -42,7 +42,7 @@ export function formatEvidence(result, command) {
   const sources = item => item.hostOutcome.byProvenance.map(group => `${group.provenance}:${group.status}=${group.count}`).join(', ') || 'none';
   if (command === 'list') {
     const lines = ['ReflexMesh evidence (read-only; key order, not chronological)'];
-    for (const item of result.items) lines.push(`${quote(item.key)} | run: ${item.run.state} | decision: ${item.decision.effect ?? 'not recorded'} | host outcome: ${item.hostOutcome.status} [${sources(item)}] | task: ${item.taskEvidence.recordedStatus}`);
+    for (const item of result.items) lines.push(`${quote(item.key)} | run: ${item.run.state} | decision: ${item.decision.effect ?? 'not recorded'} | host outcome: ${item.hostOutcome.status} [${sources(item)}] | task: ${item.taskEvidence.recordedStatus} | hook pairing: ${item.hostOutcome.hookPairing?.state ?? 'not_recorded'}`);
     if (!result.items.length) lines.push('No matching calls. A completed shadow decision is not proof of host execution.');
     if (result.nextCursor !== null) lines.push(`Next page: --after ${quote(result.nextCursor)}`);
     lines.push('Use inspect --db PATH --key KEY to see binding, reasons and evidence coverage.');
@@ -59,6 +59,7 @@ export function formatEvidence(result, command) {
     `Task at decision: ${result.taskEvidence.recordedStatus}; coverage: ${result.taskEvidence.coverage ?? 'not recorded'}; source: ${result.taskEvidence.source ?? 'not recorded'}`,
     `Host outcome: ${result.hostOutcome.status}; observations: ${result.hostOutcome.count}; labels: ${result.labelCount}`,
     `Outcome sources: ${sources(result)}`,
+    `Claude hook pairing: ${result.hostOutcome.hookPairing?.state ?? 'not_recorded'}; reason: ${result.hostOutcome.hookPairing?.reasonCode ?? 'none'}`,
     `Recovery required: ${result.recovery.required}; operator conclusion: ${result.recovery.resolution ?? 'none'}; execution allowed by this inspector: false`,
     ...result.notes,
   ].join('\n') + '\n';

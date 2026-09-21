@@ -58,11 +58,11 @@ A duplicate review ID with the identical normalized body returns its original re
 
 The model observation, operator review and supervised label are three different record classes. A review digest binds the recorded declaration; it is not a cryptographic proof of who submitted it or what happened externally. Database owners can tamper with records. No remote attestation is claimed.
 
-## Schema 1 → 2 migration
+## Schema 1 / 2 → 3 migration
 
-Schema 2 adds `recovery_reviews` and a queue index while preserving existing runs, journal rows, observations and labels. A writable open upgrades schema 1 transactionally; a read-only open can inspect/preview schema 1 without upgrading it. The schema version is checked again after acquiring the migration write lock. Future unsupported versions are rejected.
+Schema 2 introduced `recovery_reviews` and a queue index; schema 3 adds durable `claude_hook_pairs`. A writable open upgrades schemas 1 and 2 transactionally while preserving existing runs, journal rows, observations, reviews and labels. Read-only opens inspect schemas 1, 2 and 3 without upgrading them. The version is checked again after acquiring the migration write lock. Future unsupported versions are rejected. Historical runs do not receive invented pairing receipts; see [Claude pairing](CLAUDE-HOOK-PAIRING.md).
 
-Before upgrade, stop all old workers and make a SQLite-consistent backup. Do not copy only the main database file out from under an active WAL writer. Old alpha-1 binaries reject schema 2: mixed old/new workers and in-place downgrades are not supported. Do not merely reset `PRAGMA user_version` to bypass that guard. Restoring an old backup can discard newer tombstones and re-enable duplicates; reconcile outstanding actions before any rollback to old software/data.
+Before upgrade, stop all old workers and make a SQLite-consistent backup. Do not copy only the main database file out from under an active WAL writer. Previous schema-1/2 software rejects schema 3 on a fresh open, but that guard does not fence already-open old connections. Mixed old/new workers and in-place downgrades are not supported. Do not reset `PRAGMA user_version` or remove pairing rows to bypass a guard. Restoring an old backup can discard newer tombstones and re-enable duplicates; reconcile outstanding actions before any rollback to old software/data.
 
 No automatic retention, garbage collection, vacuum policy, encryption, lease renewal, distributed coordination, external exactly-once effect, or full operator recovery service is added. Reviews only concern library-managed admissions in this local database; they do not retroactively coordinate arbitrary host-owned actions observed in shadow mode.
 

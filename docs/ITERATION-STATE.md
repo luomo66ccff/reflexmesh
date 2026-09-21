@@ -146,11 +146,17 @@ current exact-head checks before any merge, not an earlier stack member's CI.
   No production SQLite code, busy budget or existing deadline was changed.
   The old failure and uncertainty remain recorded in the validation report.
 
-## Current increment: invocation-bound outcome admission
+## Reviewed increment: invocation-bound outcome admission
 
 `fix/deepseek-outcome-admission` is based on PR #8's
 `11c6407e910ab5216195dad02830f297fd373573`, not merged main. It preserves the
 existing stack and does not change any PR's merge state.
+
+Published as [PR #9](https://github.com/luomo66ccff/reflexmesh/pull/9). Exact head
+`f89955848246508b88a06877bbf9ae208a36c940` passed
+[CI 35623874475](https://github.com/luomo66ccff/reflexmesh/actions/runs/35623874475):
+Ubuntu/Node 22 passed 259/259; Windows/Node 22 and 24 each passed 258 with one
+expected symlink skip. All four offline demos passed in all three jobs.
 
 - Root reproduced new-task outcomes being attached to an old same-ID decision
   even though its before-observation had rejected the task conflict. Fixed both
@@ -173,11 +179,40 @@ existing stack and does not change any PR's merge state.
   Separate-process conflict/outcome pairing, full cold-resume/fork and default
   profile behavior remain unverified; no paid model calls were made.
 
+## Current increment: durable Claude hook pairing
+
+`fix/claude-outcome-pairing` is based on PR #9's `f899558`, not merged main.
+The earlier PR stack remains unmerged. Verify the new PR's own exact-head CI,
+not an earlier increment's checks, before any future merge.
+
+- Root reproduced three cross-process evidence misassociation failures, with a
+  late-old-result positive control. Both hook entrypoints now reserve in the
+  execution ledger before task-cache access/evaluation and require a ready,
+  matching receipt before accepting a result.
+- Schema 3 persists pending/ready/blocked association; any duplicate pre remains
+  ambiguous. Missing/early/conflicting observed events cannot revive a blocked
+  key. Post uses the stored request/action/deployment, not the current task.
+- Retained historical outcomes are unchanged but evidence list/inspect and
+  doctor show pending/blocked association explicitly. Pairing is not execution
+  authority, an UNKNOWN reset, a retry permit or a truth label.
+- Root's final Windows Node 22.23.2 and 24.19.0 suites each passed **287 of 288**
+  tests with **0 failures and one expected symlink skip**. The 29 new cases cover
+  actual CLI processes, receipt reopen, duplicate races, process death after
+  reserve, before/storage failures and schema-1/2 migration rollback.
+- Four offline demos and the installed DeepSeek lifecycle/spawn/native-admission
+  probes passed **17/17**, **12/12**, **8/8**, respectively. The latter probes use
+  synthetic transport or native tool fixtures, not new real-model calls.
+- Narrow independent review found the first-block-reason overwrite, now fixed
+  and verified. See [guide](CLAUDE-HOOK-PAIRING.md) and
+  [validation](VALIDATION-CLAUDE-PAIRING.md). Real Claude app integration,
+  pre-reservation failure detection, mixed-old-worker upgrades and production
+  load/privacy/retention certification remain open or explicitly unsupported.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions now cannot attach new-task outcomes to older decisions. Separate-process conflict/outcome pairing, forked/resumed/cancelled children, restart, timeout policy and the full cross-host gate remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Actual Claude application revalidation, forked/resumed/cancelled children, restart, timeout policy and the full cross-host gate remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |

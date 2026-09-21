@@ -38,6 +38,7 @@ const MESSAGE = Object.freeze({
   historical_task_not_ready: '所选历史记录没有可用任务摘要；不代表当前安装失败。',
   historical_outcome_conflict: '所选历史结果互相冲突；不能选定成功或自动重试。',
   historical_unknown_execution: '所选历史执行状态未知；必须独立核对，不得自动重试。',
+  historical_hook_pairing_unavailable: '所选历史记录的 Claude 钩子关联未完成或有歧义；已有结果也不能证明属于该次调用，须独立核对，不得自动重试。',
   historical_evidence_only: '历史记录不证明当前插件已加载，也未证实属于本次 tenant/scope 配置。',
   live_host_unverified: 'doctor 未启动宿主；当前实际加载和模型行为尚未验证。',
   internal_error: 'doctor 无法完成固定范围的检查。',
@@ -94,6 +95,7 @@ function historicalProjection(item, selection) {
     outcomeStatus: publicEnum(item?.hostOutcome?.status, ['missing', 'conflicting', 'succeeded', 'failed', 'unknown'], 'unrecognized'),
     outcomeCount: Number.isSafeInteger(item?.hostOutcome?.count) && item.hostOutcome.count >= 0 ? item.hostOutcome.count : null,
     outcomeByProvenance: byProvenance,
+    hookPairingState: publicEnum(item?.hostOutcome?.hookPairing?.state, ['pending', 'ready', 'blocked', 'not_recorded'], 'not_recorded'),
     recoveryRequired: item?.recovery?.required === true,
     labelCount: Number.isSafeInteger(item?.labelCount) && item.labelCount >= 0 ? item.labelCount : null,
   };
@@ -179,6 +181,7 @@ export async function diagnoseDoctor(argv, {
             add(diagnostics, 'historical_evidence_only');
             if (historicalEvidence.taskStatus !== 'ready') add(diagnostics, 'historical_task_not_ready');
             if (historicalEvidence.outcomeStatus === 'conflicting') add(diagnostics, 'historical_outcome_conflict');
+            if (['pending', 'blocked'].includes(historicalEvidence.hookPairingState)) add(diagnostics, 'historical_hook_pairing_unavailable');
             if (historicalEvidence.runState === 'unknown' || historicalEvidence.outcomeStatus === 'unknown'
               || historicalEvidence.recoveryRequired) add(diagnostics, 'historical_unknown_execution');
           } else historicalEvidence = { status: 'none', selection: input.key === undefined ? 'first_key_order_not_latest' : 'explicit_key' };

@@ -24,6 +24,12 @@ The demonstration uses synthetic predictions/outcomes. It shows no provider call
 
 Use the new entrypoint **instead of** the previous `claude-hook.mjs` for tool hooks; do not configure both for the same call. Build first. Merge only these entries with your existing settings and replace the absolute path:
 
+Both entrypoints now use [durable pre/post pairing](CLAUDE-HOOK-PAIRING.md).
+Pre reserves its receipt before opening/reading the task cache; post uses the
+accepted stored binding rather than today's task. Repeated pre deliveries are
+ambiguous even when identical. Read the schema-3 upgrade and trust limits before
+connecting an existing ledger.
+
 ```json
 {
   "hooks": {

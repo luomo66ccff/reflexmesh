@@ -7,6 +7,10 @@ export function evidenceView(row, now) {
   const groups = JSON.parse(row.outcome_groups);
   const statuses = [...new Set(groups.map(g => g.status))];
   const outcomeStatus = statuses.length === 0 ? 'missing' : statuses.length > 1 ? 'conflicting' : statuses[0];
+  const pairingState = known(row.hook_pairing_state, ['pending', 'ready', 'blocked'], 'not_recorded');
+  const pairingReason = known(row.hook_pairing_reason, ['duplicate_pre', 'legacy_unpaired', 'before_failed',
+    'unpaired_post', 'early_post', 'token_mismatch', 'descriptor_mismatch', 'decision_mismatch', 'run_missing',
+    'action_mismatch', 'deployment_mismatch', 'request_mismatch', 'outcome_conflict', 'invalid_state']);
   const expired = row.lease_until <= now;
   const recoveryRequired = row.state === 'unknown' || (row.state === 'executing' && expired);
   const taskStatus = known(row.task_status, ['ready','missing','expired','withheld','too_large','invalid'], 'not_recorded');
@@ -25,6 +29,8 @@ export function evidenceView(row, now) {
   if (outcomeStatus === 'missing') notes.push('No host outcome is recorded; this does not prove that the action did not run.');
   else notes.push('Reported outcomes are observations, not independent truth or calibration labels.');
   if (outcomeStatus === 'conflicting') notes.push('Outcome observations disagree; no successful outcome is selected automatically.');
+  if (pairingState === 'blocked') notes.push('Claude hook pairing is blocked or ambiguous. Any retained outcome lacks unambiguous invocation association; verify independently, never retry from this status.');
+  if (pairingState === 'pending') notes.push('Claude pre-hook pairing is incomplete. A later result cannot complete this reservation or prove that no tool executed.');
   if (recoveryRequired) notes.push('Execution is unknown and must not be retried under this call identity.');
   if (taskStatus !== 'not_recorded') notes.push('Task coverage describes the evidence at decision time, not current freshness or full user authorization.');
   return {
@@ -40,7 +46,8 @@ export function evidenceView(row, now) {
       recordedFreshness: known(row.task_freshness, ['within_ttl','expired','unverified']), summaryDigest: hash(row.summary_digest) },
     decision: { effect, ruleId: label(row.rule_id), directive: label(row.directive), explanation: why,
       reasonCode: label(row.reason_code), providerResultRecorded: row.has_prediction === 1 },
-    hostOutcome: { status: outcomeStatus, count: groups.reduce((n, g) => n + g.count, 0), byProvenance: groups },
+    hostOutcome: { status: outcomeStatus, count: groups.reduce((n, g) => n + g.count, 0), byProvenance: groups,
+      hookPairing: { state: pairingState, reasonCode: pairingReason } },
     labelCount: row.label_count,
     recovery: { required: recoveryRequired, leaseExpired: expired,
       resolution: known(row.resolution, ['unresolved','confirmed_succeeded','confirmed_failed','confirmed_not_executed']),
@@ -67,6 +74,8 @@ export function evidenceColumns(schemaVersion) {
       .map(([alias, path]) => textField('r.result', path, alias)),
     "CASE WHEN json_type(r.result, '$.provider')='object' THEN 1 ELSE 0 END AS has_prediction",
     '(SELECT COUNT(*) FROM labels WHERE run_key=r.key) AS label_count',
+    schemaVersion >= 3 ? '(SELECT state FROM claude_hook_pairs WHERE key=r.key) AS hook_pairing_state' : 'NULL AS hook_pairing_state',
+    schemaVersion >= 3 ? '(SELECT substr(reason_code,1,64) FROM claude_hook_pairs WHERE key=r.key) AS hook_pairing_reason' : 'NULL AS hook_pairing_reason',
     `(SELECT json_group_array(json_object('status', status, 'provenance', provenance, 'count', total)) FROM (
       SELECT CASE WHEN json_extract(body,'$.status') IN ('succeeded','failed','unknown') THEN json_extract(body,'$.status') ELSE 'unrecognized' END AS status,
       CASE WHEN json_extract(body,'$.provenance') IN ('harness-reported','model-reported','test-oracle') THEN json_extract(body,'$.provenance') ELSE 'unrecognized' END AS provenance,

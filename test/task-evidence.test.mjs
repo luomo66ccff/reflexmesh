@@ -117,7 +117,7 @@ test('session clear removes its agents but not another session or tenant', async
 test('intent cache refuses the real execution ledger without schema mutation', async t => {
   const p = join(await temporary(t), 'ledger.sqlite'); const k = new SqliteKernel(p); k.close();
   assert.throws(() => new IntentCache(p, { tenantId: 't', scope: 'p' }), /compatible intent cache/);
-  const db = new DatabaseSync(p, { readOnly: true }); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 2); db.close();
+  const db = new DatabaseSync(p, { readOnly: true }); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3); db.close();
 });
 test('path alias collision and nonregular intent database are refused', async t => {
   const dir = await temporary(t), p = join(dir, 'db.sqlite');

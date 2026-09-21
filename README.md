@@ -66,7 +66,7 @@ that concurrency; this setting does not serialize the production runtime.
 | Recovery | Durable UNKNOWN tombstones plus local, preview-first operator reviews; conclusions never enable replay or retries |
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
 | Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
-| Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
+| Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI with durable cross-process outcome pairing; always abstains from permission changes |
 | DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; isolated CLI/Agent tool round trip verified with synthetic and authorized real-model transport; broader lifecycle matrix remains open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
@@ -97,6 +97,12 @@ call IDs cannot attach new-task results to an old decision; DeepSeek checks that
 the admitted call and Agent/session references have not changed. See the
 [admission-pairing validation](docs/VALIDATION-OUTCOME-ADMISSION.md).
 
+Separate-process Claude hooks now persist pre/post association in the ledger.
+Repeated, missing, interrupted or conflicting observed pre-hooks cannot silently
+attach a later result to an older decision. Ambiguous historical reports remain
+visible with a pairing warning. This requires trusted host IDs and has explicit
+pre-reservation limits; see the [pairing and upgrade guide](docs/CLAUDE-HOOK-PAIRING.md).
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.
@@ -111,7 +117,7 @@ node adapters/recovery-cli.mjs review --db /private/path/shadow.sqlite --file re
 
 **A reviewed action remains `unknown` for execution purposes.** Review conclusions are separate administrative evidence, not replayable successes, new permissions, automatic retries or calibration labels. Review tools are deliberately not added to MCP. Actor references are operator-provided identifiers, not authentication; protect management access separately from same-user shell-capable agents.
 
-Writable opens migrate SQLite schema 1 to 2 transactionally. Read-only inspection/preview can open schema 1 without migration. Stop old workers and back up the database before upgrading; old binaries reject schema 2. See the migration/runbook in [RECOVERY.md](docs/RECOVERY.md).
+Writable opens migrate SQLite schemas 1 and 2 to 3 transactionally. Read-only inspection/preview supports all three without migration. Stop old workers and make a consistent backup before upgrading; older binaries reject schema 3 on a fresh open. Existing outcomes are preserved, not retroactively certified. See the migration/runbook in [RECOVERY.md](docs/RECOVERY.md).
 
 New label admissions also validate against the stored question contract: binary targets are `0/1`, choices must be declared, and ordinal targets are rubric indices. Inherited properties and undeclared fields are rejected. Existing historical labels are not rewritten.
 

@@ -46,6 +46,8 @@ not evidence that confirmation happened.
 | `model-reported:succeeded=1` | A model claimed success; this is not a trusted host observation or truth label. |
 | `harness-reported:succeeded=1` | The host reported success; this is still separate from independent truth. |
 | `host outcome: conflicting` | Recorded sources disagree; the inspector does not select a successful answer. |
+| `hook pairing: blocked` | A Claude result's invocation association is ambiguous, even if an earlier success report remains. Independently investigate; do not retry. |
+| `hook pairing: pending` | A Claude pre-hook reservation has not completed; this does not establish whether the host ran its tool. |
 | `task: ready`, `summary-only` | A selected summary was usable at decision time, not necessarily now. It is not the full request or authorization. |
 | `recovery required: true` | Execution remains uncertain. Investigation must not automatically retry the same logical action. |
 
@@ -70,6 +72,15 @@ normal npm banners are not part of the JSON receipt. A missing database or key,
 invalid option, or unreadable ledger exits nonzero with a bounded diagnostic.
 The inspector never creates a missing database.
 
+JSON adds `hostOutcome.hookPairing: { state, reasonCode }`; the state is
+`pending`, `ready`, `blocked` or `not_recorded`. Reason codes are a fixed closed
+set, not raw error text, and private pairing tokens are never exported. Read
+the pair state together with historical outcome counts: a retained success is
+not unambiguous association after a later block. `not_recorded` covers older
+schemas and non-Claude adapters; no historical pairing is inferred. Pair-only
+reservations without a decision row are outside this decision list. See
+[pairing semantics](CLAUDE-HOOK-PAIRING.md).
+
 ## Data and compatibility boundaries
 
 The view is a whitelisted, bounded projection. It does not export raw task
@@ -79,8 +90,8 @@ not anonymization. Unsupported or oversized text fields appear as `null`, not a
 silently truncated identity. `metadataCoverage: bounded-projection` makes this
 explicit. Stored data is not authenticated or certified by inspection.
 
-Schema 1 and 2 are read using a read-only SQLite connection and a consistent read
-transaction; schema 1 is not migrated. SQLite may interact with existing WAL/SHM
+Schemas 1, 2 and 3 are read using a read-only SQLite connection and a consistent read
+transaction; older schemas are not migrated. SQLite may interact with existing WAL/SHM
 sidecars. Read-only application behavior is not a byte-for-byte filesystem
 immutability guarantee. Observation counts may require reading existing rows;
 bounded output is not a promise of constant query time on an arbitrarily large

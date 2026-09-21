@@ -97,11 +97,11 @@ test('read-only inspection of schema 1 does not migrate it', async t => {
   assert.throws(() => k.registerPack(toolPreflightPack), /Read-only/);
   assert.throws(() => admit(k), /Read-only/);
 });
-test('schema 1 to 2 migration preserves previous journal and outcomes', async t => {
+test('schema 1 to 3 migration preserves previous journal and outcomes', async t => {
   const path = await legacy(t), k = new SqliteKernel(path); t.after(() => k.close());
   assert.equal(k.inspect('legacy').audit.length, 1); assert.equal(k.inspect('legacy').observations.length, 1);
   assert.equal(k.reviewRecovery(review(k, 'legacy')).recorded, true);
-  sql(path, db => assert.equal(db.prepare('PRAGMA user_version').get().user_version, 2));
+  sql(path, db => assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3));
   const viewer = new SqliteKernel(path, { readOnly: true }); t.after(() => viewer.close());
   assert.equal(viewer.recoverySnapshot('legacy').latestReview.review.actorRef, 'operator:test');
 });
@@ -215,7 +215,7 @@ test('CLI preview of old schema does not upgrade; apply upgrades after explicit 
   const p = cli(['review','--db',path,'--file',f]); assert.equal(p.status, 0, p.stderr);
   sql(path, db => assert.equal(db.prepare('PRAGMA user_version').get().user_version, 1));
   const a = cli(['review','--db',path,'--file',f,'--apply']); assert.equal(a.status, 0, a.stderr);
-  sql(path, db => assert.equal(db.prepare('PRAGMA user_version').get().user_version, 2));
+  sql(path, db => assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3));
 });
 test('CLI refuses force/reset options, duplicate flags and invalid limits', () => {
   for (const args of [[], ['list'], ['list','--db','x','--apply'], ['review','--db','x','--file','v','--force'], ['list','--db','x','--db','y'], ['list','--db','x','--limit','101'], ['list','--db','x','--limit','1.5']]) assert.throws(() => parseRecoveryOptions(args));

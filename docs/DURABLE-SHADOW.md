@@ -98,7 +98,7 @@ A model can skip these tools. Native Codex shell/files are untouched. Mandatory 
 
 ## Claude Code: lifecycle shadow hooks
 
-Merge these entries into the appropriate Claude settings; do not overwrite unrelated hooks. Replace each path. The hook inherits the shared configuration from the host process environment.
+Merge these entries into the appropriate Claude settings; do not overwrite unrelated hooks. Replace each path. The hook inherits the shared configuration from the host process environment. Configure only one ReflexMesh entrypoint per event, not both this legacy entrypoint and the task-aware one. Both now use [schema-3 durable pairing](CLAUDE-HOOK-PAIRING.md); read its duplicate-delivery tradeoff, trust limits and upgrade instructions first.
 
 ```json
 {
@@ -149,8 +149,8 @@ An outcome is recorded only when that invocation's before-observation resolved
 successfully. If admission or intent resolution fails, the host still executes
 once and its original return/error is preserved, but its result cannot be
 attached to an older same-ID record. This pairing is also enforced by the
-in-process DeepSeek observer. It does not introduce a cross-process receipt
-protocol for the separate Claude hooks or authenticate MCP client reports. See
+in-process DeepSeek observer. Claude hooks separately use the
+[durable pairing protocol](CLAUDE-HOOK-PAIRING.md). Neither authenticates MCP client reports. See
 [validation and exclusions](VALIDATION-OUTCOME-ADMISSION.md).
 
 ## Policy replay and labels

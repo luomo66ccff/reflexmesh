@@ -64,6 +64,12 @@ A completed shadow decision and an unknown reported host outcome can coexist.
 Doctor warns about that unknown outcome even when the decision row is completed;
 it does not turn the row into an execution tombstone or enable recovery/retry.
 
+A selected Claude record also exposes `historicalEvidence.hookPairingState`.
+Pending or blocked association emits `historical_hook_pairing_unavailable`,
+including when an older success report remains. That report cannot establish
+unambiguous invocation association. This is a historical evidence warning, not
+a Claude installation check or a new execution status; see [pairing](CLAUDE-HOOK-PAIRING.md).
+
 ## Machine-readable output and limitations
 
 Add `--json` for the versioned report; use direct `node` or `npm run --silent`

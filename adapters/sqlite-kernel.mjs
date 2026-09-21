@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { configureJournal } from './sqlite-startup.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
 import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
@@ -9,6 +9,25 @@ import { evidenceColumns, evidenceView } from './evidence-view.mjs';
 export const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 const requireValue = (ok, message) => { if (!ok) throw new ContractError(message); };
 const text = value => typeof value === 'string' && value.length > 0 && value.length <= 1024;
+const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const PAIR_REASONS = Object.freeze(['duplicate_pre', 'legacy_unpaired', 'before_failed', 'unpaired_post',
+  'early_post', 'token_mismatch', 'descriptor_mismatch', 'decision_mismatch', 'run_missing',
+  'action_mismatch', 'deployment_mismatch', 'request_mismatch', 'outcome_conflict', 'invalid_state']);
+const pairFields = ['key', 'callDigest', 'actionDigest', 'deploymentDigest'];
+function pairingDescriptor(value, receipt = false) {
+  requireValue(value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).sort().join(',') === [...pairFields, ...(receipt ? ['token'] : [])].sort().join(',')
+    && text(value.key) && [value.callDigest, value.actionDigest, value.deploymentDigest].every(hash)
+    && (!receipt || typeof value.token === 'string' && /^[a-f0-9-]{36}$/.test(value.token)), 'Invalid Claude pairing descriptor');
+  return value;
+}
+function outcomeBody(observation) {
+  requireValue(observation && text(observation.id) && ['succeeded','failed','unknown'].includes(observation.status)
+    && ['harness-reported','model-reported','test-oracle'].includes(observation.provenance)
+    && hash(observation.evidenceDigest), 'Invalid outcome evidence');
+  return canonical({ id: observation.id, status: observation.status, provenance: observation.provenance,
+    evidenceDigest: observation.evidenceDigest });
+}
 
 /** Single-node, process-safe admission. Never put this database on a network filesystem. */
 export class SqliteKernel {
@@ -28,14 +47,14 @@ export class SqliteKernel {
     try {
       this.#db.exec(`PRAGMA busy_timeout=${busyTimeoutMs}; PRAGMA foreign_keys=ON;`);
       const version = this.#db.prepare('PRAGMA user_version').get().user_version;
-      requireValue([0, 1, 2].includes(version) && (!readOnly || version > 0), 'Unsupported kernel schema');
+      requireValue([0, 1, 2, 3].includes(version) && (!readOnly || version > 0), 'Unsupported kernel schema');
       this.#schemaVersion = version;
       if (readOnly) return; // No DDL, migration, mode changes or application writes from an inspector.
       configureJournal(this.#db, { busyTimeoutMs, inMemory: path === ':memory:' });
       this.#transaction(() => {
         // Recheck under the write lock: a concurrent opener may have migrated since the first read.
         const lockedVersion = this.#db.prepare('PRAGMA user_version').get().user_version;
-        requireValue([0, 1, 2].includes(lockedVersion), 'Unsupported kernel schema');
+        requireValue([0, 1, 2, 3].includes(lockedVersion), 'Unsupported kernel schema');
         this.#db.exec(`
           CREATE TABLE IF NOT EXISTS packs (
             id TEXT NOT NULL, version TEXT NOT NULL, digest TEXT NOT NULL,
@@ -64,11 +83,22 @@ export class SqliteKernel {
             body TEXT NOT NULL, digest TEXT NOT NULL, applied_epoch INTEGER NOT NULL,
             at INTEGER NOT NULL, PRIMARY KEY(run_key,id), UNIQUE(run_key,applied_epoch)
           ) STRICT;
+          CREATE TABLE IF NOT EXISTS claude_hook_pairs (
+            key TEXT PRIMARY KEY, token TEXT NOT NULL, call_digest TEXT NOT NULL,
+            action_digest TEXT NOT NULL, deployment_digest TEXT NOT NULL,
+            request_digest TEXT,
+            state TEXT NOT NULL CHECK(state IN ('pending','ready','blocked')),
+            reason_code TEXT CHECK(reason_code IN ('duplicate_pre','legacy_unpaired','before_failed',
+              'unpaired_post','early_post','token_mismatch','descriptor_mismatch','decision_mismatch',
+              'run_missing','action_mismatch','deployment_mismatch','request_mismatch','outcome_conflict',
+              'invalid_state')),
+            CHECK((state='blocked')=(reason_code IS NOT NULL))
+          ) STRICT;
           CREATE INDEX IF NOT EXISTS runs_recovery_scan ON runs(state,key);
-          PRAGMA user_version=2;
+          PRAGMA user_version=3;
         `);
       });
-      this.#schemaVersion = 2;
+      this.#schemaVersion = 3;
     } catch (e) { this.#db.close(); throw e; }
   }
   #now() {
@@ -83,6 +113,110 @@ export class SqliteKernel {
     catch (e) { this.#db.exec('ROLLBACK'); throw e; }
   }
   #row(key) { return this.#db.prepare('SELECT * FROM runs WHERE key=?').get(key); }
+  #pair(key) { return this.#db.prepare('SELECT * FROM claude_hook_pairs WHERE key=?').get(key); }
+  #insertPair(descriptor, token, state, reason = null) {
+    this.#db.prepare('INSERT INTO claude_hook_pairs VALUES(?,?,?,?,?,?,?,?)')
+      .run(descriptor.key, token, descriptor.callDigest, descriptor.actionDigest,
+        descriptor.deploymentDigest, null, state, reason);
+  }
+  #blockPair(descriptor, reason, existing = this.#pair(descriptor.key)) {
+    requireValue(PAIR_REASONS.includes(reason), 'Invalid Claude pairing reason');
+    if (!existing) this.#insertPair(descriptor, randomUUID(), 'blocked', reason);
+    else if (existing.state !== 'blocked') this.#db.prepare("UPDATE claude_hook_pairs SET state='blocked',reason_code=? WHERE key=?")
+      .run(reason, descriptor.key);
+    return existing?.state === 'blocked' ? existing.reason_code ?? reason : reason;
+  }
+  #pairRunMismatch(descriptor, run) {
+    if (!run) return 'run_missing';
+    let evidence;
+    try { evidence = JSON.parse(run.evidence); } catch { return 'deployment_mismatch'; }
+    if (evidence?.actionDigest !== descriptor.actionDigest) return 'action_mismatch';
+    try {
+      if (digest({ packDigest: evidence?.pack?.digest, binding: evidence?.binding, mode: evidence?.mode })
+        !== descriptor.deploymentDigest) return 'deployment_mismatch';
+    } catch { return 'deployment_mismatch'; }
+    return null;
+  }
+  #pairDescriptorMismatch(descriptor, pair) {
+    return pair.call_digest !== descriptor.callDigest || pair.action_digest !== descriptor.actionDigest
+      || pair.deployment_digest !== descriptor.deploymentDigest;
+  }
+  beginClaudeHookPairing(descriptor) {
+    pairingDescriptor(descriptor);
+    const result = this.#transaction(() => {
+      const existing = this.#pair(descriptor.key);
+      if (existing) {
+        // A second PreToolUse is ambiguous even if its digest is identical.
+        return { reason: this.#blockPair(descriptor, 'duplicate_pre', existing) };
+      }
+      if (this.#row(descriptor.key)) {
+        this.#insertPair(descriptor, randomUUID(), 'blocked', 'legacy_unpaired');
+        return { reason: 'legacy_unpaired' };
+      }
+      const token = randomUUID();
+      this.#insertPair(descriptor, token, 'pending');
+      return { receipt: Object.freeze({ key: descriptor.key, callDigest: descriptor.callDigest,
+        actionDigest: descriptor.actionDigest, deploymentDigest: descriptor.deploymentDigest, token }) };
+    });
+    if (result.reason) throw new ContractError(`Claude pairing ${result.reason}`);
+    return result.receipt;
+  }
+  completeClaudeHookPairing(receipt, { decisionId } = {}) {
+    pairingDescriptor(receipt, true);
+    requireValue(text(decisionId), 'Invalid Claude pairing decision');
+    const reason = this.#transaction(() => {
+      const pair = this.#pair(receipt.key);
+      if (!pair) return this.#blockPair(receipt, this.#row(receipt.key) ? 'legacy_unpaired' : 'run_missing');
+      if (pair.state === 'blocked') return pair.reason_code ?? 'invalid_state';
+      if (pair.token !== receipt.token) return this.#blockPair(receipt, 'token_mismatch', pair);
+      if (this.#pairDescriptorMismatch(receipt, pair)) return this.#blockPair(receipt, 'descriptor_mismatch', pair);
+      if (receipt.key !== decisionId) return this.#blockPair(receipt, 'decision_mismatch', pair);
+      if (pair.state !== 'pending') return this.#blockPair(receipt, 'invalid_state', pair);
+      const run = this.#row(receipt.key), mismatch = this.#pairRunMismatch(receipt, run);
+      if (mismatch) return this.#blockPair(receipt, mismatch, pair);
+      this.#db.prepare("UPDATE claude_hook_pairs SET request_digest=?,state='ready',reason_code=NULL WHERE key=?")
+        .run(run.request_digest, receipt.key);
+      return null;
+    });
+    if (reason) throw new ContractError(`Claude pairing ${reason}`);
+  }
+  blockClaudeHookPairing(receipt, reasonCode = 'before_failed') {
+    pairingDescriptor(receipt, true);
+    requireValue(PAIR_REASONS.includes(reasonCode), 'Invalid Claude pairing reason');
+    this.#transaction(() => {
+      const pair = this.#pair(receipt.key);
+      requireValue(pair && pair.token === receipt.token && !this.#pairDescriptorMismatch(receipt, pair),
+        'Claude pairing token or descriptor mismatch');
+      this.#blockPair(receipt, reasonCode, pair);
+    });
+  }
+  observeClaudeHookPairing(descriptor, observation) {
+    pairingDescriptor(descriptor);
+    const body = outcomeBody(observation);
+    const reason = this.#transaction(() => {
+      const pair = this.#pair(descriptor.key);
+      if (!pair) return this.#blockPair(descriptor, 'unpaired_post');
+      if (pair.state === 'blocked') return pair.reason_code ?? 'invalid_state';
+      if (pair.state !== 'ready') return this.#blockPair(descriptor, 'early_post', pair);
+      if (this.#pairDescriptorMismatch(descriptor, pair)) return this.#blockPair(descriptor, 'descriptor_mismatch', pair);
+      const run = this.#row(descriptor.key), mismatch = this.#pairRunMismatch(descriptor, run);
+      if (mismatch) return this.#blockPair(descriptor, mismatch, pair);
+      if (pair.request_digest !== run.request_digest) return this.#blockPair(descriptor, 'request_mismatch', pair);
+      const old = this.#db.prepare('SELECT body FROM observations WHERE run_key=? AND id=?')
+        .get(descriptor.key, observation.id);
+      if (old && old.body !== body) return this.#blockPair(descriptor, 'outcome_conflict', pair);
+      this.#db.prepare('INSERT OR IGNORE INTO observations VALUES(?,?,?)')
+        .run(descriptor.key, observation.id, body);
+      return null;
+    });
+    if (reason) throw new ContractError(`Claude pairing ${reason}`);
+  }
+  pairingSnapshot(key) {
+    requireValue(text(key), 'Invalid Claude pairing key');
+    if (this.#schemaVersion < 3) return null;
+    const pair = this.#pair(key);
+    return pair ? snapshot({ state: pair.state, reasonCode: pair.reason_code }) : null;
+  }
   #audit(key, kind, details) {
     this.#db.prepare('INSERT INTO audit(run_key,kind,details,at) VALUES(?,?,?,?)').run(key, kind, canonical(details), this.#now());
   }
@@ -158,9 +292,8 @@ export class SqliteKernel {
     });
   }
   observe(key, observation) {
-    requireValue(text(observation.id) && ['succeeded','failed','unknown'].includes(observation.status) && ['harness-reported','model-reported','test-oracle'].includes(observation.provenance) && /^[a-f0-9]{64}$/.test(observation.evidenceDigest), 'Invalid outcome evidence');
     // Whitelist fields. Model/harness observations are explicitly NOT ground-truth labels.
-    const body = canonical({ id: observation.id, status: observation.status, provenance: observation.provenance, evidenceDigest: observation.evidenceDigest });
+    const body = outcomeBody(observation);
     this.#transaction(() => {
       requireValue(!!this.#row(key), 'Orphan outcome');
       const old = this.#db.prepare('SELECT body FROM observations WHERE run_key=? AND id=?').get(key, observation.id);

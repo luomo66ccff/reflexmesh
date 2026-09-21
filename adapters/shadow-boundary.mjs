@@ -1,13 +1,15 @@
 import { canonical, snapshot, validateCall, ContractError } from '../dist/index.js';
 import { DurableMesh, eventKey, replayPolicy } from './durable-mesh.mjs';
 import { digest } from './sqlite-kernel.mjs';
+import { resolveHostIntent } from './task-evidence.mjs';
 
 /** Observes host actions; never calls, grants, blocks, rewrites or replays a host tool. */
 export class ShadowBoundary {
-  #kernel; #mesh; #tenant; #scope; #pack;
+  #kernel; #mesh; #tenant; #scope; #pack; #deploymentDigest;
   constructor({ kernel, provider, binding, pack, tenantId, scope }) {
     if (![tenantId, scope].every(s => typeof s === 'string' && s.length > 0 && s.length <= 64)) throw new ContractError('Trusted tenant/scope required');
     this.#kernel = kernel; this.#tenant = tenantId; this.#scope = scope; this.#pack = snapshot(pack);
+    this.#deploymentDigest = digest({ packDigest: digest(this.#pack), binding: snapshot(binding), mode: 'shadow' });
     this.#mesh = new DurableMesh({ kernel, provider, binding, mode: 'shadow', decisionTimeoutMs: 3000 }).registerPack(pack);
   }
   event(call, userIntent = null) {
@@ -31,6 +33,36 @@ export class ShadowBoundary {
     if (Buffer.byteLength(canonical(evidence)) > 1000000) throw new ContractError('Outcome evidence too large');
     this.#kernel.observe(key, { id: digest([call.callId, 'outcome']), status, evidenceDigest: digest(evidence), provenance });
     return { decisionId: key, recorded: true, labelCreated: false };
+  }
+  #claudeDescriptor(call) {
+    validateCall(call);
+    if (call.harness !== 'claude-code') throw new ContractError('Claude hook call required');
+    // Do not call an overridable event() here: reserve before reading task state.
+    return { key: eventKey({ tenantId: this.#tenant, source: `reflexmesh:${this.#scope}:claude-code`,
+      id: digest([call.sessionId, call.agentId, call.callId, 'before']) }),
+    callDigest: digest(call), actionDigest: digest({ toolId: call.toolName, args: call.arguments }),
+    deploymentDigest: this.#deploymentDigest };
+  }
+  async beforeClaudeHook(call, resolveIntent) {
+    const normalized = snapshot(call);
+    const receipt = this.#kernel.beginClaudeHookPairing(this.#claudeDescriptor(normalized));
+    try {
+      const intent = resolveHostIntent(resolveIntent, normalized);
+      const result = await this.before(normalized, intent);
+      this.#kernel.completeClaudeHookPairing(receipt, { decisionId: result.decisionId });
+      return result;
+    } catch (error) {
+      // If storage also fails, pending still cannot authorize a post observation.
+      try { this.#kernel.blockClaudeHookPairing(receipt, 'before_failed'); } catch {}
+      throw error;
+    }
+  }
+  afterClaudeHook(call, status, evidence) {
+    const descriptor = this.#claudeDescriptor(snapshot(call));
+    if (Buffer.byteLength(canonical(evidence)) > 1000000) throw new ContractError('Outcome evidence too large');
+    this.#kernel.observeClaudeHookPairing(descriptor, { id: digest([call.callId, 'outcome']),
+      status, evidenceDigest: digest(evidence), provenance: 'harness-reported' });
+    return { decisionId: descriptor.key, recorded: true, labelCreated: false };
   }
   inspect(call) { return this.#kernel.inspect(eventKey(this.event(call))); }
   replay(call, candidatePack = this.#pack) { return replayPolicy(this.inspect(call), candidatePack); }
