@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { listenLoopback } from './loopback-listen.mjs';
 
 export const FAILURE_TOOL = 'mcp__reflexmesh_fixture__outcome';
 export const FAILURE_CALLS = Object.freeze([
@@ -86,7 +87,7 @@ export async function startClaudeFailureFixture({ model, token, okText, failText
   });
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
   server.requestTimeout = 5000; server.headersTimeout = 5000;
-  try { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); }); }
+  try { await listenLoopback(server); }
   catch (error) { server.close(); throw error; }
   let closing;
   return { baseUrl: `http://127.0.0.1:${server.address().port}`,

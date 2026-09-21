@@ -5,13 +5,15 @@ import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { TaskAwareBoundary } from '../adapters/task-boundary.mjs';
 import { installDeepSeekObserver } from '../adapters/deepseek-plugin.mjs';
 import { observeFunctionCall } from '../adapters/openai-compatible.mjs';
+import { ABSTAIN_CAPABILITIES } from '../adapters/provider-binding.mjs';
 
 // Synthetic ordering and real journal semantics; not a host restart certification.
 function fixture(t, harness) {
   const kernel = new SqliteKernel(':memory:');
   t.after(() => kernel.close());
   const boundary = new TaskAwareBoundary({ kernel, pack: toolPreflightPack,
-    provider: { id: 'abstain', evaluate() { throw new Error('Synthetic abstention'); } },
+    provider: { id: 'abstain', capabilities: ABSTAIN_CAPABILITIES,
+      evaluate() { throw new Error('Synthetic abstention'); } },
     binding: { providerId: 'abstain', modelId: 'not-configured', revision: 'abstain-v1',
       authorizationRevision: 'host-owned-shadow', toolsetRevision: 'host-owned-shadow' },
     tenantId: 'synthetic', scope: 'admission-regression', clock: () => 1500 });

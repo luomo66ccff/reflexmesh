@@ -43,7 +43,13 @@ The real-host baseline covers one Codex MCP smoke, one Claude prompt/hook/read/o
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 
-The proposed capability schema and rejection/conformance matrix are recorded in [PROVIDER-CONFORMANCE.md](PROVIDER-CONFORMANCE.md). This is a design boundary only; capability negotiation and a second non-fixture provider are not implemented yet.
+The implemented capability schema and rejection/conformance matrix are recorded
+in [PROVIDER-CONFORMANCE.md](PROVIDER-CONFORMANCE.md). Jev and an independent
+DeepSeek binary JSON estimate provider share the offline conformance runner.
+One bounded authorized real-provider shadow round trip is separate from host
+model transport; see [validation](VALIDATION-INDEPENDENT-PROVIDER-T001.md).
+This closes the initial capability/transport implementation, not provider
+quality, calibration, broad host latency or champion/challenger acceptance.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

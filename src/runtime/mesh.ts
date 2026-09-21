@@ -2,6 +2,7 @@ import type { AuditRecord, DecisionEvent, DecisionPack, DecisionProvider, Json, 
 import { canonical, ContractError, fingerprint, positive, snapshot, validateEvent, validatePack, validateResult, assertJson } from '../core/validation.js';
 import { evaluatePolicy } from '../core/policy.js';
 import { withDeadline } from './deadline.js';
+import { snapshotProvider } from '../core/provider-capabilities.js';
 
 export interface MeshOptions {
   provider: DecisionProvider;
@@ -28,7 +29,8 @@ export class ReflexMesh {
     for (const [n, v] of Object.entries({ decisionTimeoutMs, actionTimeoutMs, maxEventBytes, maxRetainedEvents })) positive(v, n);
     if (!Number.isSafeInteger(maxRetainedEvents)) throw new ContractError('Invalid retained event limit');
     if (options.mode !== undefined && !['shadow', 'active'].includes(options.mode)) throw new ContractError('Invalid mode');
-    this.#options = { ...options, mode: options.mode ?? 'shadow', decisionTimeoutMs, actionTimeoutMs, maxEventBytes, maxRetainedEvents };
+    this.#options = { ...options, provider: snapshotProvider(options.provider), mode: options.mode ?? 'shadow',
+      decisionTimeoutMs, actionTimeoutMs, maxEventBytes, maxRetainedEvents };
   }
   registerPack(pack: DecisionPack): this {
     validatePack(pack);
@@ -47,7 +49,8 @@ export class ReflexMesh {
       assertJson(options);
       if (options.action && (typeof options.action.toolId !== 'string' || !Object.hasOwn(options.action, 'args'))) throw new ContractError('Invalid action');
       if (options.principal && (typeof options.principal.id !== 'string' || !options.principal.id || typeof options.principal.tenantId !== 'string')) throw new ContractError('Invalid principal');
-      const request = canonical({ event, options, pack });
+      const request = canonical({ event, options, pack,
+        provider: { id: this.#options.provider.id, capabilities: this.#options.provider.capabilities } });
       if (new TextEncoder().encode(request).length > this.#options.maxEventBytes) throw new ContractError('Event size limit exceeded');
       const key = canonical([event.tenantId, event.source, event.id]);
       const previous = this.#runs.get(key);

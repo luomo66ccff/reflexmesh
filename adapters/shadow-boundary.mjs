@@ -2,6 +2,7 @@ import { canonical, snapshot, validateCall, ContractError } from '../dist/index.
 import { DurableMesh, eventKey, replayPolicy } from './durable-mesh.mjs';
 import { digest } from './sqlite-kernel.mjs';
 import { resolveHostIntent } from './task-evidence.mjs';
+import { normalizeProviderBinding } from './provider-binding.mjs';
 
 /** Observes host actions; never calls, grants, blocks, rewrites or replays a host tool. */
 export class ShadowBoundary {
@@ -9,8 +10,10 @@ export class ShadowBoundary {
   constructor({ kernel, provider, binding, pack, tenantId, scope }) {
     if (![tenantId, scope].every(s => typeof s === 'string' && s.length > 0 && s.length <= 64)) throw new ContractError('Trusted tenant/scope required');
     this.#kernel = kernel; this.#tenant = tenantId; this.#scope = scope; this.#pack = snapshot(pack);
-    this.#deploymentDigest = digest({ packDigest: digest(this.#pack), binding: snapshot(binding), mode: 'shadow' });
-    this.#mesh = new DurableMesh({ kernel, provider, binding, mode: 'shadow', decisionTimeoutMs: 3000 }).registerPack(pack);
+    const normalizedBinding = normalizeProviderBinding(provider, binding);
+    this.#deploymentDigest = digest({ packDigest: digest(this.#pack), binding: normalizedBinding, mode: 'shadow' });
+    this.#mesh = new DurableMesh({ kernel, provider, binding: normalizedBinding,
+      mode: 'shadow', decisionTimeoutMs: 3000 }).registerPack(pack);
   }
   event(call, userIntent = null) {
     validateCall(call);

@@ -306,10 +306,15 @@ published head and CI independently.
   default-profile, restart, platform and operational exclusions. No paid model
   calls or user settings changes were made.
 
-## Current increment: cold-resume evidence and attention
+## Reviewed increment: cold-resume evidence and attention
 
 `feat/evidence-attention` is based on PR #13's `380b156`, not merged main.
-This increment does not merge or retarget any existing PR.
+This increment does not merge or retarget any existing PR. Published as
+[PR #14](https://github.com/luomo66ccff/reflexmesh/pull/14). Its exact head
+`ed8754de8b8d2fe6b30118fe781a97c2f7fd81de` passed
+[CI 35641787237](https://github.com/luomo66ccff/reflexmesh/actions/runs/35641787237):
+Ubuntu/Node 22 passed 539/539, Windows/Node 22 and 24 each passed 538 with one
+expected skip, plus all four offline demos. That CI is not this next branch's CI.
 
 - `evidence attention --db PATH` now gives a read-only, bounded keyset page of
   existing decision rows needing evidence review. Missing completed-shadow
@@ -335,22 +340,53 @@ This increment does not merge or retarget any existing PR.
   retain unattended resume, cancellation, default-profile, child/fork, platform,
   external effects and descendant-termination exclusions.
 
+## Current increment: independent provider and capability-bound evidence
+
+`feat/independent-provider` is based on PR #14's `ed8754d`, not merged main.
+No existing PR is merged or retargeted. Verify this increment's exact published
+head and its own CI before any merge.
+
+- Required immutable capability declarations and final input conformance now
+  protect Jev, independent DeepSeek binary JSON estimates, fixtures and honest
+  abstention. Unsupported question types fail before egress with no fallback.
+- Explicit model and capability digest propagate through task-aware/durable
+  wrappers, Claude pairing and public evidence. Schema 3 stays unchanged;
+  historical missing fields remain null. Stop old workers and use new explicit
+  namespaces/bindings rather than silently reusing prior judgments/calibration.
+- User-authorized official DeepSeek synthetic decision-provider smoke passed
+  **11/11**: one HTTP 200, 318 input/35 output tokens, no tools or labels,
+  close/reopen replay and unsupported choice without further requests. These
+  are uncalibrated model-authored estimates, not measured confidence or host
+  authorization. The Loader stays abstain-only; no profile was read or changed.
+- Review reproduced and fixed three JSON serialization bypass variants; both
+  provider transports now reject them with zero egress/getter invocation. A
+  synthetic loopback forbidden-port flake was also fixed without changing
+  production transport. Root verified the corrections and scoped re-review.
+- Local Windows Node 22.23.2 and 24.19.0 suites: **635 tests, 634 passed,
+  zero failed, one expected symlink skip**. Four offline demos and opt-in demo
+  help passed. Actual isolated Claude generated setup remained **17/17** per
+  scenario and cold resume **20/20** per scenario on both Node versions, using
+  synthetic model transport. Published exact-head CI is checked separately.
+- [Usage](DEEPSEEK-PROVIDER.md), [contract](PROVIDER-CONFORMANCE.md) and
+  [validation t001](VALIDATION-INDEPENDENT-PROVIDER-T001.md) retain migration,
+  model-alias, latency, quality and full-host exclusions. No paid demo in CI.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
 | Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
-| Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
+| Independent providers | Initial immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress shared conformance and binding propagation are implemented and narrowly tested. Quality/calibration, independent labeled comparisons, real Jev acceptance for this increment, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
 | Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
-Next milestone moves to runtime capability declarations and an independent
-provider after this bounded cold-resume increment. This deliberate engineering
-sequence adjustment does not close the first host gate or enlarge supported
-scope: open matrix entries above remain open, and discovered lifecycle blockers
-take priority. See the dated [roadmap decision](ROADMAP.md).
+After the initial independent-provider boundary, the next product milestone is
+a usable independently labeled, separately bound comparison/report workflow.
+Retention and lifecycle gates remain open; newly discovered lifecycle blockers
+take priority. This engineering sequence does not certify the broad host gate
+or enlarge supported scope. See the dated [roadmap decision](ROADMAP.md).
 No dashboard, new agent framework, automatic writes, or
 automatic threshold loosening is part of this plan. Missing real-host credentials
 or a new external authority requirement should be stated precisely; it does not

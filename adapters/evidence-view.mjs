@@ -41,6 +41,9 @@ export function evidenceView(row, now) {
     pack: { id: label(row.pack_id), version: label(row.pack_version), digest: hash(row.pack_digest) },
     binding: { providerId: label(row.provider_id), modelId: label(row.model_id), revision: label(row.revision),
       authorizationRevision: label(row.authorization_revision), toolsetRevision: label(row.toolset_revision) },
+    providerCapabilities: { digest: hash(row.capabilities_digest),
+      probabilitySemantics: known(row.probability_semantics,
+        ['provider-native', 'elicited-estimate', 'synthetic-fixture', 'none']) },
     taskEvidence: { recordedStatus: taskStatus, coverage: known(row.task_coverage, ['none','summary-only']),
       source: known(row.task_source, ['claude-explicit-summary','host-declared','model-reported']),
       recordedFreshness: known(row.task_freshness, ['within_ttl','expired','unverified']), summaryDigest: hash(row.summary_digest) },
@@ -90,6 +93,8 @@ export function evidenceColumns(schemaVersion) {
   const fields = {
     mode: '$.mode', action_digest: '$.actionDigest', pack_id: '$.pack.id', pack_version: '$.pack.version', pack_digest: '$.pack.digest',
     provider_id: '$.binding.providerId', model_id: '$.binding.modelId', revision: '$.binding.revision',
+    capabilities_digest: '$.binding.capabilitiesDigest',
+    probability_semantics: '$.providerCapabilities.probabilitySemantics',
     authorization_revision: '$.binding.authorizationRevision', toolset_revision: '$.binding.toolsetRevision',
     task_status: '$.taskEvidence.status', task_coverage: '$.taskEvidence.coverage', task_source: '$.taskEvidence.source',
     task_freshness: '$.taskEvidence.freshness', summary_digest: '$.taskEvidence.summaryDigest',

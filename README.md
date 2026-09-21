@@ -69,7 +69,13 @@ npm run demo:durable
 npm run demo:recovery
 ```
 
-The demos use explicitly labeled synthetic fixtures, not real Jev predictions. The durable demo closes and reopens SQLite, reuses the decision without another model call, and tests a stricter policy without executing any tool. Generated `dist/` is ignored by Git; build before running adapter entrypoints.
+The demos above use explicitly labeled synthetic fixtures, not real model predictions. The durable demo closes and reopens SQLite, reuses the decision without another model call, and tests a stricter policy without executing any tool. Generated `dist/` is ignored by Git; build before running adapter entrypoints.
+
+For one opt-in, paid independent-provider round trip with synthetic input,
+start with `npm run demo:deepseek -- --help` and the
+[DeepSeek decision-provider guide](docs/DEEPSEEK-PROVIDER.md). No request runs
+without `--execute` and explicit remote/key/model/revision configuration. This
+is separate from the DeepSeek Harness Loader, which still abstains by default.
 
 The test runner processes independent test files sequentially to limit unrelated
 resource contention. Tests that explicitly spawn competing OS processes retain
@@ -79,7 +85,8 @@ that concurrency; this setting does not serialize the production runtime.
 
 | Capability | Scope in this alpha |
 | --- | --- |
-| Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision + host authorization/toolset revisions |
+| Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision/capabilities digest + host authorization/toolset revisions |
+| Independent decision providers | Jev and independent DeepSeek binary JSON estimates, immutable capability declarations and fail-before-egress conformance; no calibration or automatic fallback |
 | Durable admission | SQLite WAL, transactional uniqueness, leases and fencing epochs; separate-process tests and real process-kill tests |
 | Recovery | Durable UNKNOWN tombstones plus local, preview-first operator reviews; conclusions never enable replay or retries |
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
@@ -185,7 +192,21 @@ REFLEXMESH_PROVIDER_REVISION=<your evaluated deployment revision>
 REFLEXMESH_SCOPE=<project scope>
 ```
 
-The returned model must match the binding. An alias that resolves to a different model will fail closed rather than silently inheriting old thresholds. Full provider-capability negotiation, calibration fitting and automatic model migration are **not shipped**. Switching binding for the same event ID raises a conflict; start a separately named shadow deployment for comparisons.
+For independent DeepSeek assessment, use `REFLEXMESH_PROVIDER=deepseek`,
+`DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` and the same explicit remote/revision/scope
+settings. Only binary questions are supported. The model writes the numeric
+answers itself: they are **uncalibrated subjective estimates**, not measured
+classifier confidence or a claim that an action is safe. See the
+[provider guide](docs/DEEPSEEK-PROVIDER.md) and
+[bounded validation](docs/VALIDATION-INDEPENDENT-PROVIDER-T001.md).
+
+The returned model must exactly match the binding; a different identifier fails
+closed. Matching aliases do not prove unchanged backend weights. Capabilities
+are validated, frozen and bound into durable identity, with no automatic
+fallback, calibration fitting or model migration. Switching binding for the
+same event ID raises a conflict; stop old workers and start a separately named
+shadow deployment. Existing schema-3 records are not backfilled with invented
+capabilities; historical projections expose missing fields as null.
 
 ## Design boundaries
 
@@ -199,7 +220,13 @@ Tenant/session keys separate records but are not authentication. Use trusted ing
 
 ## Development direction
 
-The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md). The proposed second-provider capability boundary is documented in [PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md); it is not implemented yet. Next priorities are deeper real-host compatibility, provider conformance, retention tooling, independently verified recovery evidence and a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic workflow editor, automatic writes and full Saga remain outside this alpha.
+The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md).
+The implemented declaration and fail-before-egress boundary is documented in
+[PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md). Next priorities are
+usable independently labeled provider comparisons, deeper real-host
+compatibility, retention tooling, independently verified recovery evidence and
+a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic
+workflow editor, automatic writes and full Saga remain outside this alpha.
 
 Repository: https://github.com/luomo66ccff/reflexmesh
 

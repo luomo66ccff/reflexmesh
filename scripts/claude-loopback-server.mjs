@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { listenLoopback } from './loopback-listen.mjs';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REQUESTS = 8;
@@ -170,10 +171,7 @@ export async function startClaudeFixture({ model, fixturePath, fixtureText, toke
   server.requestTimeout = 5000;
   server.headersTimeout = 5000;
   try {
-    await new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(0, '127.0.0.1', resolve);
-    });
+    await listenLoopback(server);
   } catch (error) { server.close(); throw error; }
   const address = server.address();
   let closing;

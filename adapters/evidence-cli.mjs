@@ -71,6 +71,7 @@ export function formatEvidence(result, command) {
     ...(result.decision.directive ? [`Advisory directive: ${quote(result.decision.directive)}`] : []),
     `Pack: ${quote(result.pack.id)} @ ${quote(result.pack.version)}`,
     `Provider: ${quote(result.binding.providerId)} / ${quote(result.binding.modelId)} @ ${quote(result.binding.revision)}`,
+    `Provider declaration: ${quote(result.providerCapabilities.digest)}; probability semantics: ${result.providerCapabilities.probabilitySemantics ?? 'not recorded'} (not a calibration claim)`,
     `Task at decision: ${result.taskEvidence.recordedStatus}; coverage: ${result.taskEvidence.coverage ?? 'not recorded'}; source: ${result.taskEvidence.source ?? 'not recorded'}`,
     `Host outcome: ${result.hostOutcome.status}; observations: ${result.hostOutcome.count}; labels: ${result.labelCount}`,
     `Outcome sources: ${sources(result)}`,

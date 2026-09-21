@@ -6,6 +6,7 @@ import { TaskAwareBoundary } from './task-boundary.mjs';
 import { installDeepSeekObserver } from './deepseek-plugin.mjs';
 import { createDeepSeekTaskSource } from './deepseek-task-source.mjs';
 import { validateDeepSeekLoaderConfig } from './deepseek-loader-config.mjs';
+import { ABSTAIN_CAPABILITIES } from './provider-binding.mjs';
 
 export { validateDeepSeekLoaderConfig } from './deepseek-loader-config.mjs';
 
@@ -21,7 +22,8 @@ const plugin = {
     let observerDrained = false, kernelClosed = false;
     try {
       taskSource = createDeepSeekTaskSource(ctx, { intentMode: options.intentMode });
-      const provider = { id: 'abstain', evaluate: async () => { throw new Error('Decision provider not configured'); } };
+      const provider = { id: 'abstain', capabilities: ABSTAIN_CAPABILITIES,
+        evaluate: async () => { throw new Error('Decision provider not configured'); } };
       const boundary = new TaskAwareBoundary({ kernel, provider, pack: toolPreflightPack,
         tenantId: options.tenantId, scope: options.scope,
         binding: { providerId: 'abstain', modelId: 'not-configured', revision: 'abstain-v1',

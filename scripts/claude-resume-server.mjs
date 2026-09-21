@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { listenLoopback } from './loopback-listen.mjs';
 
 export const RESUME_TOOL = 'mcp__reflexmesh_fixture__read';
 export const resumeCall = phase => ({ type: 'tool_use', id: `resume_call_${phase}`, name: RESUME_TOOL, input: { phase } });
@@ -103,7 +104,7 @@ export async function startClaudeResumeFixture({ token, proof, firstPrompt, seco
   });
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
   server.requestTimeout = 5000; server.headersTimeout = 5000;
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  await listenLoopback(server);
   return { baseUrl: `http://127.0.0.1:${server.address().port}`,
     resume() { if (stage !== (interrupted ? 'first-result' : 'await-resume')) throw new Error('invalid_resume_stage'); stage = 'resume'; },
     snapshot: () => ({ stage, helloRequests, messageRequests, resumedHistory, entries: entries.map(item => ({ ...item })), failure }),

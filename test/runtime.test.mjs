@@ -66,7 +66,9 @@ test('invalid provider probabilities fail closed', async () => {
   assert.equal((await mesh.run(event(), requestOptions())).verdict.effect, 'escalate');
 });
 test('uncooperative provider is bounded by a runtime deadline', async () => {
-  const { mesh } = harness({ mode: 'active', decisionTimeoutMs: 15, provider: { id: 'hung', evaluate: () => new Promise(() => {}) } });
+  const { mesh } = harness({ mode: 'active', decisionTimeoutMs: 15,
+    provider: { id: 'hung', capabilities: new MockProvider(result).capabilities,
+      evaluate: () => new Promise(() => {}) } });
   const r = await mesh.run(event(), requestOptions()); assert.equal(r.status, 'blocked');
 });
 test('tool timeout is unknown outcome and is not automatically retried', async () => {
