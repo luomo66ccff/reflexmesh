@@ -233,12 +233,18 @@ test('task-aware MCP real STDIO subprocess preserves protocol and explicit prove
   assert.equal(r.status, 0, r.stderr); const responses = r.stdout.trim().split('\n').map(JSON.parse); assert.equal(responses.length, 2);
   assert.equal(JSON.parse(responses[1].result.content[0].text).taskEvidence.source, 'model-reported');
 });
-test('DeepSeek host resolver supplies scoped summary while preserving next decision', async t => {
+test('DeepSeek host resolver supplies scoped summary while preserving next decision', { timeout: 5000 }, async t => {
   const f = fixture(t), handlers = new Map(), ctx = { on(k, fn) { handlers.set(k, fn); return () => handlers.delete(k); } };
   const s = scope({ harness: 'deepseek-harness' });
   const observer = installDeepSeekObserver(ctx, { boundary: f.boundary, identity: () => ({ sessionId: 's1', agentId: 'root' }), resolveIntent: () => intent({ scope: s }) });
-  const result = await handlers.get('tools/pre-execute')({ callId: 'c1', name: 'Read', arguments: {}, signal: new AbortController().signal }, async () => ({ kind: 'ask', reason: 'host-owned' }));
-  assert.deepEqual(result, { kind: 'ask', reason: 'host-owned' }); assert.equal(f.observed().userIntent, intent().summary); await observer.dispose();
+  const exec = { callId: 'c1', name: 'Read', arguments: {}, signal: new AbortController().signal };
+  const result = await handlers.get('tools/pre-execute')(exec, async () => ({ kind: 'ask', reason: 'host-owned' }));
+  assert.deepEqual(result, { kind: 'ask', reason: 'host-owned' }); assert.equal(f.observed().userIntent, intent().summary);
+  // The host owns confirmation and its eventual final result. Complete the
+  // fixture lifecycle before unloading, just as the installed runtime does.
+  handlers.get('tools/result')(exec, { isError: true, content: [] });
+  await observer.dispose();
+  assert.equal(handlers.size, 0);
 });
 test('function-call resolver failure does not cause host retries or change its result', async () => {
   let calls = 0; const original = { value: 'host' };
@@ -277,14 +283,18 @@ test('async or never-settling host resolver cannot hang the original function ca
     assert.equal(result, 'host-result'); assert.equal(calls, 1);
   }
 });
-test('DeepSeek abort during synchronous resolver does not call the provider or replace next()', async () => {
-  const controller = new AbortController(), handlers = new Map(); let assessments = 0;
+test('DeepSeek abort during synchronous resolver does not call the provider or replace next()', { timeout: 5000 }, async () => {
+  const controller = new AbortController(), handlers = new Map(); let assessments = 0, outcomes = 0;
   const observer = installDeepSeekObserver({ on(k, fn) { handlers.set(k, fn); return () => handlers.delete(k); } }, {
-    boundary: { before() { assessments++; }, after() {} }, identity: () => ({ sessionId: 's1', agentId: 'root' }),
+    boundary: { before() { assessments++; }, after(_call, status) { assert.equal(status, 'failed'); outcomes++; } }, identity: () => ({ sessionId: 's1', agentId: 'root' }),
     resolveIntent() { controller.abort(); return null; },
   });
-  const r = await handlers.get('tools/pre-execute')({ signal: controller.signal }, async () => ({ kind: 'cancel' }));
-  assert.deepEqual(r, { kind: 'cancel' }); assert.equal(assessments, 0); await observer.dispose();
+  const exec = { callId: 'cancelled', name: 'Read', arguments: {}, signal: controller.signal };
+  const r = await handlers.get('tools/pre-execute')(exec, async () => ({ kind: 'cancel' }));
+  assert.deepEqual(r, { kind: 'cancel' }); assert.equal(assessments, 0);
+  handlers.get('tools/result')(exec, { isError: true, content: [] });
+  await observer.dispose();
+  assert.equal(outcomes, 1); assert.equal(handlers.size, 0);
 });
 test('intent expiring between admission and provider egress is never sent', async t => {
   let now = 1500; const f = fixture(t, { clock: () => now });

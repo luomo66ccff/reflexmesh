@@ -7,10 +7,18 @@ import { resolveHostIntent } from './task-evidence.mjs';
  */
 export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent, onError = () => {} }) {
   if (typeof ctx?.on !== 'function' || typeof identity !== 'function' || (resolveIntent !== undefined && typeof resolveIntent !== 'function')) throw new TypeError('Context and identity resolver required');
-  const pending = new Set();
-  const maxPending = 256;
+  // The host uses this same execution object at pre-execute and result. Keep
+  // only accepted calls, bounded until their authoritative result is drained.
+  const active = new Map();
+  const maxActive = 256;
+  let closing = false;
   const warn = () => { try { onError('reflexmesh_shadow_observation_failed'); } catch {} };
-  const offPre = ctx.on('tools/pre-execute', async (exec, next) => {
+  const observePre = async (exec, next) => {
+    if (closing) return next();
+    if (active.size >= maxActive || active.has(exec)) { warn(); return next(); }
+    let settle;
+    const done = new Promise(resolve => { settle = resolve; });
+    active.set(exec, { done, settle, resultSeen: false });
     try {
       if (!exec.signal.aborted) {
         const intent = resolveHostIntent(resolveIntent, exec);
@@ -19,17 +27,54 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     } catch { warn(); }
     // Never return {kind:'allow'}: preserve the rest of the host permission waterfall.
     return next();
-  });
-  const offResult = ctx.on('tools/result', (exec, result) => {
-    if (pending.size >= maxPending) { warn(); return undefined; }
+  };
+  const observeResult = (exec, result) => {
+    const state = active.get(exec);
+    if (!state || state.resultSeen) return undefined;
+    state.resultSeen = true;
     // tools/result is a synchronous observe-only event. Track async work without changing its return type.
     const task = Promise.resolve().then(() => boundary.after(fromDeepSeekCall(exec, identity(exec)),
-      result.isError === true ? 'failed' : result.isError === false ? 'succeeded' : 'unknown', result, 'harness-reported')).catch(warn);
-    pending.add(task); task.then(() => pending.delete(task));
+      result.isError === true ? 'failed' : result.isError === false ? 'succeeded' : 'unknown', result, 'harness-reported'))
+      .catch(warn).finally(() => { active.delete(exec); state.settle(); });
+    void task;
     return undefined;
-  });
+  };
+  let offPre, offResult, shutdownPromise;
+  const flush = () => Promise.all([...active.values()].map(state => state.done));
+  const shutdown = () => {
+    if (shutdownPromise) return shutdownPromise;
+    closing = true;
+    offPre();
+    shutdownPromise = (async () => {
+      await flush();
+      offResult();
+    })();
+    return shutdownPromise;
+  };
+  let stop;
+  if (typeof ctx.effect === 'function') {
+    // Cordis unloads independent ctx.on effects in parallel. Group their
+    // disposers in one effect instead: its returned drain runs first, then
+    // result and pre listeners are removed in reverse collection order.
+    stop = ctx.effect(function* () {
+      offPre = ctx.on('tools/pre-execute', observePre);
+      yield offPre;
+      offResult = ctx.on('tools/result', observeResult);
+      yield offResult;
+      return shutdown;
+    }, 'reflexmesh.deepseek.observer');
+  } else {
+    offPre = ctx.on('tools/pre-execute', observePre);
+    try { offResult = ctx.on('tools/result', observeResult); }
+    catch (error) { offPre(); throw error; }
+    stop = shutdown;
+  }
   return {
-    async flush() { await Promise.all([...pending]); },
-    async dispose() { offPre(); offResult(); await Promise.all([...pending]); },
+    flush,
+    async dispose() {
+      const stopped = stop();
+      await shutdown();
+      await stopped;
+    },
   };
 }

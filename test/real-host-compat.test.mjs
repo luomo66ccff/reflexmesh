@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   evaluateClaudeJsonl,
   evaluateCodexJsonl,
+  evaluateDeepSeekProbeOutput,
   main,
   parseArgs,
   processFailureReason,
   resolveExecutable,
   runBounded,
+  runCompatibilityProbe,
 } from '../scripts/real-host-compat.mjs';
 
 const codexLine = value => JSON.stringify(value);
@@ -31,9 +35,83 @@ test('argument parser accepts host and command/path overrides without command st
   assert.ok(parsed.mcpServer.endsWith('custom-mcp.mjs'));
   assert.equal(parsed.timeoutMs, 30000);
   assert.equal(parsed.stdoutLimitBytes, 8192);
+  const deepseek = parseArgs(['--host', 'deepseek', '--deepseek-package-root', '.']);
+  assert.equal(deepseek.deepseekPackageRoot, process.cwd());
+  assert.equal(parseArgs(['--host', 'deepseek']).deepseekPackageRoot, null);
   assert.throws(() => parseArgs(['--host', 'other']), /invalid_host/);
   assert.throws(() => parseArgs(['--timeout-ms', '999999999']), /invalid_timeout_ms/);
   assert.throws(() => parseArgs(['--unknown', 'secret-value']), /unknown_option/);
+});
+
+test('DeepSeek runtime evidence parser rejects claims without exact native pipeline assertions', () => {
+  const names = [
+    'cordis_plugin_mounted', 'cordis_plugin_unmounted', 'task_ready', 'tool_and_outcome', 'repeat_provider_once',
+    'repeat_is_not_tool_retry_protection', 'accepted_failure_recorded', 'cancel_skips_body', 'async_disposal_waited',
+    'post_dispose_unobserved', 'caller_kernel_remains_open', 'no_ground_truth_labels',
+    'no_observer_errors',
+  ];
+  const report = { schemaVersion: 1, evidenceLevel: 'native_tool_pipeline', agentE2E: false,
+    classification: 'synthetic_classification', hostVersion: '0.1.2-rc.1', status: 'passed',
+    reason: 'native_tool_pipeline_passed', assertions: names.map(name => ({ name, passed: true })) };
+  const assessed = evaluateDeepSeekProbeOutput(JSON.stringify({ ...report,
+    assertions: report.assertions.map(item => ({ ...item, extra: 'DO_NOT_FORWARD' })) }));
+  assert.equal(assessed?.status, 'passed');
+  assert.equal(JSON.stringify(assessed).includes('DO_NOT_FORWARD'), false);
+  assert.equal(evaluateDeepSeekProbeOutput(JSON.stringify({ ...report, agentE2E: true })), null);
+  assert.equal(evaluateDeepSeekProbeOutput(JSON.stringify({ ...report, assertions: report.assertions.slice(1) })), null);
+  assert.equal(evaluateDeepSeekProbeOutput(JSON.stringify({ ...report, assertions: report.assertions.map((item, i) => i === 5 ? { ...item, passed: false } : item) })), null);
+  assert.equal(evaluateDeepSeekProbeOutput('not-json'), null);
+});
+
+test('DeepSeek opt-in fails clearly for absent package without discovering or starting a model', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'rm-deepseek-absent-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const options = parseArgs(['--host', 'deepseek', '--deepseek-package-root', join(directory, 'missing'), '--node-command', process.execPath]);
+  const report = await runCompatibilityProbe(options);
+  assert.equal(report.status, 'failed');
+  assert.equal(report.reason, 'host_package_missing');
+  assert.equal(report.evidenceLevel, 'none');
+  assert.equal(report.agentE2E, false);
+  assert.equal(report.results[0].requestedEvidenceLevel, 'native_tool_pipeline');
+  const script = fileURLToPath(new URL('../scripts/deepseek-runtime-probe.mjs', import.meta.url));
+  const standalone = spawnSync(process.execPath, [script, join(directory, 'missing')], { encoding: 'utf8', timeout: 5000 });
+  assert.equal(standalone.status, 1);
+  assert.equal(JSON.parse(standalone.stdout).reason, 'host_package_missing');
+});
+
+test('DeepSeek opt-in rejects an unsupported package version before loading modules', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'rm-deepseek-version-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const scope = join(directory, '@deepseek-ai');
+  for (const [folder, name, version] of [
+    ['dsh', '@deepseek-ai/dsh', '9.0.0'],
+    ['dsh-tools', '@deepseek-ai/dsh-tools', '0.1.2-rc.1'],
+    ['dsh-system-prompt', '@deepseek-ai/dsh-system-prompt', '0.1.2-rc.1'],
+    ['cordis', '@deepseek-ai/cordis', '4.0.2'],
+  ]) {
+    const target = join(scope, folder);
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, 'package.json'), JSON.stringify({ name, version }));
+  }
+  const options = parseArgs(['--host', 'deepseek', '--deepseek-package-root', join(scope, 'dsh'), '--node-command', process.execPath]);
+  const report = await runCompatibilityProbe(options);
+  assert.equal(report.status, 'failed');
+  assert.equal(report.reason, 'unsupported_host_version');
+  assert.equal(report.hostVersion, 'DeepSeek Harness 9.0.0');
+  assert.equal(report.evidenceLevel, 'none');
+});
+
+test('DeepSeek without package-root preserves version-only discovery', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'rm-deepseek-version-only-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const fake = join(directory, 'fake-dsh.mjs');
+  await writeFile(fake, "process.stdout.write('dsh 0.1.2-rc.1\\n');\n");
+  const options = parseArgs(['--host', 'deepseek', '--deepseek-command', process.execPath,
+    '--deepseek-command-arg', fake]);
+  const report = await runCompatibilityProbe(options);
+  assert.equal(report.status, 'discovered_not_exercised');
+  assert.equal(report.evidenceLevel, 'version_only');
+  assert.equal(report.agentE2E, false);
 });
 
 test('Windows command discovery accepts native executables and rejects shell shims', async t => {

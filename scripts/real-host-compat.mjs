@@ -34,6 +34,7 @@ const ARGUMENTS = Object.freeze({
   '--codex-command': 'codexCommand',
   '--claude-command': 'claudeCommand',
   '--deepseek-command': 'deepseekCommand',
+  '--deepseek-package-root': 'deepseekPackageRoot',
   '--node-command': 'nodeCommand',
   '--timeout-ms': 'timeoutMs',
   '--version-timeout-ms': 'versionTimeoutMs',
@@ -71,6 +72,7 @@ export function parseArgs(argv, defaults = {}) {
     codexCommand: 'codex',
     claudeCommand: 'claude',
     deepseekCommand: null,
+    deepseekPackageRoot: null,
     nodeCommand: process.execPath,
     codexCommandArgs: [],
     claudeCommandArgs: [],
@@ -96,6 +98,7 @@ export function parseArgs(argv, defaults = {}) {
   parsed.repoRoot = resolve(parsed.repoRoot);
   parsed.mcpServer = resolve(parsed.mcpServer ?? join(parsed.repoRoot, 'adapters', 'mcp-server.mjs'));
   parsed.claudeHook = resolve(parsed.claudeHook ?? join(parsed.repoRoot, 'adapters', 'claude-task-hook.mjs'));
+  if (parsed.deepseekPackageRoot !== null) parsed.deepseekPackageRoot = resolve(parsed.deepseekPackageRoot);
   return parsed;
 }
 
@@ -153,6 +156,7 @@ export function runBounded(executable, args, {
   timeoutMs,
   stdoutLimitBytes,
   stderrLimitBytes,
+  captureNonzeroStdout = false,
 } = DEFAULT_LIMITS) {
   return new Promise(resolveResult => {
     let settled = false;
@@ -234,7 +238,8 @@ export function runBounded(executable, args, {
     child.once('close', code => {
       if (timedOut) return finish({ ok: false, kind: 'timeout' });
       if (overflow) return finish({ ok: false, kind: overflow });
-      if (code !== 0) return finish({ ok: false, kind: 'nonzero_exit' });
+      if (code !== 0) return finish({ ok: false, kind: 'nonzero_exit',
+        ...(captureNonzeroStdout && code === 1 ? { stdout: Buffer.concat(stdout).toString('utf8') } : {}) });
       finish({ ok: true, stdout: Buffer.concat(stdout).toString('utf8') });
     });
   });
@@ -431,7 +436,7 @@ function fixedAssertions(host) {
   return [assertion('installation_discovered', false), assertion('version_captured', false), assertion('e2e_exercised', false)];
 }
 
-function hostReport(host, testedAt, hostVersion, adapterVersion, status, reason, assertions, started) {
+function hostReport(host, testedAt, hostVersion, adapterVersion, status, reason, assertions, started, extras = {}) {
   return {
     host,
     testedAt,
@@ -441,6 +446,7 @@ function hostReport(host, testedAt, hostVersion, adapterVersion, status, reason,
     reason,
     assertions,
     durationMs: Math.max(0, Date.now() - started),
+    ...extras,
   };
 }
 
@@ -613,26 +619,77 @@ async function runClaude(options, adapterVersion) {
   } finally { removeTemp(directory, prefix); }
 }
 
+const DEEPSEEK_ASSERTIONS = Object.freeze([
+  'cordis_plugin_mounted', 'cordis_plugin_unmounted', 'task_ready', 'tool_and_outcome', 'repeat_provider_once',
+  'repeat_is_not_tool_retry_protection', 'accepted_failure_recorded', 'cancel_skips_body', 'async_disposal_waited',
+  'post_dispose_unobserved', 'caller_kernel_remains_open', 'no_ground_truth_labels',
+  'no_observer_errors',
+]);
+const DEEPSEEK_FAILURES = new Set(['host_package_missing', 'unsupported_host_version', 'host_load_failed', 'probe_assertion_failed', 'probe_execution_failed']);
+
+/** Accept only the bounded child's fixed evidence contract; never echo arbitrary output. */
+export function evaluateDeepSeekProbeOutput(stdout) {
+  let value;
+  try { value = JSON.parse(stdout.trim()); } catch { return null; }
+  if (!value || value.schemaVersion !== 1 || value.evidenceLevel !== 'native_tool_pipeline' || value.agentE2E !== false
+    || value.classification !== 'synthetic_classification' || !Array.isArray(value.assertions)) return null;
+  const version = typeof value.hostVersion === 'string' && /^[0-9A-Za-z.+_-]{1,64}$/.test(value.hostVersion) ? value.hostVersion : 'unknown';
+  if (value.status === 'passed' && version === '0.1.2-rc.1' && value.reason === 'native_tool_pipeline_passed'
+    && value.assertions.length === DEEPSEEK_ASSERTIONS.length
+    && DEEPSEEK_ASSERTIONS.every((name, index) => value.assertions[index]?.name === name && value.assertions[index]?.passed === true)) {
+    return { status: 'passed', reason: value.reason, version, assertions: DEEPSEEK_ASSERTIONS.map(name => assertion(name, true)) };
+  }
+  if (value.status === 'failed' && DEEPSEEK_FAILURES.has(value.reason)) {
+    return { status: 'failed', reason: value.reason, version, assertions: DEEPSEEK_ASSERTIONS.map(name => assertion(name, false)) };
+  }
+  return null;
+}
+
+async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
+  const host = 'deepseek';
+  const extra = { evidenceLevel: 'none', requestedEvidenceLevel: 'native_tool_pipeline', agentE2E: false, classification: 'synthetic_classification' };
+  const spec = processSpec(options.nodeCommand, options.nodeCommandArgs, 'node', process.env);
+  if (!spec) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'node_command_not_found', [], started, extra);
+  const child = await runBounded(spec.executable, [...spec.prefixArgs, join(options.repoRoot, 'scripts', 'deepseek-runtime-probe.mjs'), options.deepseekPackageRoot], {
+    cwd: options.repoRoot,
+    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR },
+    timeoutMs: options.timeoutMs,
+    stdoutLimitBytes: Math.min(options.stdoutLimitBytes, 64 * 1024),
+    stderrLimitBytes: options.stderrLimitBytes,
+    captureNonzeroStdout: true,
+  });
+  if (!child.ok && !(child.kind === 'nonzero_exit' && typeof child.stdout === 'string')) {
+    return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', processFailureReason(child), [], started, extra);
+  }
+  const assessed = evaluateDeepSeekProbeOutput(child.stdout);
+  if (!assessed) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_output_invalid', [], started, extra);
+  if (child.ok !== (assessed.status === 'passed')) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_exit_mismatch', [], started, extra);
+  const hostVersion = assessed.version === 'unknown' ? 'unknown' : `DeepSeek Harness ${assessed.version}`;
+  return hostReport(host, testedAt, hostVersion, adapterVersion, assessed.status, assessed.reason, assessed.assertions, started,
+    { ...extra, evidenceLevel: assessed.status === 'passed' ? 'native_tool_pipeline' : 'none' });
+}
+
 async function runDeepSeek(options, adapterVersion) {
   const host = 'deepseek', testedAt = new Date().toISOString(), started = Date.now();
+  if (options.deepseekPackageRoot) return runDeepSeekRuntime(options, adapterVersion, testedAt, started);
   const commands = options.deepseekCommand ? [options.deepseekCommand] : ['dsh', 'deepseek-harness'];
   let spec = null;
   for (const command of commands) {
     spec = processSpec(command, options.deepseekCommandArgs, host, process.env);
     if (spec) break;
   }
-  if (!spec) return unavailableReport(host, testedAt, adapterVersion, started);
+  if (!spec) return { ...unavailableReport(host, testedAt, adapterVersion, started), evidenceLevel: 'none', agentE2E: false };
   const version = await discoverVersion(host, spec, options);
   if (!version.ok) return hostReport(host, testedAt, version.version, adapterVersion, 'failed', version.reason, [
     assertion('installation_discovered', true),
     assertion('version_captured', false),
     assertion('e2e_exercised', false),
-  ], started);
+  ], started, { evidenceLevel: 'none', agentE2E: false });
   return hostReport(host, testedAt, version.version, adapterVersion, 'discovered_not_exercised', 'discovered_not_exercised', [
     assertion('installation_discovered', true),
     assertion('version_captured', version.version !== 'unknown'),
     assertion('e2e_exercised', false),
-  ], started);
+  ], started, { evidenceLevel: 'version_only', agentE2E: false });
 }
 
 function aggregateStatus(results) {
@@ -666,6 +723,10 @@ export async function runCompatibilityProbe(options) {
     assertions: results.flatMap(result => result.assertions.map(value => ({ host: result.host, ...value }))),
     durationMs: Math.max(0, Date.now() - started),
     results,
+    ...(results.length === 1 && results[0].host === 'deepseek'
+      ? { evidenceLevel: results[0].evidenceLevel, agentE2E: false,
+        ...(results[0].classification ? { classification: results[0].classification } : {}) }
+      : {}),
   };
 }
 
