@@ -14,7 +14,9 @@ logged-in host/model, and from the default offline suite.
 ## Run
 
 The installed-host check currently accepts **Windows and Claude Code 2.1.263
-only**, with Node 22.16+. Other versions/platforms fail closed; the command does
+only**, with a Node runtime satisfying both the 22.16+ API floor and the
+[actual SQLite WAL write gate](SQLITE-RUNTIME.md). Node 22.16.0 itself does not
+pass that gate. Other host versions/platforms fail closed; the command does
 not install, downgrade or change Claude. A version match is not a signature check:
 the installed executable, OS environment and repository checkout must be trusted.
 

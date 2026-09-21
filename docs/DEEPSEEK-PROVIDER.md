@@ -32,7 +32,9 @@ never received the request.
 
 ## Account-free inspection, then explicit one-request example
 
-Use Node.js 22.16+ and build locally. The first command only prints help after
+Use a Node runtime meeting the [SQLite WAL write requirement](SQLITE-RUNTIME.md)
+(the 22.16+ API floor alone is insufficient) and build locally.
+The first command only prints help after
 the build; it does not discover a profile, read a key, create a ledger or make a
 remote request:
 

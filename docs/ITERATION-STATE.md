@@ -453,6 +453,9 @@ No existing PR is merged or retargeted. Verify the new published head's own CI.
 ## Current increment: SQLite runtime preflight
 
 Current increment: **SQLite runtime preflight**, based on PR #17's `09bd885`.
+Published as [PR #18](https://github.com/luomo66ccff/reflexmesh/pull/18);
+implementation commit `46bfdb0539804faf9a358fbfe41861877c7bf0d1` passed clean-head
+focused tests **8/8**. Subsequent onboarding corrections are documentation-only.
 No existing PR is merged or retargeted. Persistent writable kernels and product
 directory-creation entrypoints now reject affected/unknown SQLite runtimes
 before touching the ledger. Read-only history, in-memory kernels, separate

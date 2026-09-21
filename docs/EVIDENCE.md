@@ -13,6 +13,10 @@ from totals and never recommends automatic deletion; see the
 
 From a clone with Node.js 22.16 or newer:
 
+This is the API floor for read-only inspection. Any command or example that
+creates a persistent ledger also needs the
+[actual SQLite WAL write gate](SQLITE-RUNTIME.md); Node 22.16.0 does not pass it.
+
 ```bash
 npm ci --ignore-scripts
 npm run demo:evidence
