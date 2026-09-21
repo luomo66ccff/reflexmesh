@@ -32,3 +32,4 @@ jobs:
       - run: npm run demo
       - run: npm run demo:durable
       - run: npm run demo:recovery
+      - run: npm run demo:evidence

@@ -1,0 +1,51 @@
+# ReflexMesh iteration state
+
+## Long-term objective and completion boundary
+
+Keep iterating toward a distinctive, useful and easy-to-start semantic decision
+runtime, with no known unresolved defects within a clearly tested release scope.
+The user objective is broader than this increment. A green suite or one PR does
+not prove the project bug-free or finish the whole objective.
+
+The product direction remains **one contract, durable evidence, multiple
+harnesses**. Its practical value is explaining what was decided, from which
+limited task evidence, under which immutable provider/pack binding, separately
+from what a host reports happened. Replaying policy must never run a tool.
+
+## Completed foundation
+
+- Recovery review and task-evidence PRs #2 and #3 are merged. Their final main
+  CI run [35511931142](https://github.com/luomo66ccff/reflexmesh/actions/runs/35511931142)
+  passed Ubuntu/Node 22 and Windows/Node 22/24. This is baseline evidence, not
+  CI evidence for later commits.
+- Preserve shadow defaults, host-owned authorization, immutable bindings,
+  minimized task summaries, provenance separation, and UNKNOWN no-retry rules.
+- Historical narrow Codex/Claude live probes remain dated evidence in
+  [VALIDATION-REAL-HOSTS.md](VALIDATION-REAL-HOSTS.md), not a full host matrix.
+
+## Current increment: host evidence experience
+
+- Read-only, bounded evidence `list` / `inspect`, including explanations,
+  task coverage, outcome provenance, and recovery uncertainty.
+- Credential-free `demo:evidence` walkthrough, explicitly synthetic.
+- DeepSeek Cordis plugin wrapper and opt-in installed native tool-pipeline
+  probe, explicitly **not CLI/Agent/model E2E**.
+- Actual validation, regressions found and evidence limits are recorded in
+  [VALIDATION-HOST-EXPERIENCE.md](VALIDATION-HOST-EXPERIENCE.md).
+
+## Unfinished acceptance gates
+
+| Gate | Remaining work |
+| --- | --- |
+| Actual host lifecycle | DeepSeek CLI profile + Agent loop; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. |
+| Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
+| Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
+| Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
+| Easy onboarding | Real first-run validation across supported hosts/platforms, actionable diagnostics, installation guidance without silent credential/settings changes. |
+| Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
+
+Next increments should close the host lifecycle gaps before broadening the
+provider surface. No dashboard, new agent framework, automatic writes, or
+automatic threshold loosening is part of this plan. Missing real-host credentials
+or a new external authority requirement should be stated precisely; it does not
+justify fabricated evidence or abandoning independently verifiable work.

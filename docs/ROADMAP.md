@@ -2,6 +2,9 @@
 
 Updated for **v0.2.0-alpha.1**, 2026-09-19. See [ADR-0001](ADR-0001.md) for positioning and [DURABLE-SHADOW](DURABLE-SHADOW.md) for the implemented protocol. Version labels describe scope, not promised delivery dates.
 
+The current incremental evidence and unfinished acceptance gates are tracked in
+[ITERATION-STATE.md](ITERATION-STATE.md). Earlier validation reports remain dated snapshots.
+
 ## Implemented alpha slice
 
 - [x] Preserve the v0.1 runtime, deterministic policy, Jev/Mock adapters and all 45 original tests.
@@ -17,14 +20,16 @@ Updated for **v0.2.0-alpha.1**, 2026-09-19. See [ADR-0001](ADR-0001.md) for posi
 - [x] Add read-only inspection, transactional schema-2 migration and typed label validation.
 - [x] Add 32 focused recovery/label tests and a credential-free recovery demo; see [validation scope](VALIDATION-RECOVERY.md).
 - [x] Add an isolated real-host probe and exercise pinned Codex and Claude smoke paths; see [validation](VALIDATION-REAL-HOSTS.md).
-- [ ] Load the observer through the actual DeepSeek Harness plugin lifecycle; current evidence is version discovery only.
+- [x] Add a read-only evidence CLI and account-free explained walkthrough, with explicit task coverage and outcome provenance.
+- [x] Load the observer through installed DeepSeek/Cordis native tool components, including disposal and pre-dispatch cancellation; classification is synthetic.
+- [ ] Exercise DeepSeek's CLI profile loader and actual Agent/model lifecycle; native tool-pipeline evidence does not close this gate.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 
 ## Next: v0.2 alpha hardening
 
 **First gate: actual host compatibility and useful evidence.** Run each real host against the adapter, including cancellation, parallel tools, agent identity and shutdown. Record which CLI/plugin revision passed. Capture host-owned task intent through an explicit minimization policy rather than treating tool-only evidence as a complete task description. Do not silently read full transcripts or inherit credentials.
 
-The first real-host baseline now covers one Codex MCP smoke and one Claude prompt/hook/read/outcome path. DeepSeek E2E, cancellation, parallel tools, subagents and restart remain open; a discovered executable is not counted as an exercised host.
+The real-host baseline covers one Codex MCP smoke, one Claude prompt/hook/read/outcome path, and an opt-in DeepSeek native tool pipeline. DeepSeek CLI/Agent E2E and a complete cross-host cancellation, parallel-tool, subagent and restart matrix remain open. A discovered executable is not counted as an exercised host.
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 

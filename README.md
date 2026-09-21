@@ -57,7 +57,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
 | Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
 | Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
-| DeepSeek Harness | Source-matched `tools/pre-execute` + `tools/result` observer; preserves `next()` and supports disposal |
+| DeepSeek Harness | Cordis plugin + `tools/pre-execute` / `tools/result` observer; preserves `next()` and supports async disposal; native tool pipeline tested, Agent E2E still open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
@@ -65,7 +65,9 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 
 **Initial alpha verification:** 79 offline tests passed before the recovery-review change, including spawned MCP/Claude protocol processes and SQLite process-kill/race tests. Actual Codex, Claude Code and DeepSeek applications were **not installed or exercised** in that environment. Real Jev inference was **not run**. See the [initial validation](docs/VALIDATION.md) and [recovery validation scope](docs/VALIDATION-RECOVERY.md).
 
-**Current real-host baseline (2026-09-19):** Codex CLI 0.155.0-alpha.9.2 passed an actual isolated STDIO MCP smoke, and Claude Code 2.1.263 passed an actual prompt/hook/read/outcome path with zero labels. DeepSeek Harness 0.1.2-rc.1 was discovered but **not exercised end to end**. See [VALIDATION-REAL-HOSTS.md](docs/VALIDATION-REAL-HOSTS.md) for exact assertions and untested boundaries. The opt-in probe may invoke a logged-in host/model; it is not part of offline CI.
+**Historical CLI baseline (2026-09-19):** Codex CLI 0.155.0-alpha.9.2 passed an isolated STDIO MCP smoke, and Claude Code 2.1.263 passed a prompt/hook/read/outcome path with zero labels. Those paths were not rerun for this increment. See [VALIDATION-REAL-HOSTS.md](docs/VALIDATION-REAL-HOSTS.md) for exact assertions and untested boundaries. Codex/Claude opt-in probes may invoke a logged-in host/model; they are not part of offline CI.
+
+**DeepSeek increment:** the installed 0.1.2-rc.1 native tool pipeline can now load the observer via Cordis and exercise a synthetic task without loading a user profile or model. This is **not CLI/Agent/model E2E**. See the [plugin guide](docs/DEEPSEEK-HOST.md), [increment validation](docs/VALIDATION-HOST-EXPERIENCE.md), and [open acceptance gates](docs/ITERATION-STATE.md).
 
 ## Review an unknown execution
 
