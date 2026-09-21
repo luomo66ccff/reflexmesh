@@ -14,6 +14,7 @@ import plugin from '../adapters/deepseek-loader-plugin.mjs';
 import { fromClaudeHook } from '../dist/index.js';
 import { createLedgerBackup } from '../adapters/backup.mjs';
 import { applyLedgerCompaction } from '../adapters/compaction.mjs';
+import { applyLedgerAuditArchive } from '../adapters/audit-archive.mjs';
 
 assert.equal(process.versions.node, '22.16.0', 'Use the pinned affected Node only');
 const runtime = inspectSqliteRuntime();
@@ -53,6 +54,10 @@ try {
   await assert.rejects(applyLedgerCompaction({ dbPath: historical, backupDirectory: archiveDir,
     planDirectory: compactionDir, quiescent: true }), blocked);
   assert.equal(existsSync(compactionDir), false); assert.deepEqual(readFileSync(historical), bytes); assertions++;
+  const archivalDir = join(root, 'blocked-archival');
+  await assert.rejects(applyLedgerAuditArchive({ dbPath: historical, backupDirectory: archiveDir,
+    planDirectory: archivalDir, quiescent: true }), blocked);
+  assert.equal(existsSync(archivalDir), false); assert.deepEqual(readFileSync(historical), bytes); assertions++;
 
   const run = (entry, args = [], extra = {}) => spawnSync(process.execPath,
     [fileURLToPath(new URL(`../adapters/${entry}`, import.meta.url)), ...args],

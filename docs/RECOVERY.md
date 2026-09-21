@@ -7,6 +7,13 @@ For a consistent local archive before an operational change, use the separate
 current ledger or turns a valid older snapshot into restoration authority;
 newer admission/pairing guards and external effects still require reconciliation.
 
+Explicit [audit archival](AUDIT-ARCHIVAL.md) can move older audit bodies out of
+the online ledger. All reviews, observations and execution guards remain online.
+Use its `history/query` with the exact external archive to inspect older audit;
+an absent online row is not proof of non-execution. A new schema-4 backup contains
+coverage references, not the earlier archives' bodies. Retrieval never grants
+retry/restore authority or changes the operator-review requirements below.
+
 ## Operational meaning
 
 Two facts remain separate:

@@ -511,7 +511,7 @@ each, all seven offline demos and both old-runtime **12-group** negative jobs.
 The new backup symlink regression executed successfully on Windows CI; only
 the existing review-input skip remained. This is historical base evidence.
 
-## Current increment: all-record ledger compaction
+## Reviewed increment: all-record ledger compaction
 
 `feat/ledger-retention` is based on PR #19's exact `feee864`, not merged main.
 The branch delivers physical compaction, **not historical evidence retention**.
@@ -541,6 +541,44 @@ No existing PR is merged or retargeted; verify the published head's own CI.
   calls or real-user-ledger work. See [guide](LEDGER-COMPACTION.md) and
   [validation t001](VALIDATION-LEDGER-COMPACTION-T001.md).
 
+PR #20 exact head `c4471de112666bcee6c9ac883b70014b0b08e695` passed
+[CI 35662335169](https://github.com/luomo66ccff/reflexmesh/actions/runs/35662335169):
+Ubuntu/Node 22 **777/777**, Windows/Node 22/24 **776 passed, one existing skip**
+each, all eight offline demos and both old-runtime **13-group** negative jobs.
+This is historical base evidence, not archival CI.
+
+## Current increment: explicit audit archival and verified lookup
+
+`feat/audit-archival` is based on PR #20's exact `c4471de`, not merged main.
+No existing PR is merged or retargeted; verify this branch's own published CI.
+
+- Explicit backup-bound preview/apply removes selected historical audit rows
+  only. Schema 4 and per-run/batch coverage are committed atomically with the
+  deletion; the global highwater row, six non-audit tables and existing metadata
+  remain. Ordinary fresh ledgers remain 3, existing 4 is never downgraded.
+- Read-only history and explicit one-batch archive query verify the full selected
+  run before bounded output. Evidence views distinguish online from archived
+  history. Missing/wrong archive is unverified, not missing-action evidence.
+- One exclusive maintenance transaction requires all other connections closed,
+  including idle readers. One-shot attempts retain unknown post-dispatch
+  outcomes. Raw byte/BigInt digests, sequence exhaustion and metadata validation
+  preserve the no-retry/idempotency boundary; no other evidence body is pruned.
+- Legacy v1/seven-table backup/compaction artifacts remain unchanged. Schema 4
+  uses v2/nine-table artifacts; a new full backup contains online references,
+  not older external bodies. Archive availability remains separately unverified.
+- Windows Node 22.23.2 and 24.19.0 passed **810 full-suite tests: 808 passed,
+  zero failed, two existing local symlink skips** each. After a final test-only
+  child-timeout fix/addition, all **34 focused tests** passed on both runtimes;
+  the next full CI has 811 cases. All **nine offline demos** and the affected
+  Node 22.16.0 **14 negative groups** passed. Old v1 artifacts and new v2/schema4
+  readonly verification were exercised, including the affected old runtime.
+- The retained synthetic lesson archives 42 then 1 audit rows, retrieves original
+  run detail bytes, and verifies nine-table compaction plus replay/UNKNOWN/pair
+  guards. Scoped independent review/root verification closed bounded-scan,
+  encoding and test-child-cleanup defects; no remaining reviewed P1/P2.
+  No real ledger, paid model, production restore or global runtime changes.
+  See [guide](AUDIT-ARCHIVAL.md) and [validation t001](VALIDATION-AUDIT-ARCHIVAL-T001.md).
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
@@ -548,15 +586,16 @@ No existing PR is merged or retargeted; verify the published head's own CI.
 | Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
-| Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation and explicit all-record compaction are implemented. Historical retention with archival coverage and ID/version guards, production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness or restore authority. |
+| Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
 | Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 The independently labeled, separately bound comparison/report workflow is now
 implemented with an explicit provenance and descriptive-only boundary. Next,
-prioritize explicit archival coverage and batch/tombstone contracts for actual
-historical retention, beyond the implemented diagnostics, runtime gate,
-backup/restore validation and all-record compaction, alongside remaining lifecycle evidence;
+prioritize independent stacked-PR integration and a release-candidate first-run
+check so implemented features reach the default checkout. Audit archival/lookup
+is now implemented, while other evidence-body retention and broader operational
+acceptance remain open, alongside remaining lifecycle evidence;
 newly discovered lifecycle blockers take priority. Real comparative quality
 requires suitable independent labels and distinct approved provider routes,
 not repeated same-model synthetic calls. This sequence does not certify the broad host gate

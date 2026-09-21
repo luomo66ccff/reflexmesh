@@ -30,6 +30,7 @@ export function formatStorageReport(report) {
     ? `Claude pair states in scanned sample: ${counts(data.pairStates.counts)}; pair-only=${data.pairStates.pairOnly}`
     : 'Claude pair guards: not recorded by this schema.');
   lines.push('Preserve run tombstones and pair guards, including completed, reviewed UNKNOWN and expired leases.',
+    ...(data.ledgerSchemaVersion >= 4 ? ['Archive metadata is online; earlier external audit archives have NOT been checked. Use explicit audit-archive history/query.'] : []),
     'No age-based deletion eligibility is computed. Counts do not authorize deleting audit, labels, reviews or packs.',
     'No DELETE, VACUUM, checkpoint, profile/provider access, review application or automatic retry is performed.',
     'SQLite WAL readers may touch shared-memory sidecars; read-only does not mean byte-for-byte filesystem immutability.',

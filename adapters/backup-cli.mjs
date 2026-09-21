@@ -10,6 +10,7 @@ Build first. Local trusted private directories only; existing output directories
 Create writes a full, unencrypted ledger copy. Source application rows are read-only.
 Timeout/cancel/failure retains incomplete output; inspect manually, do not automatically retry.
 Verify is local and read-only, not origin authentication or permission to restore an old snapshot.
+Schema4 backups preserve online coverage, not older external audit bodies; external archive availability is NOT checked.
 There is no production restore, deletion, provider call, or tool execution command.
 For Windows paths containing spaces use this quoted Node entrypoint directly, not npm forwarding.
 `;
@@ -67,6 +68,7 @@ export async function backupMain(argv = process.argv.slice(2), output = process.
       `Ledger schema ${report.manifest.ledgerSchemaVersion}; ${report.manifest.database.bytes} bytes; SHA256 ${report.manifest.database.sha256}`,
       'SQLite integrity, foreign keys and recognized schema passed; bounded counts are in the manifest.',
       'This is a full unencrypted ledger copy, not a minimized dataset. Protect its directory.',
+      ...(report.manifest.ledgerSchemaVersion === 4 ? ['Older external audit archives are NOT included or verified. Keep every referenced archive.'] : []),
       'Freshness and origin are not attested. Restore is NOT authorized; UNKNOWN stays non-retryable.',
       'Never overwrite a live ledger or lose newer admission/pairing guards. See docs/LEDGER-BACKUP.md.', '',
     ].join('\n'));

@@ -14,6 +14,7 @@ const USAGE = `ReflexMesh evidence: explain decisions separately from host outco
 States: admitted, executing, completed, unknown. Pages are ordered by key, not recency.
 Attention covers decision rows only; pair-only reservations are excluded, and this is not a complete error inventory.
 Storage includes bounded table/pair-only counts and file lengths, never deletion eligibility or automatic cleanup.
+Archived audit bodies require audit-archive-cli history/query and explicit archive files; a backup does not verify external archives.
 No provider, tool, permission change or replay is invoked. Use --json for metadata receipts.
 The database must already exist. Build once with npm run build before using this CLI.
 For paths containing spaces on Windows, use the direct node adapters/evidence-cli.mjs entrypoint with a quoted path.
@@ -61,6 +62,7 @@ export function formatEvidence(result, command) {
     for (const item of result.items) {
       lines.push(`${quote(item.key)} | run: ${item.run.state} | outcome observations: ${item.hostOutcome.status} [${sources(item)}] | hook pairing: ${item.hostOutcome.hookPairing.state}`);
       for (const reason of item.attention.reasons) lines.push(`  ${reason.code}: ${reason.explanation}`);
+      if (item.auditHistory?.archived) lines.push('  Audit history partially archived; external archive availability not checked.');
     }
     if (!result.items.length) lines.push('No matching decision rows; absence is not proof of host safety or non-execution.');
     if (result.nextCursor !== null) lines.push(`Next page: --after ${quote(result.nextCursor)}`);
@@ -69,7 +71,7 @@ export function formatEvidence(result, command) {
   }
   if (command === 'list') {
     const lines = ['ReflexMesh evidence (read-only; key order, not chronological)'];
-    for (const item of result.items) lines.push(`${quote(item.key)} | run: ${item.run.state} | decision: ${item.decision.effect ?? 'not recorded'} | host outcome: ${item.hostOutcome.status} [${sources(item)}] | task: ${item.taskEvidence.recordedStatus} | hook pairing: ${item.hostOutcome.hookPairing?.state ?? 'not_recorded'}`);
+    for (const item of result.items) lines.push(`${quote(item.key)} | run: ${item.run.state} | decision: ${item.decision.effect ?? 'not recorded'} | host outcome: ${item.hostOutcome.status} [${sources(item)}] | task: ${item.taskEvidence.recordedStatus} | hook pairing: ${item.hostOutcome.hookPairing?.state ?? 'not_recorded'}${item.auditHistory?.archived ? ' | audit: partially archived (availability not checked)' : ''}`);
     if (!result.items.length) lines.push('No matching calls. A completed shadow decision is not proof of host execution.');
     if (result.nextCursor !== null) lines.push(`Next page: --after ${quote(result.nextCursor)}`);
     lines.push('Use inspect --db PATH --key KEY to see binding, reasons and evidence coverage.');
@@ -89,6 +91,7 @@ export function formatEvidence(result, command) {
     `Outcome sources: ${sources(result)}`,
     `Claude hook pairing: ${result.hostOutcome.hookPairing?.state ?? 'not_recorded'}; reason: ${result.hostOutcome.hookPairing?.reasonCode ?? 'none'}`,
     `Recovery required: ${result.recovery.required}; operator conclusion: ${result.recovery.resolution ?? 'none'}; execution allowed by this inspector: false`,
+    ...(result.auditHistory ? [`Audit: ${result.auditHistory.archivedRowCount} archived rows in ${result.auditHistory.batchCount} batches; external files not checked.`] : []),
     ...result.notes,
   ].join('\n') + '\n';
 }

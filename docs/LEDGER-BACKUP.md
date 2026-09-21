@@ -103,7 +103,7 @@ This is not a power-loss/directory-fsync durability certification.
 
 ## What verify establishes
 
-The verifier accepts only the repository-generated schema-1/2/3 structures,
+The verifier accepts only the repository-generated schema-1/2/3/4 structures,
 including their known constraints and indexes. Unknown/custom schema variants
 fail closed rather than being normalized. It checks SQLite integrity and
 foreign keys, a standalone DELETE header/journal and absent sidecars, full-file
@@ -111,6 +111,13 @@ SHA256/length, and a strict manifest bound by COMPLETE. Raw header checks preced
 SQLite open, so a standalone WAL-header input is rejected without generating
 new sidecars. No schema migration, repair or journal conversion happens during
 verification.
+
+Schemas 1–3 retain the original v1 manifest and seven-table summary shape.
+Schema 4 uses v2 with nine tables, including audit archive batches/coverage.
+The backup contains all **online** records, not audit bodies moved into previous
+external archives. `externalAuditArchives:"not_verified"` is explicit: a valid
+new backup does not prove that those older archives are available. Keep every
+referenced archive and use [explicit one-batch lookup](AUDIT-ARCHIVAL.md).
 
 Manifest table/state counts use a **bounded sample of at most 1000 per table**.
 Truncated totals are null, unsupported old-schema tables are null, and the sample

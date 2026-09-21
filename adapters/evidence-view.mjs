@@ -25,6 +25,11 @@ export function evidenceView(row, now) {
             : effect === 'escalate' ? 'The semantic policy requires review or more evidence.'
               : 'No policy verdict is recorded.';
   const notes = [];
+  const archiveCount = row.archived_audit_count;
+  const archiveBatches = row.audit_archive_batch_count;
+  if (archiveCount !== undefined && (!Number.isSafeInteger(archiveCount) || archiveCount < 0
+    || !Number.isSafeInteger(archiveBatches) || archiveBatches < 0)) throw new Error('Invalid audit coverage');
+  if (archiveCount > 0) notes.push('Online audit rows are not the complete recorded history. Use audit-archive history/query with explicit archive files; availability has not been checked.');
   if (row.mode === 'shadow') notes.push('Shadow observation does not grant, deny or execute a host action.');
   if (outcomeStatus === 'missing') notes.push('No host outcome is recorded; this does not prove that the action did not run.');
   else notes.push('Reported outcomes are observations, not independent truth or calibration labels.');
@@ -52,6 +57,8 @@ export function evidenceView(row, now) {
     hostOutcome: { status: outcomeStatus, count: groups.reduce((n, g) => n + g.count, 0), byProvenance: groups,
       hookPairing: { state: pairingState, reasonCode: pairingReason } },
     labelCount: row.label_count,
+    ...(archiveCount === undefined ? {} : { auditHistory: { archived: archiveCount > 0,
+      archivedRowCount: archiveCount, batchCount: archiveBatches, archiveAvailability: 'not_checked' } }),
     recovery: { required: recoveryRequired, leaseExpired: expired,
       resolution: known(row.resolution, ['unresolved','confirmed_succeeded','confirmed_failed','confirmed_not_executed']),
       executionAllowed: false },
@@ -106,6 +113,10 @@ export function evidenceColumns(schemaVersion) {
       .map(([alias, path]) => textField('r.result', path, alias)),
     "CASE WHEN json_type(r.result, '$.provider')='object' THEN 1 ELSE 0 END AS has_prediction",
     '(SELECT COUNT(*) FROM labels WHERE run_key=r.key) AS label_count',
+    ...(schemaVersion >= 4 ? [
+      '(SELECT COALESCE(SUM(row_count),0) FROM audit_archive_coverage WHERE run_key=r.key) AS archived_audit_count',
+      '(SELECT COUNT(*) FROM audit_archive_coverage WHERE run_key=r.key) AS audit_archive_batch_count',
+    ] : []),
     schemaVersion >= 3 ? '(SELECT state FROM claude_hook_pairs WHERE key=r.key) AS hook_pairing_state' : 'NULL AS hook_pairing_state',
     schemaVersion >= 3 ? '(SELECT substr(reason_code,1,64) FROM claude_hook_pairs WHERE key=r.key) AS hook_pairing_reason' : 'NULL AS hook_pairing_reason',
     `(SELECT json_group_array(json_object('status', status, 'provenance', provenance, 'count', total)) FROM (

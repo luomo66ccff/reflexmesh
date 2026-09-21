@@ -4,9 +4,11 @@ import { basename, isAbsolute } from 'node:path';
 import { SqliteKernel } from './sqlite-kernel.mjs';
 import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
 import { fileIdentity, sameOpenedFile } from './backup-files.mjs';
+import { AUDIT_ARCHIVE_TABLE_SQL, AUDIT_ARCHIVE_COLUMNS, inspectAuditArchiveMetadata } from './audit-archive-schema.mjs';
 
 const requireBuiltin = createRequire(import.meta.url);
 const TABLE_SQL = Object.freeze({
+  ...AUDIT_ARCHIVE_TABLE_SQL,
   packs: `CREATE TABLE packs (id TEXT NOT NULL, version TEXT NOT NULL, digest TEXT NOT NULL,
     body TEXT NOT NULL, PRIMARY KEY(id, version)) STRICT`,
   runs: `CREATE TABLE runs (key TEXT PRIMARY KEY, request_digest TEXT NOT NULL,
@@ -31,6 +33,7 @@ const TABLE_SQL = Object.freeze({
       'invalid_state')), CHECK((state='blocked')=(reason_code IS NOT NULL))) STRICT`,
 });
 const COLUMNS = Object.freeze({
+  ...AUDIT_ARCHIVE_COLUMNS,
   packs: ['id:TEXT:1:1', 'version:TEXT:1:2', 'digest:TEXT:1:0', 'body:TEXT:1:0'],
   runs: ['key:TEXT:1:1', 'request_digest:TEXT:1:0', 'state:TEXT:1:0', 'epoch:INTEGER:1:0',
     'owner:TEXT:1:0', 'lease_until:INTEGER:1:0', 'evidence:TEXT:1:0', 'result:TEXT:0:0'],
@@ -68,7 +71,8 @@ export class BackupDatabaseError extends Error {
 const fail = code => { throw new BackupDatabaseError(code); };
 const check = (ok, code) => { if (!ok) fail(code); };
 
-function tableNames(version) { return TABLES.slice(0, version === 1 ? 5 : version === 2 ? 6 : 7); }
+function tableNames(version) { return version === 4 ? [...TABLES, ...Object.keys(AUDIT_ARCHIVE_TABLE_SQL)]
+  : TABLES.slice(0, version === 1 ? 5 : version === 2 ? 6 : 7); }
 function indexColumns(db, name) {
   check(/^[A-Za-z_][A-Za-z_0-9]*$/.test(name), 'backup_schema_unrecognized');
   return db.prepare(`PRAGMA index_info(${name})`).all().map(row => row.name);
@@ -77,7 +81,7 @@ function indexColumns(db, name) {
 /** Metadata/constraint recognition only; never parses user evidence or claims semantic correctness. */
 export function recognizedSchema(db) {
   const version = db.prepare('PRAGMA user_version').get()?.user_version;
-  check([1, 2, 3].includes(version), 'backup_schema_unrecognized');
+  check([1, 2, 3, 4].includes(version), 'backup_schema_unrecognized');
   const expected = tableNames(version);
   const objects = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'").all();
   const listed = objects.filter(row => row.type === 'table');
@@ -99,7 +103,12 @@ export function recognizedSchema(db) {
       && columns.every((column, i) => `${column.name}:${column.type}:${column.notnull}:${column.pk}` === COLUMNS[table][i]
         && column.hidden === 0 && column.dflt_value === null), 'backup_schema_unrecognized');
     const foreign = db.prepare(`PRAGMA foreign_key_list(${table})`).all();
-    check(foreign.length === (FOREIGN_TABLES.has(table) ? 1 : 0), 'backup_schema_unrecognized');
+    const references = table === 'audit_archive_batches' ? [['audit_archive_batches', 'previous_id', 'id']]
+      : table === 'audit_archive_coverage' ? [['runs', 'run_key', 'key'], ['audit_archive_batches', 'batch_id', 'id']]
+        : FOREIGN_TABLES.has(table) ? [['runs', 'run_key', 'key']] : [];
+    check(foreign.length === references.length && references.every(([target, from, to]) => foreign.some(row =>
+      row.table === target && row.from === from && row.to === to && row.on_update === 'NO ACTION'
+      && row.on_delete === 'NO ACTION')), 'backup_schema_unrecognized');
     if (FOREIGN_TABLES.has(table)) {
       const row = foreign[0];
       check(row.table === 'runs' && row.from === 'run_key' && row.to === 'key'
@@ -111,7 +120,7 @@ export function recognizedSchema(db) {
     check(unique.some(index => index.unique === 1 && indexColumns(db, index.name).join(',') === 'run_key,applied_epoch'),
       'backup_schema_unrecognized');
   }
-  if (version === 3) {
+  if (version >= 3) {
     const index = db.prepare("SELECT type,tbl_name FROM sqlite_schema WHERE name='runs_recovery_scan'").get();
     check(index?.type === 'index' && index.tbl_name === 'runs'
       && indexColumns(db, 'runs_recovery_scan').join(',') === 'state,key', 'backup_schema_unrecognized');
@@ -188,6 +197,9 @@ function inspectOpened(db, requireDelete) {
   if (requireDelete) check(db.prepare('PRAGMA journal_mode').get()?.journal_mode === 'delete', 'backup_journal_not_delete');
   check(db.prepare('PRAGMA integrity_check(1)').get()?.integrity_check === 'ok', 'backup_integrity_failed');
   check(db.prepare('PRAGMA foreign_key_check').get() === undefined, 'backup_foreign_keys_failed');
+  if (version === 4) {
+    try { inspectAuditArchiveMetadata(db, version); } catch { fail('backup_schema_unrecognized'); }
+  }
   return version;
 }
 

@@ -4,7 +4,8 @@ This explicit local maintenance workflow compacts a ReflexMesh ledger using
 SQLite VACUUM while retaining every supported table's logical contents. It is
 **not TTL retention, historical evidence deletion or a production restore tool**.
 If the ledger contains no reclaimable free pages or fragmentation, it may not
-shrink. Growing retained evidence still requires a separate retention design.
+shrink. Optional [audit archival](AUDIT-ARCHIVAL.md) is a separate, explicit
+row-deletion workflow; create a new backup/plan after it before compaction.
 
 ## Try it without an account
 
@@ -73,7 +74,7 @@ other workers or silently retrying. This entrypoint is not exposed through MCP.
 
 ## What is preserved and verified
 
-Known schema 1/2/3 is checked without migration. Full contents of every supported
+Known schema 1/2/3/4 is checked without migration. Full contents of every supported
 table are streamed into a versioned, typed hash, sorted by explicit primary keys;
 all explicit columns are included and integer values retain exact BigInt
 precision. TEXT uses raw stored bytes with typed length framing and database
@@ -100,7 +101,10 @@ and [VACUUM behavior](https://www.sqlite.org/lang_vacuum.html).
 `runs`, completed replay metadata, UNKNOWN tombstones, pending/ready/blocked and
 pair-only guards, immutable packs, all audit rows, observations, labels and
 reviews are retained. No record's age, lease or reviewed status becomes a
-deletion/retry permission. This preserves existing readers without schema 4.
+deletion/retry permission. Schema 4 also preserves both online archival metadata
+tables. Legacy schemas retain v1 seven-table plans/digests; schema 4 uses explicit
+v2 nine-table plans with a new digest domain. External archive bodies are not
+checked or compacted by this operation.
 
 ## Completion and uncertain outcomes
 
@@ -157,6 +161,5 @@ No automatic backup deletion, evidence pruning or privacy-compliance guarantee
 is provided. Production restoration still requires reconciliation of newer
 admission/pairing guards and independently verified external effects.
 
-Actual historical retention remains a separate next milestone: explicit archival
-coverage, batch receipts and necessary ID/version tombstones, plus upgraded
-readers that distinguish archived evidence from never-recorded evidence.
+Actual historical audit retention is provided separately by [audit archival](AUDIT-ARCHIVAL.md),
+with explicit coverage and lookup. Compaction never performs its row deletion.

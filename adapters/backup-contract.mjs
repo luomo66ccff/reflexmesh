@@ -1,6 +1,6 @@
 import { snapshot } from '../dist/index.js';
+import { storageTables } from './storage-view.mjs';
 
-const TABLES = Object.freeze(['packs', 'runs', 'audit', 'observations', 'labels', 'recovery_reviews', 'claude_hook_pairs']);
 const RUN_STATES = Object.freeze(['admitted', 'executing', 'completed', 'unknown']);
 const PAIR_STATES = Object.freeze(['pending', 'ready', 'blocked']);
 const HEX = /^[a-f0-9]{64}$/;
@@ -16,7 +16,7 @@ const check = ok => { if (!ok) throw new BackupManifestError(); };
 
 function validSummary(summary, version) {
   check(exact(summary, ['schemaVersion', 'kind', 'ledgerSchemaVersion', 'scanLimit', 'pages', 'tables', 'runStates', 'pairStates'])
-    && summary.schemaVersion === 1 && summary.kind === 'reflexmesh-storage-snapshot'
+    && summary.schemaVersion === (version === 4 ? 2 : 1) && summary.kind === 'reflexmesh-storage-snapshot'
     && summary.ledgerSchemaVersion === version && summary.scanLimit === 1000);
   const pages = summary.pages;
   check(exact(pages, ['pageSize', 'pageCount', 'freelistCount', 'logicalBytes', 'reusableBytes'])
@@ -25,8 +25,8 @@ function validSummary(summary, version) {
     && pages.freelistCount <= pages.pageCount && Number.isSafeInteger(pages.pageSize * pages.pageCount)
     && pages.logicalBytes === pages.pageSize * pages.pageCount
     && pages.reusableBytes === pages.pageSize * pages.freelistCount);
-  check(exact(summary.tables, TABLES));
-  for (const table of TABLES) {
+  check(exact(summary.tables, storageTables(version)));
+  for (const table of storageTables(version)) {
     const item = summary.tables[table];
     const supported = table === 'recovery_reviews' ? version >= 2
       : table === 'claude_hook_pairs' ? version >= 3 : true;
@@ -55,11 +55,12 @@ export function validateBackupManifest(input) {
   let value;
   try { value = snapshot(input); } catch { throw new BackupManifestError(); }
   check(exact(value, ['schemaVersion', 'kind', 'createdAt', 'ledgerSchemaVersion', 'database',
-    'runtime', 'summary', 'checks', 'restoreAuthorized', 'retryAllowed'])
-    && value.schemaVersion === 1 && value.kind === 'reflexmesh-ledger-backup'
+    'runtime', 'summary', 'checks', 'restoreAuthorized', 'retryAllowed',
+    ...(value.ledgerSchemaVersion === 4 ? ['externalAuditArchives'] : [])])
+    && value.schemaVersion === (value.ledgerSchemaVersion === 4 ? 2 : 1) && value.kind === 'reflexmesh-ledger-backup'
     && typeof value.createdAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.createdAt)
     && Number.isFinite(Date.parse(value.createdAt)) && new Date(value.createdAt).toISOString() === value.createdAt
-    && [1, 2, 3].includes(value.ledgerSchemaVersion)
+    && [1, 2, 3, 4].includes(value.ledgerSchemaVersion)
     && value.restoreAuthorized === false && value.retryAllowed === false);
   check(exact(value.database, ['file', 'bytes', 'sha256']) && value.database.file === 'ledger.sqlite'
     && Number.isSafeInteger(value.database.bytes) && value.database.bytes > 0
@@ -70,6 +71,7 @@ export function validateBackupManifest(input) {
     && typeof value.runtime.sqliteVersion === 'string' && value.runtime.sqliteVersion.length <= 32
     && VERSION.test(value.runtime.sqliteVersion));
   validSummary(value.summary, value.ledgerSchemaVersion);
+  check(value.ledgerSchemaVersion !== 4 || value.externalAuditArchives === 'not_verified');
   check(value.database.bytes === value.summary.pages.logicalBytes);
   check(exact(value.checks, ['integrity', 'foreignKeys', 'schema'])
     && value.checks.integrity === 'ok' && value.checks.foreignKeys === 'ok'

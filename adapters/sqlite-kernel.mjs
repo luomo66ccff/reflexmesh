@@ -5,13 +5,15 @@ import { closeSync, openSync } from 'node:fs';
 import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
 import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
-import { STORAGE_TABLES, storageView } from './storage-view.mjs';
+import { storageTables, storageView } from './storage-view.mjs';
 import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
+import { inspectAuditArchiveMetadata } from './audit-archive-schema.mjs';
 
 export const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 const requireValue = (ok, message) => { if (!ok) throw new ContractError(message); };
 const text = value => typeof value === 'string' && value.length > 0 && value.length <= 1024;
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const MAX_SQLITE_ROWID = 9223372036854775807n;
 const PAIR_REASONS = Object.freeze(['duplicate_pre', 'legacy_unpaired', 'before_failed', 'unpaired_post',
   'early_post', 'token_mismatch', 'descriptor_mismatch', 'decision_mismatch', 'run_missing',
   'action_mismatch', 'deployment_mismatch', 'request_mismatch', 'outcome_conflict', 'invalid_state']);
@@ -50,14 +52,15 @@ export class SqliteKernel {
     try {
       this.#db.exec(`PRAGMA busy_timeout=${busyTimeoutMs}; PRAGMA foreign_keys=ON;`);
       const version = this.#db.prepare('PRAGMA user_version').get().user_version;
-      requireValue([0, 1, 2, 3].includes(version) && (!readOnly || version > 0), 'Unsupported kernel schema');
+      requireValue([0, 1, 2, 3, 4].includes(version) && (!readOnly || version > 0), 'Unsupported kernel schema');
       this.#schemaVersion = version;
       if (readOnly) return; // No DDL, migration, mode changes or application writes from an inspector.
       configureJournal(this.#db, { busyTimeoutMs, inMemory: path === ':memory:' });
       this.#transaction(() => {
         // Recheck under the write lock: a concurrent opener may have migrated since the first read.
-        const lockedVersion = this.#db.prepare('PRAGMA user_version').get().user_version;
-        requireValue([0, 1, 2, 3].includes(lockedVersion), 'Unsupported kernel schema');
+        const lockedVersion = this.#schemaVersion;
+        requireValue([0, 1, 2, 3, 4].includes(lockedVersion), 'Unsupported kernel schema');
+        if (lockedVersion === 4) return; // Archival is explicit maintenance; ordinary open never downgrades it.
         this.#db.exec(`
           CREATE TABLE IF NOT EXISTS packs (
             id TEXT NOT NULL, version TEXT NOT NULL, digest TEXT NOT NULL,
@@ -100,8 +103,8 @@ export class SqliteKernel {
           CREATE INDEX IF NOT EXISTS runs_recovery_scan ON runs(state,key);
           PRAGMA user_version=3;
         `);
+        this.#schemaVersion = 3;
       });
-      this.#schemaVersion = 3;
     } catch (e) { this.#db.close(); throw e; }
   }
   #now() {
@@ -112,7 +115,12 @@ export class SqliteKernel {
   #transaction(fn) {
     requireValue(!this.#readOnly, 'Read-only kernel');
     this.#db.exec('BEGIN IMMEDIATE');
-    try { const value = fn(); this.#db.exec('COMMIT'); return value; }
+    try {
+      const version = this.#db.prepare('PRAGMA user_version').get().user_version;
+      requireValue([0, 1, 2, 3, 4].includes(version), 'Unsupported kernel schema');
+      this.#schemaVersion = version;
+      const value = fn(); this.#db.exec('COMMIT'); return value;
+    }
     catch (e) { this.#db.exec('ROLLBACK'); throw e; }
   }
   #row(key) { return this.#db.prepare('SELECT * FROM runs WHERE key=?').get(key); }
@@ -221,6 +229,9 @@ export class SqliteKernel {
     return pair ? snapshot({ state: pair.state, reasonCode: pair.reason_code }) : null;
   }
   #audit(key, kind, details) {
+    const latest = this.#db.prepare('SELECT seq FROM audit ORDER BY seq DESC LIMIT 1');
+    latest.setReadBigInts(true);
+    requireValue((latest.get()?.seq ?? 0n) < MAX_SQLITE_ROWID, 'Audit sequence exhausted');
     this.#db.prepare('INSERT INTO audit(run_key,kind,details,at) VALUES(?,?,?,?)').run(key, kind, canonical(details), this.#now());
   }
   #owned(handle) {
@@ -403,7 +414,14 @@ export class SqliteKernel {
     // One read transaction keeps pagination, decisions and outcome counts coherent.
     // This is also allowed on read-only/schema-1 connections: no migration or DDL.
     this.#db.exec('BEGIN');
-    try { const result = fn(this.#now()); this.#db.exec('COMMIT'); return snapshot(result); }
+    try {
+      const version = this.#db.prepare('PRAGMA user_version').get().user_version;
+      requireValue([1, 2, 3, 4].includes(version), 'Unsupported kernel schema');
+      this.#schemaVersion = version;
+      if (version === 4) inspectAuditArchiveMetadata(this.#db, 4);
+      const result = fn(this.#now()); this.#db.exec('COMMIT');
+      return result === undefined ? undefined : snapshot(result);
+    }
     catch (error) { this.#db.exec('ROLLBACK'); throw error; }
   }
   evidenceSnapshot(key) {
@@ -455,13 +473,94 @@ export class SqliteKernel {
     });
   }
   inspect(key) {
-    const row = this.#row(key);
-    if (!row) return undefined;
-    return snapshot({ key, state: row.state, epoch: row.epoch, latestRecoveryReview: this.#latestReview(key),
-      evidence: JSON.parse(row.evidence), result: row.result ? JSON.parse(row.result) : null,
-      audit: this.#db.prepare('SELECT kind,details,at FROM audit WHERE run_key=? ORDER BY seq').all(key).map(r => ({ ...r, details: JSON.parse(r.details) })),
-      observations: this.#db.prepare('SELECT body FROM observations WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
-      labels: this.#db.prepare('SELECT body FROM labels WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
+    requireValue(text(key), 'Invalid inspection key');
+    return this.#readEvidence(() => {
+      const row = this.#row(key);
+      if (!row) return undefined;
+      let archivedRowCount = 0, batchCount = 0;
+      if (this.#schemaVersion >= 4) {
+        const counts = this.#db.prepare('SELECT COUNT(*) AS batches,COALESCE(SUM(row_count),0) AS rows FROM audit_archive_coverage WHERE run_key=?');
+        counts.setReadBigInts(true);
+        const value = counts.get(key);
+        requireValue(value.batches <= BigInt(Number.MAX_SAFE_INTEGER)
+          && value.rows <= BigInt(Number.MAX_SAFE_INTEGER), 'Invalid audit archive history');
+        batchCount = Number(value.batches); archivedRowCount = Number(value.rows);
+      }
+      return { key, state: row.state, epoch: row.epoch, latestRecoveryReview: this.#latestReview(key),
+        evidence: JSON.parse(row.evidence), result: row.result ? JSON.parse(row.result) : null,
+        audit: this.#db.prepare('SELECT kind,details,at FROM audit WHERE run_key=? ORDER BY seq').all(key).map(r => ({ ...r, details: JSON.parse(r.details) })),
+        observations: this.#db.prepare('SELECT body FROM observations WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
+        labels: this.#db.prepare('SELECT body FROM labels WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
+        auditHistory: { archived: archivedRowCount > 0, archivedRowCount, batchCount,
+          archiveAvailability: 'not_checked' },
+      };
+    });
+  }
+  #archiveEntry(key, row) {
+    const count = value => {
+      requireValue(typeof value === 'bigint' && value >= 0n
+        && value <= BigInt(Number.MAX_SAFE_INTEGER), 'Invalid audit archive history');
+      return Number(value);
+    };
+    const current = this.#onlineAudit(key);
+    return { batch: { id: row.id, previousId: row.previous_id,
+      archiveSha256: row.archive_sha256, archiveBytes: count(row.archive_bytes),
+      sourceSchemaVersion: count(row.source_schema_version), sourceLogicalDigest: row.source_logical_digest,
+      cutoffAt: count(row.cutoff_at), highwaterSeq: row.highwater_seq.toString(),
+      rowCount: count(row.batch_row_count), auditDigest: row.batch_audit_digest,
+      committedAt: count(row.committed_at) },
+    coverage: { rowCount: count(row.coverage_row_count), minSeq: row.min_seq.toString(),
+      maxSeq: row.max_seq.toString(), auditDigest: row.coverage_audit_digest },
+    online: current, archiveAvailability: 'not_checked' };
+  }
+  #onlineAudit(key) {
+    const statement = this.#db.prepare('SELECT COUNT(*) AS row_count,MIN(seq) AS min_seq,MAX(seq) AS max_seq FROM audit WHERE run_key=?');
+    statement.setReadBigInts(true);
+    const row = statement.get(key);
+    requireValue(row.row_count >= 0n && row.row_count <= BigInt(Number.MAX_SAFE_INTEGER),
+      'Invalid audit archive history');
+    return { rowCount: Number(row.row_count), minSeq: row.min_seq?.toString() ?? null,
+      maxSeq: row.max_seq?.toString() ?? null };
+  }
+  #archiveSelect() {
+    return `SELECT b.id,b.previous_id,b.archive_sha256,b.archive_bytes,b.source_schema_version,
+      b.source_logical_digest,b.cutoff_at,b.highwater_seq,b.row_count AS batch_row_count,
+      b.audit_digest AS batch_audit_digest,b.committed_at,
+      c.row_count AS coverage_row_count,c.min_seq,c.max_seq,c.audit_digest AS coverage_audit_digest
+      FROM audit_archive_coverage c JOIN audit_archive_batches b ON b.id=c.batch_id`;
+  }
+  auditArchiveBatch(key, batchId) {
+    requireValue(text(key) && hash(batchId), 'Invalid audit archive lookup');
+    return this.#readEvidence(() => {
+      if (this.#schemaVersion < 4 || !this.#row(key)) return null;
+      const statement = this.#db.prepare(`${this.#archiveSelect()} WHERE c.run_key=? AND b.id=?`);
+      statement.setReadBigInts(true);
+      const row = statement.get(key, batchId);
+      return row ? this.#archiveEntry(key, row) : null;
+    });
+  }
+  auditArchiveHistory(key, { after = '', limit = 20 } = {}) {
+    requireValue(text(key) && (after === '' || hash(after)) && Number.isSafeInteger(limit)
+      && limit >= 1 && limit <= 50, 'Invalid audit archive page');
+    return this.#readEvidence(() => {
+      if (!this.#row(key)) return null;
+      if (this.#schemaVersion < 4) return { items: [], nextCursor: null,
+        archived: false, archivedRowCount: 0, batchCount: 0, online: this.#onlineAudit(key),
+        archiveAvailability: 'not_checked' };
+      const totals = this.#db.prepare('SELECT COUNT(*) AS batches,COALESCE(SUM(row_count),0) AS rows FROM audit_archive_coverage WHERE run_key=?');
+      totals.setReadBigInts(true);
+      const total = totals.get(key);
+      requireValue(total.batches <= BigInt(Number.MAX_SAFE_INTEGER)
+        && total.rows <= BigInt(Number.MAX_SAFE_INTEGER), 'Invalid audit archive history');
+      const statement = this.#db.prepare(`${this.#archiveSelect()} WHERE c.run_key=? AND b.id>?
+        ORDER BY b.id LIMIT ?`);
+      statement.setReadBigInts(true);
+      const rows = statement.all(key, after, limit + 1);
+      return { items: rows.slice(0, limit).map(row => this.#archiveEntry(key, row)),
+        nextCursor: rows.length > limit ? rows[limit - 1].id : null,
+        archived: total.rows > 0n, archivedRowCount: Number(total.rows),
+        batchCount: Number(total.batches), online: this.#onlineAudit(key),
+        archiveAvailability: 'not_checked' };
     });
   }
   storageSnapshot(options = {}) {
@@ -475,14 +574,15 @@ export class SqliteKernel {
     this.#db.exec('BEGIN');
     try {
       const ledgerSchemaVersion = this.#db.prepare('PRAGMA user_version').get().user_version;
-      requireValue([1, 2, 3].includes(ledgerSchemaVersion), 'Unsupported kernel schema');
+      requireValue([1, 2, 3, 4].includes(ledgerSchemaVersion), 'Unsupported kernel schema');
+      this.#schemaVersion = ledgerSchemaVersion;
       const pages = {
         pageSize: this.#db.prepare('PRAGMA page_size').get().page_size,
         pageCount: this.#db.prepare('PRAGMA page_count').get().page_count,
         freelistCount: this.#db.prepare('PRAGMA freelist_count').get().freelist_count,
       };
       const rows = {};
-      for (const table of STORAGE_TABLES) {
+      for (const table of storageTables(ledgerSchemaVersion)) {
         if (table === 'recovery_reviews' && ledgerSchemaVersion < 2
           || table === 'claude_hook_pairs' && ledgerSchemaVersion < 3) {
           rows[table] = null;

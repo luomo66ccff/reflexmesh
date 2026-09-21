@@ -77,7 +77,7 @@ export async function previewLedgerCompaction(input) {
     sourceIdentity: source, backupDirectory, backup }, workerOptions);
   if (input.signal?.aborted) throw new CompactionError('compaction_cancelled');
   if (JSON.stringify(identity(path)) !== JSON.stringify(source)) throw new CompactionError('source_changed');
-  const plan = validateCompactionPlan({ schemaVersion: 1, kind: 'reflexmesh-ledger-compaction-plan',
+  const plan = validateCompactionPlan({ schemaVersion: receipt.snapshot.ledgerSchemaVersion === 4 ? 2 : 1, kind: 'reflexmesh-ledger-compaction-plan',
     createdAt: new Date().toISOString(), source, backup, snapshot: validateLedgerSnapshot(receipt.snapshot),
     quiescenceRequired: true, preservesAllRows: true, deleteRows: false, restoreAuthorized: false, retryAllowed: false });
   const output = reserve(selectedOutput), bytes = `${JSON.stringify(plan)}\n`;

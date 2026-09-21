@@ -4,6 +4,7 @@ import { isAbsolute } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { recognizedSchema } from './backup-database.mjs';
 import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
+import { inspectAuditArchiveMetadata } from './audit-archive-schema.mjs';
 
 const TABLES = Object.freeze([
   { name: 'packs', since: 1, columns: ['id', 'version', 'digest', 'body'], key: ['id', 'version'] },
@@ -13,10 +14,15 @@ const TABLES = Object.freeze([
   { name: 'labels', since: 1, columns: ['run_key', 'id', 'body'], key: ['run_key', 'id'] },
   { name: 'recovery_reviews', since: 2, columns: ['run_key', 'id', 'body', 'digest', 'applied_epoch', 'at'], key: ['run_key', 'id'] },
   { name: 'claude_hook_pairs', since: 3, columns: ['key', 'token', 'call_digest', 'action_digest', 'deployment_digest', 'request_digest', 'state', 'reason_code'], key: ['key'] },
+  { name: 'audit_archive_batches', since: 4, columns: ['id', 'previous_id', 'archive_sha256', 'archive_bytes', 'source_schema_version', 'source_logical_digest', 'cutoff_at', 'highwater_seq', 'row_count', 'audit_digest', 'committed_at'], key: ['id'] },
+  { name: 'audit_archive_coverage', since: 4, columns: ['run_key', 'batch_id', 'row_count', 'min_seq', 'max_seq', 'audit_digest'], key: ['run_key', 'batch_id'] },
 ]);
-const NAMES = TABLES.map(table => table.name);
+const versionTables = version => TABLES.filter(table => table.since < 4 || version >= 4);
+const names = version => versionTables(version).map(table => table.name);
 const INTEGER_COLUMNS = new Set(['runs.epoch', 'runs.lease_until', 'audit.seq', 'audit.at',
-  'recovery_reviews.applied_epoch', 'recovery_reviews.at']);
+  'recovery_reviews.applied_epoch', 'recovery_reviews.at',
+  ...['archive_bytes', 'source_schema_version', 'cutoff_at', 'highwater_seq', 'row_count', 'committed_at'].map(column => `audit_archive_batches.${column}`),
+  ...['row_count', 'min_seq', 'max_seq'].map(column => `audit_archive_coverage.${column}`)]);
 const HASH = /^[a-f0-9]{64}$/;
 const INVALID = 'compaction_snapshot_invalid';
 
@@ -68,7 +74,8 @@ function pages(db) {
     && Number.isSafeInteger(pageSize * pageCount), 'compaction_integrity_failed');
   return Object.freeze({ pageSize, pageCount, freelistCount });
 }
-function openedSnapshot(db) {
+/** Caller owns the connection and transaction; never opens another source connection. */
+export function snapshotLedgerConnection(db) {
   let version;
   try { version = recognizedSchema(db); }
   catch { fail('compaction_schema_unrecognized'); }
@@ -83,10 +90,13 @@ function openedSnapshot(db) {
   }
   check(checks === 1, 'compaction_integrity_failed');
   check(db.prepare('PRAGMA foreign_key_check').get() === undefined, 'compaction_foreign_keys_failed');
+  if (version === 4) {
+    try { inspectAuditArchiveMetadata(db, version); } catch { fail('compaction_schema_unrecognized'); }
+  }
   const physicalPages = pages(db);
   const hash = createHash('sha256'), rowCounts = {};
-  frame(hash, 'reflexmesh-ledger-logical-v2'); frame(hash, String(version)); frame(hash, encoding);
-  for (const table of TABLES) {
+  frame(hash, version >= 4 ? 'reflexmesh-ledger-logical-v3' : 'reflexmesh-ledger-logical-v2'); frame(hash, String(version)); frame(hash, encoding);
+  for (const table of versionTables(version)) {
     if (table.since > version) { rowCounts[table.name] = null; continue; }
     frame(hash, table.name);
     for (const column of table.columns) {
@@ -113,11 +123,11 @@ function openedSnapshot(db) {
 }
 function validExpected(value) {
   check(exact(value, ['ledgerSchemaVersion', 'logicalDigest', 'rowCounts', 'pages', 'journalMode'])
-    && [1, 2, 3].includes(value.ledgerSchemaVersion)
+    && [1, 2, 3, 4].includes(value.ledgerSchemaVersion)
     && typeof value.logicalDigest === 'string' && HASH.test(value.logicalDigest)
     && ['wal', 'delete'].includes(value.journalMode), INVALID);
-  check(exact(value.rowCounts, NAMES) && exact(value.pages, ['pageSize', 'pageCount', 'freelistCount']), INVALID);
-  for (const table of TABLES) {
+  check(exact(value.rowCounts, names(value.ledgerSchemaVersion)) && exact(value.pages, ['pageSize', 'pageCount', 'freelistCount']), INVALID);
+  for (const table of versionTables(value.ledgerSchemaVersion)) {
     const count = value.rowCounts[table.name];
     check(table.since <= value.ledgerSchemaVersion ? safeCount(count) : count === null, INVALID);
   }
@@ -126,11 +136,11 @@ function validExpected(value) {
     && safeCount(pageCount) && pageCount >= 1 && safeCount(freelistCount) && freelistCount <= pageCount
     && Number.isSafeInteger(pageSize * pageCount), INVALID);
   return Object.freeze({ ledgerSchemaVersion: value.ledgerSchemaVersion, logicalDigest: value.logicalDigest,
-    rowCounts: Object.freeze(Object.fromEntries(NAMES.map(name => [name, value.rowCounts[name]]))),
+    rowCounts: Object.freeze(Object.fromEntries(names(value.ledgerSchemaVersion).map(name => [name, value.rowCounts[name]]))),
     pages: Object.freeze({ pageSize, pageCount, freelistCount }), journalMode: value.journalMode });
 }
 function sameRows(left, right) {
-  return NAMES.every(name => left.rowCounts[name] === right.rowCounts[name]);
+  return names(left.ledgerSchemaVersion).every(name => left.rowCounts[name] === right.rowCounts[name]);
 }
 function sameContent(left, right) {
   return left.ledgerSchemaVersion === right.ledgerSchemaVersion
@@ -150,7 +160,7 @@ export function ledgerSnapshot(path) {
   try {
     db = new DatabaseSync(path, { readOnly: true });
     db.exec('BEGIN'); active = true;
-    result = openedSnapshot(db);
+    result = snapshotLedgerConnection(db);
   } catch (error) { failure = error instanceof CompactionDatabaseError ? error : new CompactionDatabaseError('compaction_failed'); }
   finally {
     if (active) try { db.exec('ROLLBACK'); } catch { failure ??= new CompactionDatabaseError('compaction_failed'); }
@@ -177,7 +187,7 @@ export async function compactLedger(path, options = {}) {
     check(db.prepare('PRAGMA main.locking_mode=EXCLUSIVE').get()?.locking_mode === 'exclusive', 'compaction_lock_failed');
     db.exec('PRAGMA busy_timeout=0');
     db.exec('BEGIN EXCLUSIVE'); active = true;
-    const before = openedSnapshot(db);
+    const before = snapshotLedgerConnection(db);
     check(sameBefore(before, expected), 'compaction_stale_snapshot');
     const backup = ledgerSnapshot(backupPath);
     check(backup.journalMode === 'delete' && sameContent(before, backup), 'compaction_backup_mismatch');
@@ -189,7 +199,7 @@ export async function compactLedger(path, options = {}) {
     db.exec('VACUUM');
     if (onStage) await onStage('after-vacuum');
     db.exec('BEGIN'); active = true;
-    const after = openedSnapshot(db);
+    const after = snapshotLedgerConnection(db);
     check(sameContent(before, after) && after.journalMode === before.journalMode
       && after.pages.pageSize === before.pages.pageSize, 'compaction_content_changed');
     db.exec('COMMIT'); active = false;

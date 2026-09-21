@@ -4,6 +4,8 @@ export const STORAGE_TABLES = Object.freeze([
   'packs', 'runs', 'audit', 'observations', 'labels', 'recovery_reviews', 'claude_hook_pairs',
 ]);
 const RUN_STATES = Object.freeze(['admitted', 'executing', 'completed', 'unknown']);
+export const storageTables = version => version >= 4
+  ? [...STORAGE_TABLES, 'audit_archive_batches', 'audit_archive_coverage'] : [...STORAGE_TABLES];
 const PAIR_STATES = Object.freeze(['pending', 'ready', 'blocked']);
 const check = (ok, message) => { if (!ok) throw new ContractError(message); };
 const exact = (value, keys) => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -12,7 +14,7 @@ const countMap = states => Object.fromEntries(states.map(state => [state, 0]));
 
 /** Pure projection of fixed, bounded SQLite metadata rows. No row body can reach the result. */
 export function storageView({ ledgerSchemaVersion, scanLimit, pages, rows }) {
-  check([1, 2, 3].includes(ledgerSchemaVersion) && Number.isSafeInteger(scanLimit)
+  check([1, 2, 3, 4].includes(ledgerSchemaVersion) && Number.isSafeInteger(scanLimit)
     && scanLimit >= 1 && scanLimit <= 10000, 'Invalid storage view options');
   check(exact(pages, ['pageSize', 'pageCount', 'freelistCount'])
     && Number.isSafeInteger(pages.pageSize) && pages.pageSize >= 512 && pages.pageSize <= 65536
@@ -22,10 +24,10 @@ export function storageView({ ledgerSchemaVersion, scanLimit, pages, rows }) {
     && pages.freelistCount <= pages.pageCount
     && Number.isSafeInteger(pages.pageSize * pages.pageCount)
     && Number.isSafeInteger(pages.pageSize * pages.freelistCount), 'Invalid SQLite page metadata');
-  check(exact(rows, STORAGE_TABLES), 'Invalid storage table set');
+  check(exact(rows, storageTables(ledgerSchemaVersion)), 'Invalid storage table set');
   const tables = {}, runCounts = countMap(RUN_STATES), pairCounts = countMap(PAIR_STATES);
   let pairOnly = 0;
-  for (const table of STORAGE_TABLES) {
+  for (const table of storageTables(ledgerSchemaVersion)) {
     const supported = table === 'recovery_reviews' ? ledgerSchemaVersion >= 2
       : table === 'claude_hook_pairs' ? ledgerSchemaVersion >= 3 : true;
     const items = rows[table];
@@ -51,7 +53,7 @@ export function storageView({ ledgerSchemaVersion, scanLimit, pages, rows }) {
     tables[table] = { supported: true, scanned: scanned.length, truncated, total: truncated ? null : scanned.length };
   }
   return snapshot({
-    schemaVersion: 1, kind: 'reflexmesh-storage-snapshot', ledgerSchemaVersion, scanLimit,
+    schemaVersion: ledgerSchemaVersion === 4 ? 2 : 1, kind: 'reflexmesh-storage-snapshot', ledgerSchemaVersion, scanLimit,
     pages: { pageSize: pages.pageSize, pageCount: pages.pageCount, freelistCount: pages.freelistCount,
       logicalBytes: pages.pageSize * pages.pageCount,
       reusableBytes: pages.pageSize * pages.freelistCount },

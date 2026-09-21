@@ -91,14 +91,20 @@ maintenance while retaining all logical rows and no-retry/pairing guards.
 separate actual synthetic main-file shrinkage from physical allocation, secure
 erasure and historical deletion. No schema migration is needed for this step.
 
-**Next retention dependency:** introduce explicit archival coverage and batch
-receipts before pruning any logical evidence. Start with audit archival, then
-design ID/body/version tombstones wherever observations, labels, reviews or packs
-currently reject duplicate/conflicting admissions. Runs/results and pair-only
-guards cannot simply expire. Schema/readers/backup/recovery must distinguish
-archived evidence from never-recorded evidence before an actual-delete command
-is shipped. Compaction provides maintenance locking and verification, not a
-substitute for this still-open product capability.
+**2026-09-22 audit archival:** explicit backup-bound audit deletion, online
+batch/per-run coverage, highwater sequence protection and verified one-batch
+lookup are implemented in the [archival increment](AUDIT-ARCHIVAL.md). Only apply
+upgrades to schema 4; all non-audit evidence and execution guards stay online.
+Backups/compaction distinguish legacy seven-table v1 and nine-table v2 formats.
+This does not certify external archive availability, production recovery, total
+space reduction, privacy compliance or large-ledger load. Further pruning of
+observations/labels/reviews/packs still requires ID/body/version tombstones.
+
+**Next integration priority:** independently review and integrate the stacked
+increments into a release candidate, with exact-head CI and first-run validation.
+Unmerged feature branches are not the default checkout experience. This roadmap
+does not itself authorize merge/retarget, release, profile changes or new paid
+model work. Remaining host lifecycle, quality and operational gates stay open.
 
 ## v0.3: memory governance and calibrated comparison
 

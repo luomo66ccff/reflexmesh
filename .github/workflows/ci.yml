@@ -38,6 +38,7 @@ jobs:
       - run: npm run demo:storage
       - run: npm run demo:backup
       - run: npm run demo:compaction
+      - run: npm run demo:archival
   affected-runtime-negative:
     strategy:
       fail-fast: false

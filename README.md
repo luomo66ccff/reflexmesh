@@ -70,6 +70,12 @@ compaction, not age-based deletion or secure erasure. Use
 `node adapters/compaction-cli.mjs --help` and the
 [compaction guide](docs/LEDGER-COMPACTION.md) before a real local rewrite.
 
+Need to move older audit history out of the online ledger? `npm run demo:archival`
+shows two backup-bound archival batches and verified historical lookup, without
+an account. The opt-in [audit archival guide](docs/AUDIT-ARCHIVAL.md) covers
+explicit schema 4, retained execution guards and external archive availability.
+It deletes selected audit rows, not tombstones; keep every referenced backup.
+
 Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 [read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
 installation and configuration prerequisites and prints a configuration snippet
@@ -135,9 +141,10 @@ that concurrency; this setting does not serialize the production runtime.
 | DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; isolated CLI/Agent tool round trip verified with synthetic and authorized real-model transport; broader lifecycle matrix remains open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
-| Storage diagnostics | Read-only schema-1/2/3 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
+| Storage diagnostics | Read-only schema-1/2/3/4 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
 | Consistent ledger archives | Native SQLite online backup into a new private directory, offline integrity/hash verification and synthetic isolated restore/no-retry lesson; no production overwrite restore |
 | Ledger compaction | Backup-bound preview, exclusive maintenance and complete logical-content verification; explicit local VACUUM, no historical row deletion or automatic retry |
+| Audit archival | Explicit backup-bound audit deletion with per-run coverage and one-batch verified lookup; all execution guards retained, external archive chain not automatically verified |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 
@@ -201,7 +208,7 @@ node adapters/recovery-cli.mjs review --db /private/path/shadow.sqlite --file re
 
 **A reviewed action remains `unknown` for execution purposes.** Review conclusions are separate administrative evidence, not replayable successes, new permissions, automatic retries or calibration labels. Review tools are deliberately not added to MCP. Actor references are operator-provided identifiers, not authentication; protect management access separately from same-user shell-capable agents.
 
-Writable opens migrate SQLite schemas 1 and 2 to 3 transactionally. Read-only inspection/preview supports all three without migration. Stop old workers and make a consistent backup before upgrading; older binaries reject schema 3 on a fresh open. Existing outcomes are preserved, not retroactively certified. See the migration/runbook in [RECOVERY.md](docs/RECOVERY.md).
+Writable opens migrate SQLite schemas 1 and 2 to 3 transactionally; fresh ledgers remain 3. Only explicit audit archival upgrades to 4, atomically with coverage and deletion. Read-only inspection supports 1–4 without migration, and ordinary writes never downgrade 4. Stop all old workers and make a consistent backup before upgrading; fresh-open version checks cannot revoke old open connections. Existing outcomes are preserved, not retroactively certified. See [recovery](docs/RECOVERY.md) and [archival](docs/AUDIT-ARCHIVAL.md).
 
 New label admissions also validate against the stored question contract: binary targets are `0/1`, choices must be declared, and ordinal targets are rubric indices. Inherited properties and undeclared fields are rejected. Existing historical labels are not rewritten.
 

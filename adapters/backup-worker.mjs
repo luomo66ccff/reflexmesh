@@ -28,12 +28,13 @@ process.once('message', async request => {
       await createBackupDatabase(source, path);
       const { ledgerSchemaVersion, summary, file } = await inspectStable(path);
       const runtime = inspectSqliteRuntime();
-      const manifest = validateBackupManifest({ schemaVersion: 1, kind: 'reflexmesh-ledger-backup',
+      const manifest = validateBackupManifest({ schemaVersion: ledgerSchemaVersion === 4 ? 2 : 1, kind: 'reflexmesh-ledger-backup',
         createdAt: new Date().toISOString(), ledgerSchemaVersion,
         database: { file: 'ledger.sqlite', bytes: file.bytes, sha256: file.sha256 },
         runtime: { nodeVersion: runtime.nodeVersion, sqliteVersion: runtime.sqliteVersion }, summary,
         checks: { integrity: 'ok', foreignKeys: 'ok', schema: 'recognized' },
-        restoreAuthorized: false, retryAllowed: false });
+        restoreAuthorized: false, retryAllowed: false,
+        ...(ledgerSchemaVersion === 4 ? { externalAuditArchives: 'not_verified' } : {}) });
       reply = { ok: true, manifest, identity: file.identity };
     } else if (request?.operation === 'verify') {
       const directory = archiveDirectory(request.directory);
