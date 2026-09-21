@@ -423,7 +423,7 @@ Ubuntu/Node 22 **676/676**, Windows/Node 22 and 24 **675 passed, one expected
 skip** each, plus all five offline demos. This remains historical base evidence
 for the next branch, not its CI.
 
-## Current increment: read-only storage diagnostics
+## Reviewed increment: read-only storage diagnostics
 
 `feat/storage-diagnostics` is based on PR #16's `d6c23c4`, not merged main.
 No existing PR is merged or retargeted. Verify the new published head's own CI.
@@ -450,6 +450,24 @@ No existing PR is merged or retargeted. Verify the new published head's own CI.
   [Guide](STORAGE-DIAGNOSTICS.md) and
   [validation t001](VALIDATION-STORAGE-DIAGNOSTICS-T001.md) preserve exclusions.
 
+## Current increment: SQLite runtime preflight
+
+Current increment: **SQLite runtime preflight**, based on PR #17's `09bd885`.
+No existing PR is merged or retargeted. Persistent writable kernels and product
+directory-creation entrypoints now reject affected/unknown SQLite runtimes
+before touching the ledger. Read-only history, in-memory kernels, separate
+DELETE-journal cache, schema and no-retry/permission guards remain unchanged.
+Both doctors expose the actual in-memory probe, and `doctor:runtime` works
+without a build or ledger. See [manual runtime guidance](SQLITE-RUNTIME.md).
+
+Root verified Windows Node 22.23.2 and 24.19.0: **707 tests, 706 passed, zero
+failed, one expected skip** per runtime, plus six offline demos each. The
+official affected Node 22.16.0 / SQLite 3.49.1 passed all **11 negative scenario
+groups**. Scoped independent review found no reproducible P1/P2. This is not
+reproduction of the upstream corruption race or a database-integrity audit;
+see [validation t001](VALIDATION-SQLITE-RUNTIME-T001.md). Verify this branch's
+own exact-head CI independently before merge. No paid calls or user data work.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
@@ -463,7 +481,8 @@ No existing PR is merged or retargeted. Verify the new published head's own CI.
 
 The independently labeled, separately bound comparison/report workflow is now
 implemented with an explicit provenance and descriptive-only boundary. Next,
-prioritize safe operational retention/review beyond the implemented diagnostics
+prioritize consistent backup and isolated restore validation, then safe
+operational retention/review beyond the implemented diagnostics and runtime gate
 and remaining lifecycle evidence;
 newly discovered lifecycle blockers take priority. Real comparative quality
 requires suitable independent labels and distinct approved provider routes,

@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { inspectAgentPackages } from './deepseek-installation.mjs';
 import { validateDeepSeekLoaderConfig } from './deepseek-loader-config.mjs';
+import { inspectSqliteRuntime } from './sqlite-runtime.mjs';
 
 const SAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
 const VERSION = /^([0-9]+)\.([0-9]+)\.[0-9]+(?:[-+].*)?$/;
@@ -26,6 +27,7 @@ const MESSAGE = Object.freeze({
   invalid_configuration: '数据库路径、tenant 或 scope 无效。',
   invalid_key: '证据 key 无效。',
   node_unsupported: '需要 Node.js 22.16 或更高版本。',
+  sqlite_wal_runtime_unsupported: '当前 SQLite 未确认包含 WAL-reset 修复，持久化账本写入已阻止；只读历史检查仍可用。请运行 node adapters/runtime-cli.mjs 并参考 docs/SQLITE-RUNTIME.md，手动选择已修复的 Node 后重启旧 worker；不会自动升级。',
   build_required: '缺少 dist/index.js；请先构建 ReflexMesh。',
   host_package_missing: '显式指定的 DeepSeek 安装包或依赖清单缺失。',
   unsupported_host_version: 'DeepSeek 安装包版本不在已验证白名单。',
@@ -47,7 +49,7 @@ const ACTION_CODES = new Set([
   'invalid_arguments', 'missing_package_root', 'missing_db', 'missing_tenant', 'missing_scope',
   'invalid_package_root', 'invalid_configuration', 'invalid_key', 'node_unsupported', 'build_required',
   'host_package_missing', 'unsupported_host_version', 'unsupported_package_layout', 'database_invalid',
-  'internal_error',
+  'internal_error', 'sqlite_wal_runtime_unsupported',
 ]);
 const note = code => ({ code, severity: ACTION_CODES.has(code) ? 'action' : 'info' });
 const safeString = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max && !SAFE_TEXT.test(value);
@@ -118,6 +120,7 @@ export async function diagnoseDoctor(argv, {
   buildEntry = BUILD_ENTRY,
   inspectPackages = inspectAgentPackages,
   openKernel = openReadOnlyKernel,
+  inspectRuntime = inspectSqliteRuntime,
 } = {}) {
   const parsed = parseDoctorOptions(argv);
   if (parsed.help) return { help: true, exitCode: 0 };
@@ -125,6 +128,8 @@ export async function diagnoseDoctor(argv, {
   if (parsed.invalid) add(diagnostics, 'invalid_arguments');
   const input = parsed.invalid ? {} : parsed;
   if (!nodeSupported(nodeVersion)) add(diagnostics, 'node_unsupported');
+  const sqliteRuntime = inspectRuntime();
+  if (!sqliteRuntime.persistentWriteAllowed) add(diagnostics, 'sqlite_wal_runtime_unsupported');
   const built = isFile(buildEntry);
   if (!built) add(diagnostics, 'build_required');
 
@@ -199,13 +204,15 @@ export async function diagnoseDoctor(argv, {
   return { exitCode: status === 'prerequisites_ready' ? 0 : 1, report: {
     schemaVersion: 1, kind: 'deepseek_first_run_doctor', status,
     prerequisites: { node: nodeSupported(nodeVersion) ? 'supported' : 'unsupported',
-      build: built ? 'ready' : 'missing', installation, configuration: config ? 'ready' : 'incomplete', database },
+      sqliteRuntime, build: built ? 'ready' : 'missing', installation, configuration: config ? 'ready' : 'incomplete', database },
     setup, historicalEvidence, liveHost: 'live_host_unverified', diagnostics,
   } };
 }
 
 export function formatDoctor(report) {
   const lines = [`ReflexMesh DeepSeek doctor: ${report.status}`, '当前宿主状态：未验证。'];
+  const runtime = report.prerequisites.sqliteRuntime;
+  if (runtime) lines.push(`当前进程：Node ${runtime.nodeVersion}; SQLite ${runtime.sqliteVersion ?? 'unknown'}; WAL-reset fix=${runtime.walResetFix}。版本检查不验证其他 worker 或数据库完整性。`);
   for (const diagnostic of report.diagnostics) lines.push(`- ${MESSAGE[diagnostic.code] ?? MESSAGE.internal_error}`);
   if (report.setup) lines.push('只读建议片段（请自行审阅并手动配置）：', report.setup.yamlInsert.trimEnd());
   if (report.historicalEvidence.status === 'historical_evidence') {

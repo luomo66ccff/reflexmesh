@@ -93,4 +93,10 @@ The demo uses a temporary database, synthetic clock and synthetic evidence. It r
 - SQLite transaction and `BEGIN IMMEDIATE` behavior: https://www.sqlite.org/lang_transaction.html
 - WAL local-filesystem, checkpoint and backup considerations: https://www.sqlite.org/wal.html
 
-The implementation uses only APIs available in the tested Node 22.16 environment. This is an engineering extension of the project's evidence-bound decision contract, not a claim of a novel database algorithm or production safety certification.
+The API floor remains Node 22.16, but that version's SQLite 3.49.1 does not meet
+the current persistent WAL write gate. Writable opens, including review apply,
+require an actual SQLite runtime containing the known WAL-reset fix before any
+file open or migration. Read-only inspection remains available; see
+[runtime requirements and manual restart guidance](SQLITE-RUNTIME.md).
+This is an engineering extension of the project's evidence-bound decision
+contract, not a claim of a novel database algorithm or production safety certification.

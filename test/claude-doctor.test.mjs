@@ -174,13 +174,13 @@ test('direct CLI from an unbuilt copy gives fixed build guidance without a modul
   mkdirSync(adapters);
   for (const name of ['claude-doctor-cli.mjs', 'claude-doctor.mjs', 'claude-setup.mjs',
     'claude-installation.mjs', 'doctor.mjs', 'deepseek-installation.mjs',
-    'deepseek-loader-config.mjs', 'direct-run.mjs']) {
+    'deepseek-loader-config.mjs', 'direct-run.mjs', 'sqlite-runtime.mjs']) {
     copyFileSync(fileURLToPath(new URL(`../adapters/${name}`, import.meta.url)), join(adapters, name));
   }
   const child = spawnSync(process.execPath, [join(adapters, 'claude-doctor-cli.mjs'), '--json'],
     { encoding: 'utf8', timeout: 10000 });
   assert.equal(child.status, 1);
-  assert.equal(child.stderr, '');
+  assert.match(child.stderr, /^(?:\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n)?$/);
   const report = JSON.parse(child.stdout);
   assert.equal(report.kind, 'claude_first_run_doctor');
   assert.ok(codes(report).includes('build_required'));

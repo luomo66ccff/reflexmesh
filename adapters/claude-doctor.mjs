@@ -2,6 +2,7 @@ import { lstatSync, statSync } from 'node:fs';
 import { historicalProjection } from './doctor.mjs';
 import { createClaudeSettings } from './claude-setup.mjs';
 import { inspectExplicitClaudeExecutable } from './claude-installation.mjs';
+import { inspectSqliteRuntime } from './sqlite-runtime.mjs';
 
 const BUILD_ENTRY = new URL('../dist/index.js', import.meta.url);
 const HOOK_ENTRY = new URL('./claude-task-hook.mjs', import.meta.url);
@@ -11,7 +12,7 @@ const ACTIONS = new Set(['invalid_arguments', 'missing_executable', 'missing_db'
   'missing_scope', 'invalid_configuration', 'invalid_key', 'node_unsupported', 'build_required',
   'hook_entry_missing',
   'unsupported_host_platform', 'invalid_executable_path', 'unsupported_executable_layout',
-  'host_executable_missing', 'database_invalid', 'internal_error']);
+  'host_executable_missing', 'database_invalid', 'internal_error', 'sqlite_wal_runtime_unsupported']);
 const INSTALL_FAILURES = ['unsupported_host_platform', 'invalid_executable_path',
   'unsupported_executable_layout', 'host_executable_missing'];
 const note = code => ({ code, severity: ACTIONS.has(code) ? 'action' : 'info' });
@@ -44,6 +45,7 @@ const MESSAGES = Object.freeze({
   invalid_configuration: '数据库、任务摘要缓存、tenant 或 scope 配置无效。',
   invalid_key: '证据 key 无效。',
   node_unsupported: '需要 Node.js 22.16 或更高版本。',
+  sqlite_wal_runtime_unsupported: '当前 SQLite 未确认包含 WAL-reset 修复，持久化账本写入已阻止；只读历史检查仍可用。请运行 node adapters/runtime-cli.mjs 并参考 docs/SQLITE-RUNTIME.md，手动选择已修复的 Node 后重启旧 worker；不会自动升级。',
   build_required: '缺少 dist/index.js；请先构建 ReflexMesh。',
   hook_entry_missing: '缺少普通文件形式的生产 Claude hook 入口；请检查安装或构建。',
   unsupported_host_platform: '此静态安装检查仅支持 Windows 本机 Claude .exe。',
@@ -96,6 +98,7 @@ export async function diagnoseClaudeDoctor(argv, {
   hookEntry = HOOK_ENTRY,
   inspectExecutable = inspectExplicitClaudeExecutable,
   openKernel = openReadOnlyKernel,
+  inspectRuntime = inspectSqliteRuntime,
 } = {}) {
   const parsed = parseClaudeDoctorOptions(argv);
   if (parsed.help) return { help: true, exitCode: 0 };
@@ -104,6 +107,8 @@ export async function diagnoseClaudeDoctor(argv, {
   const input = parsed.invalid ? {} : parsed;
   const nodeReady = supportedNode(nodeVersion), built = isFile(buildEntry);
   if (!nodeReady) add(diagnostics, 'node_unsupported');
+  const sqliteRuntime = inspectRuntime();
+  if (!sqliteRuntime.persistentWriteAllowed) add(diagnostics, 'sqlite_wal_runtime_unsupported');
   if (!built) add(diagnostics, 'build_required');
   let installation = { status: 'not_checked', hostVersion: 'unverified' };
   if (platform !== 'win32') {
@@ -181,7 +186,7 @@ export async function diagnoseClaudeDoctor(argv, {
   const status = diagnostics.some(item => item.severity === 'action') ? 'action_required' : 'prerequisites_ready';
   return { exitCode: status === 'prerequisites_ready' ? 0 : 1, report: {
     schemaVersion: 1, kind: 'claude_first_run_doctor', status,
-    prerequisites: { node: nodeReady ? 'supported' : 'unsupported', build: built ? 'ready' : 'missing',
+    prerequisites: { node: nodeReady ? 'supported' : 'unsupported', sqliteRuntime, build: built ? 'ready' : 'missing',
       installation, configuration: settings ? 'ready' : 'incomplete', database },
     setup: settings ? { settings, manualMergeRequired: true, avoidDuplicateHooks: true } : null,
     historicalEvidence, liveHost: 'live_host_unverified', diagnostics,
@@ -190,6 +195,8 @@ export async function diagnoseClaudeDoctor(argv, {
 
 export function formatClaudeDoctor(report) {
   const lines = [`ReflexMesh Claude doctor: ${report.status}`, '当前宿主状态：未验证。'];
+  const runtime = report.prerequisites.sqliteRuntime;
+  if (runtime) lines.push(`当前进程：Node ${runtime.nodeVersion}; SQLite ${runtime.sqliteVersion ?? 'unknown'}; WAL-reset fix=${runtime.walResetFix}。版本检查不验证其他 worker 或数据库完整性。`);
   for (const diagnostic of report.diagnostics) lines.push(`- ${MESSAGES[diagnostic.code] ?? MESSAGES.internal_error}`);
   if (report.setup) lines.push('只读建议片段（请审阅并手动合并，勿重复安装）：',
     JSON.stringify(report.setup.settings, null, 2));

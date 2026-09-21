@@ -103,13 +103,13 @@ test('direct CLI starts from an unbuilt copy with fixed build guidance', () => {
     const destination = join(w.root, 'adapters');
     mkdirSync(destination);
     for (const name of ['doctor-cli.mjs', 'doctor.mjs', 'direct-run.mjs',
-      'deepseek-installation.mjs', 'deepseek-loader-config.mjs']) {
+      'deepseek-installation.mjs', 'deepseek-loader-config.mjs', 'sqlite-runtime.mjs']) {
       copyFileSync(fileURLToPath(new URL(`../adapters/${name}`, import.meta.url)), join(destination, name));
     }
     const child = spawnSync(process.execPath, [join(destination, 'doctor-cli.mjs'), '--json'],
       { encoding: 'utf8', timeout: 10_000 });
     assert.equal(child.status, 1);
-    assert.equal(child.stderr, '');
+    assert.match(child.stderr, /^(?:\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n)?$/);
     const report = JSON.parse(child.stdout);
     assert.ok(codes(report).includes('build_required'));
     assert.equal(report.liveHost, 'live_host_unverified');

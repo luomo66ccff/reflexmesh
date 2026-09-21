@@ -30,6 +30,7 @@
     "evidence": "node adapters/evidence-cli.mjs",
     "evaluation": "node adapters/evaluation-cli.mjs",
     "doctor": "node adapters/doctor-cli.mjs",
+    "doctor:runtime": "node adapters/runtime-cli.mjs",
     "doctor:claude": "node adapters/claude-doctor-cli.mjs",
     "demo:evidence": "npm run build && node examples/task-intent.mjs --explain",
     "demo:recovery": "npm run build && node examples/recovery-review.mjs"

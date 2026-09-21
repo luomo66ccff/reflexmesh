@@ -3,7 +3,11 @@
 `doctor:claude` turns explicit deployment choices into a read-only diagnostic and
 a ready-to-review settings fragment. It does not start Claude, read a profile or
 credentials, create a database, install hooks, or change settings. The existing
-DeepSeek `doctor` command and report format are unchanged.
+DeepSeek `doctor` remains a separate command. Both reports now include an actual
+SQLite runtime probe and distinguish the API floor from persistent WAL write
+readiness. A blocked gate requires manual Node selection/restart, not database
+repair; historical read-only inspection remains available. See
+[SQLite runtime requirements](SQLITE-RUNTIME.md).
 
 ## 1. Check the explicit setup
 

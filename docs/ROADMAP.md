@@ -70,6 +70,15 @@ any retention design. Neither diagnostic closes the broader host, quality or
 operational gate. Actual reclamation and verified restore must preserve admission
 and pairing guards; no automatic deletion or UNKNOWN retry is introduced.
 
+**2026-09-22 runtime compatibility correction:** Node 22.16 is only an API
+floor; its SQLite 3.49.1 predates the upstream WAL-reset fix. A real in-memory
+version probe now blocks affected/unknown persistent writers before ledger
+creation/migration, while preserving read-only diagnosis. Both doctors and a
+build-free [runtime preflight](SQLITE-RUNTIME.md) explain manual upgrade/restart.
+Pinned old-runtime negative tests complement supported Node 22/24 suites.
+Next: consistent backup and isolated restore verification before retention;
+never overwrite a live ledger or lose newer admission tombstones.
+
 ## v0.3: memory governance and calibrated comparison
 
 Connect the existing Memory Engine through an adapter, not a new memory database. Add read-time relevance/staleness/conflict assessment; enforce consent, tenant namespace, TTL and deletion in host code. Preserve competing facts and provenance rather than overwriting them on a model's opinion.

@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { toolPreflightPack } from '../dist/index.js';
 import { SqliteKernel } from './sqlite-kernel.mjs';
+import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
 import { TaskAwareBoundary } from './task-boundary.mjs';
 import { installDeepSeekObserver } from './deepseek-plugin.mjs';
 import { createDeepSeekTaskSource } from './deepseek-task-source.mjs';
@@ -16,6 +17,7 @@ const plugin = {
   inject: ['agents', 'sessions', 'tools'],
   async apply(ctx, config) {
     const options = validateDeepSeekLoaderConfig(config);
+    assertSqliteWalRuntime();
     mkdirSync(dirname(options.dbPath), { recursive: true, mode: 0o700 });
     const kernel = new SqliteKernel(options.dbPath);
     let taskSource, observer;

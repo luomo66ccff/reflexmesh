@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { JevProvider, DeepSeekEstimateProvider, toolPreflightPack, ContractError } from '../dist/index.js';
 import { SqliteKernel } from './sqlite-kernel.mjs';
+import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
 import { ShadowBoundary } from './shadow-boundary.mjs';
 import { TaskAwareBoundary } from './task-boundary.mjs';
 import { ABSTAIN_CAPABILITIES } from './provider-binding.mjs';
@@ -28,6 +29,7 @@ export function openLocalBoundary(env = process.env, { taskAware = env.REFLEXMES
     modelId = env.DEEPSEEK_MODEL; revision = env.REFLEXMESH_PROVIDER_REVISION;
   } else throw new ContractError('Unsupported provider');
   const path = env.REFLEXMESH_DB ? resolve(env.REFLEXMESH_DB) : join(homedir(), '.reflexmesh', 'shadow.sqlite');
+  assertSqliteWalRuntime();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const kernel = new SqliteKernel(path);
   try {

@@ -24,7 +24,15 @@ Codex STDIO MCP       Claude Code hooks       DeepSeek Harness hooks
 
 ## Run the current branch
 
-Node.js **22.16+**, npm. TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages are required. The new adapter uses Node's built-in, experimental `node:sqlite` API on a **single machine / local filesystem**.
+Node.js **22.16+ is the API floor, not sufficient for persistent ledger writes**.
+The actual SQLite must include the known WAL-reset fix; run
+`node adapters/runtime-cli.mjs` before setup. Tested combinations are Node
+22.23.2 / SQLite 3.51.3 and Node 24.19.0 / SQLite 3.53.3. Older/unknown affected
+runtimes are blocked before writable ledger open; read-only inspection remains
+available. See the [runtime requirement and manual upgrade guide](docs/SQLITE-RUNTIME.md).
+TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages
+are required. The adapter uses Node's built-in, experimental `node:sqlite` API
+on a **single machine / local filesystem**.
 
 Start with an account-free, explained walkthrough:
 

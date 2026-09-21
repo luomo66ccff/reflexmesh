@@ -6,6 +6,7 @@ import { canonical, snapshot, validatePack, ContractError } from '../dist/index.
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
 import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
 import { STORAGE_TABLES, storageView } from './storage-view.mjs';
+import { assertSqliteWalRuntime } from './sqlite-runtime.mjs';
 
 export const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 const requireValue = (ok, message) => { if (!ok) throw new ContractError(message); };
@@ -38,6 +39,7 @@ export class SqliteKernel {
   #schemaVersion;
   constructor(path, { clock = Date.now, busyTimeoutMs = 2000, readOnly = false } = {}) {
     requireValue(text(path) && typeof readOnly === 'boolean' && typeof clock === 'function' && Number.isSafeInteger(busyTimeoutMs) && busyTimeoutMs >= 0 && busyTimeoutMs <= 10000, 'Invalid SQLite options');
+    if (!readOnly && path !== ':memory:') assertSqliteWalRuntime();
     // Create with restrictive permissions; never tighten/replace an existing file silently.
     if (!readOnly && path !== ':memory:') {
       try { closeSync(openSync(path, 'wx', 0o600)); } catch (e) { if (e.code !== 'EEXIST') throw e; }

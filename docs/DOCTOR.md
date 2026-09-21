@@ -1,6 +1,6 @@
 # First-run doctor: prerequisites are not a live-host certificate
 
-This page describes the unchanged DeepSeek `doctor` command. Claude users can
+This page describes the DeepSeek `doctor` command. Claude users can
 use the separate [Claude first-run doctor](CLAUDE-FIRST-RUN.md), which generates
 direct production-hook settings without modifying an existing installation.
 
@@ -35,6 +35,11 @@ is installed automatically. The proposed configuration keeps task capture
 provider. It does not inherit provider settings or keys from the environment.
 
 ## Understand the three separate questions
+
+Both doctors now report the actual in-memory SQLite runtime probe separately
+from the Node API floor. A blocked WAL write gate requires manual runtime
+selection and restart; it does not prevent historical read-only diagnosis or
+mean the selected ledger is corrupt. See [SQLite runtime](SQLITE-RUNTIME.md).
 
 | Question | What doctor can establish |
 | --- | --- |
