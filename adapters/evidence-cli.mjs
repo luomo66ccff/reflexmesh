@@ -3,23 +3,29 @@ import { resolve } from 'node:path';
 import { ContractError } from '../dist/index.js';
 import { SqliteKernel } from './sqlite-kernel.mjs';
 import { isDirectRun } from './direct-run.mjs';
+import { resolveStorageDatabasePath } from './storage-files.mjs';
+import { formatStorageReport, storageReport } from './storage-report.mjs';
 
 const USAGE = `ReflexMesh evidence: explain decisions separately from host outcomes (read-only)
   npm run evidence -- list --db PATH [--limit 20] [--after KEY] [--state STATE] [--json]
   npm run evidence -- attention --db PATH [--limit 20] [--after KEY] [--json]
   npm run evidence -- inspect --db PATH --key KEY [--json]
+  npm run evidence -- storage --db PATH [--scan-limit 1000] [--json]
 States: admitted, executing, completed, unknown. Pages are ordered by key, not recency.
 Attention covers decision rows only; pair-only reservations are excluded, and this is not a complete error inventory.
+Storage includes bounded table/pair-only counts and file lengths, never deletion eligibility or automatic cleanup.
 No provider, tool, permission change or replay is invoked. Use --json for metadata receipts.
 The database must already exist. Build once with npm run build before using this CLI.
+For paths containing spaces on Windows, use the direct node adapters/evidence-cli.mjs entrypoint with a quoted path.
 `;
 const fail = message => { throw new ContractError(message); };
 export function parseEvidenceOptions(argv) {
   if (!argv.length || (argv.length === 1 && argv[0] === '--help')) return { help: true };
   const [command, ...rest] = argv;
-  if (!['list','attention','inspect'].includes(command)) fail('Expected list, attention or inspect; use --help');
+  if (!['list','attention','inspect','storage'].includes(command)) fail('Expected list, attention, inspect or storage; use --help');
   const allowed = command === 'list' ? ['db','limit','after','state','json']
-    : command === 'attention' ? ['db','limit','after','json'] : ['db','key','json'];
+    : command === 'attention' ? ['db','limit','after','json']
+      : command === 'storage' ? ['db','scan-limit','json'] : ['db','key','json'];
   const options = { command };
   for (let i = 0; i < rest.length; i++) {
     const name = rest[i].startsWith('--') ? rest[i].slice(2) : '';
@@ -38,9 +44,15 @@ export function parseEvidenceOptions(argv) {
     options.limit = Number(options.limit);
   }
   if (options.state !== undefined && !['admitted','executing','completed','unknown'].includes(options.state)) fail('Invalid evidence state');
+  if (options['scan-limit'] !== undefined) {
+    if (!/^[0-9]+$/.test(options['scan-limit']) || Number(options['scan-limit']) < 1 || Number(options['scan-limit']) > 10000)
+      fail('Storage scan limit must be 1 through 10000');
+    options['scan-limit'] = Number(options['scan-limit']);
+  }
   return options;
 }
 export function formatEvidence(result, command) {
+  if (command === 'storage') return formatStorageReport(result);
   const quote = value => JSON.stringify(value ?? 'not recorded');
   const sources = item => item.hostOutcome.byProvenance.map(group => `${group.provenance}:${group.status}=${group.count}`).join(', ') || 'none';
   if (command === 'attention') {
@@ -83,9 +95,11 @@ export function formatEvidence(result, command) {
 export async function evidenceMain(argv, output = process.stdout) {
   const options = parseEvidenceOptions(argv);
   if (options.help) { output.write(USAGE); return; }
-  const kernel = new SqliteKernel(resolve(options.db), { readOnly: true });
+  const path = options.command === 'storage' ? resolveStorageDatabasePath(options.db) : resolve(options.db);
+  const kernel = new SqliteKernel(path, { readOnly: true });
   try {
-    const result = options.command === 'list'
+    const result = options.command === 'storage' ? storageReport(kernel, path, options['scan-limit'] ?? 1000)
+      : options.command === 'list'
       ? kernel.listEvidence({ limit: options.limit ?? 20, after: options.after ?? '', state: options.state ?? null })
       : options.command === 'attention'
         ? kernel.listAttention({ limit: options.limit ?? 20, after: options.after ?? '' })

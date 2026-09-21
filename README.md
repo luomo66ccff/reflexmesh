@@ -41,6 +41,13 @@ hook pairing, or execution recovery requirements. It never infers a crash or
 authorizes a retry; missing shadow reports remain separate from run UNKNOWN.
 An empty list is not a health certificate. See the [attention guide](docs/EVIDENCE.md#find-evidence-that-needs-attention).
 
+Wondering what is growing in a local ledger? `npm run evidence -- storage --db PATH`
+shows bounded table/state counts, pair-only guards and database/WAL/SHM logical
+sizes. It distinguishes truncated samples from totals and reusable SQLite pages
+from disk-space reclamation. `npm run demo:storage` explains it without an
+account. This is read-only diagnosis, not cleanup; see the
+[storage guide](docs/STORAGE-DIAGNOSTICS.md).
+
 Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 [read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
 installation and configuration prerequisites and prints a configuration snippet
@@ -106,6 +113,7 @@ that concurrency; this setting does not serialize the production runtime.
 | DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; isolated CLI/Agent tool round trip verified with synthetic and authorized real-model transport; broader lifecycle matrix remains open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
+| Storage diagnostics | Read-only schema-1/2/3 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 
@@ -234,8 +242,8 @@ Tenant/session keys separate records but are not authentication. Use trusted ing
 The research-to-code decision is recorded in [ADR-0001](docs/ADR-0001.md).
 The implemented declaration and fail-before-egress boundary is documented in
 [PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md). Next priorities are
-usable independently labeled provider comparisons, deeper real-host
-compatibility, retention tooling, independently verified recovery evidence and
+representative independent-model comparisons, deeper real-host
+compatibility, safe retention beyond read-only diagnostics, independently verified recovery evidence and
 a bidirectional Memory Engine adapter. Dashboard, distributed broker, generic
 workflow editor, automatic writes and full Saga remain outside this alpha.
 

@@ -4,6 +4,11 @@ ReflexMesh binds a decision to its task evidence, action digest, immutable pack,
 and provider deployment. The evidence CLI makes that record readable without
 calling a provider, running a tool, retrying an action, or altering a database.
 
+For bounded table/state/pair-only counts and database/WAL/SHM file lengths,
+use `npm run evidence -- storage --db PATH`. It distinguishes incomplete samples
+from totals and never recommends automatic deletion; see the
+[storage diagnostics guide](STORAGE-DIAGNOSTICS.md).
+
 ## Start without an account
 
 From a clone with Node.js 22.16 or newer:

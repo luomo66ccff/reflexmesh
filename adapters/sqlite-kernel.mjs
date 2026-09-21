@@ -5,6 +5,7 @@ import { closeSync, openSync } from 'node:fs';
 import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
 import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
+import { STORAGE_TABLES, storageView } from './storage-view.mjs';
 
 export const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 const requireValue = (ok, message) => { if (!ok) throw new ContractError(message); };
@@ -460,6 +461,44 @@ export class SqliteKernel {
       observations: this.#db.prepare('SELECT body FROM observations WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
       labels: this.#db.prepare('SELECT body FROM labels WHERE run_key=? ORDER BY id').all(key).map(r => JSON.parse(r.body)),
     });
+  }
+  storageSnapshot(options = {}) {
+    const input = snapshot(options);
+    requireValue(input && typeof input === 'object' && !Array.isArray(input)
+      && Object.keys(input).every(key => key === 'scanLimit'), 'Invalid storage options');
+    const scanLimit = Object.hasOwn(input, 'scanLimit') ? input.scanLimit : 1000;
+    requireValue(Number.isSafeInteger(scanLimit) && scanLimit >= 1 && scanLimit <= 10000, 'Invalid storage scan limit');
+    // This transaction takes one SQLite read snapshot, even on a read-only or
+    // historical connection. It never parses or selects application JSON.
+    this.#db.exec('BEGIN');
+    try {
+      const ledgerSchemaVersion = this.#db.prepare('PRAGMA user_version').get().user_version;
+      requireValue([1, 2, 3].includes(ledgerSchemaVersion), 'Unsupported kernel schema');
+      const pages = {
+        pageSize: this.#db.prepare('PRAGMA page_size').get().page_size,
+        pageCount: this.#db.prepare('PRAGMA page_count').get().page_count,
+        freelistCount: this.#db.prepare('PRAGMA freelist_count').get().freelist_count,
+      };
+      const rows = {};
+      for (const table of STORAGE_TABLES) {
+        if (table === 'recovery_reviews' && ledgerSchemaVersion < 2
+          || table === 'claude_hook_pairs' && ledgerSchemaVersion < 3) {
+          rows[table] = null;
+        } else if (table === 'runs') {
+          rows[table] = this.#db.prepare('SELECT state FROM runs LIMIT ?').all(scanLimit + 1);
+        } else if (table === 'claude_hook_pairs') {
+          rows[table] = this.#db.prepare(`SELECT p.state AS state,
+            NOT EXISTS (SELECT 1 FROM runs r WHERE r.key=p.key) AS pairOnly
+            FROM claude_hook_pairs p LIMIT ?`).all(scanLimit + 1);
+        } else {
+          // `table` is from STORAGE_TABLES only; no user-controlled identifier.
+          rows[table] = this.#db.prepare(`SELECT 1 AS present FROM ${table} LIMIT ?`).all(scanLimit + 1);
+        }
+      }
+      const projected = storageView({ ledgerSchemaVersion, scanLimit, pages, rows });
+      this.#db.exec('COMMIT');
+      return projected;
+    } catch (error) { this.#db.exec('ROLLBACK'); throw error; }
   }
   close() { this.#db.close(); }
 }

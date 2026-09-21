@@ -15,6 +15,7 @@
     "demo:jev": "npm run build && node examples/jev.mjs",
     "demo:deepseek": "npm run build && node examples/deepseek-shadow.mjs",
     "demo:comparison": "npm run build && node examples/provider-comparison.mjs",
+    "demo:storage": "npm run build && node examples/storage-diagnostics.mjs",
     "check": "npm run typecheck && npm test",
     "publish:github": "node scripts/publish-github.mjs",
     "demo:durable": "npm run build && node examples/durable-shadow.mjs",
