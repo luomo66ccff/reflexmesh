@@ -26,6 +26,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Exercise one authorized isolated real-model DeepSeek Agent/tool round trip with bounded official transport; see [t001 evidence and limits](VALIDATION-DEEPSEEK-REAL-MODEL-T001.md).
 - [x] Add read-only DeepSeek first-run doctor separating prerequisites, historical evidence and unverified live loading; see [guide](DOCTOR.md).
 - [x] Preserve native DeepSeek post-dispatch cancellation as unknown and verify fixed installed-host parallel/task-replacement/cancel/followup scenarios with synthetic model transport; see [validation](VALIDATION-DEEPSEEK-LIFECYCLE.md).
+- [x] Preserve model-reported provenance for delegated DeepSeek summaries and verify official sequential spawn isolation with repeated call IDs and per-call result digests; see [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md).
 - [ ] Exercise default-profile compatibility and the broader lifecycle matrix; one isolated real-model result does not close this gate.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 
@@ -33,7 +34,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 
 **First gate: actual host compatibility and useful evidence.** Run each real host against the adapter, including cancellation, parallel tools, agent identity and shutdown. Record which CLI/plugin revision passed. Capture host-owned task intent through an explicit minimization policy rather than treating tool-only evidence as a complete task description. Do not silently read full transcripts or inherit credentials.
 
-The real-host baseline covers one Codex MCP smoke, one Claude prompt/hook/read/outcome path, a DeepSeek native tool pipeline, and isolated DeepSeek CLI/Agent round trips with synthetic and authorized real-model transport. Default-profile compatibility and a complete cross-host cancellation, parallel-tool, subagent and restart matrix remain open. A discovered executable is not counted as an exercised host.
+The real-host baseline covers one Codex MCP smoke, one Claude prompt/hook/read/outcome path, a DeepSeek native tool pipeline, isolated DeepSeek CLI/Agent round trips with synthetic and authorized real-model transport, and fixed official spawn-child isolation with synthetic transport. Default-profile compatibility and a complete cross-host cancellation, parallel-tool, subagent and restart matrix remain open. A discovered executable is not counted as an exercised host.
 
 **Second gate: provider conformance.** Introduce declared capabilities and a genuinely independent local/structured provider. A provider lacking probabilities must not fabricate them. Evaluate separately named champion/challenger deployments; binding mismatches must never silently inherit old thresholds.
 

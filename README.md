@@ -81,6 +81,12 @@ parallel tool bodies, task replacement and followup through the installed
 Agent loop with synthetic model transport. See its
 [dated verification and exclusions](docs/VALIDATION-DEEPSEEK-LIFECYCLE.md).
 
+The optional [subagent-isolation check](docs/DEEPSEEK-SUBAGENTS.md) exercises
+official in-process spawn children with separate task/result evidence, even
+when call IDs repeat. Delegated child summaries stay model-reported rather than
+being upgraded to user-origin evidence by the host's message wrapper. See the
+[verification scope](docs/VALIDATION-DEEPSEEK-SUBAGENTS.md).
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.

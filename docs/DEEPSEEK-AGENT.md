@@ -84,8 +84,13 @@ its own conversation under its own configuration; this observer does not control
 that storage.
 
 `source.kind=user` is a producer declaration, **not independent authentication**.
-Use this mode only with a trusted host ingress. The receipt is `host-declared`,
-not proof of human identity, authorization or full-context understanding. A
+Use this mode only with a trusted host ingress. A top-level receipt is `host-declared`,
+not proof of human identity, authorization or full-context understanding. The
+official subagent driver also wraps delegated text as `source.kind=user`; a
+child with subagent-origin or parent-session metadata is therefore conservatively
+`model-reported`, with unverified freshness and null envelope timestamps. A
+private local TTL still limits reuse, but does not verify the original task's
+age or authorship. Child summaries never inherit the parent's selection. A
 claimed message may subsequently be rejected or transformed by the host; the
 receipt describes the claimed summary, not the complete final model prompt.
 
@@ -147,3 +152,8 @@ task replacement, cancellation and followup, use the
 [lifecycle-matrix guide](DEEPSEEK-LIFECYCLE.md). These scenarios deliberately use
 synthetic model transport, retain zero labels and keep the full lifecycle gate
 open.
+
+The separate [subagent-isolation guide](DEEPSEEK-SUBAGENTS.md) explains the
+official in-process spawn path, repeated call IDs across distinct Agents,
+missing child summaries and model-reported child provenance. It does not certify
+all delegation plugins or process restart.

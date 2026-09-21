@@ -88,9 +88,14 @@ one expected symlink skip. All four offline demos passed in all three jobs.
   one isolated model-driven tool round trip, not the whole lifecycle gate or
   a second ReflexMesh decision provider.
 
-## Current increment: DeepSeek cancellation-safe lifecycle evidence
+## Reviewed increment: DeepSeek cancellation-safe lifecycle evidence
 
 `feat/deepseek-lifecycle-matrix` is based on PR #6's `7811d35`, not main.
+Published as [PR #7](https://github.com/luomo66ccff/reflexmesh/pull/7). Exact head
+`d2073c8790e25d4310cb9b53e87406286ef4828d` passed
+[CI 35616804863](https://github.com/luomo66ccff/reflexmesh/actions/runs/35616804863)
+on Ubuntu/Node 22 (231/231) and Windows/Node 22/24 (230 passed, one expected
+symlink skip each), plus four offline demos per job. The stack remains unmerged.
 
 - Native post-dispatch `ABORTED` now produces harness-reported unknown instead
   of collapsing cancellation into plain failure. Current identity/call/result are captured during
@@ -110,11 +115,32 @@ one expected symlink skip. All four offline demos passed in all three jobs.
   [validation report](VALIDATION-DEEPSEEK-LIFECYCLE.md) record exact scope,
   review corrections, migration limits and untested paths.
 
+## Current increment: official subagent isolation and honest provenance
+
+`feat/deepseek-subagent-isolation` is based on PR #7's `d2073c8`, not main.
+
+- Fixed a reproduced source upgrade: official child prompts wrapped as user
+  messages now remain model-reported/unverified. Private resolver TTL remains
+  enforced without inventing human-origin or independent freshness evidence.
+- Root verified actual installed CLI/Loader/Agent and official in-process spawn
+  of two sequential children with synthetic model transport: **12/12**. Parent
+  and children reuse a call ID but preserve exact task, action and result
+  bindings, including per-call native payload digests and zero labels.
+- Source-shaped regressions also cover shared signals, same-ID replacement
+  objects and late disposal without inheriting or clearing another task.
+- Full local suite: **240 tests, 239 passed, 0 failed, one expected Windows
+  symlink skip**; four offline demos passed. Existing lifecycle matrix rerun:
+  **17/17**. Final narrow independent review found no remaining blocker.
+- [Subagent guide](DEEPSEEK-SUBAGENTS.md) and
+  [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md) explain source APIs, exact
+  assertions, historical-record limits and untested fork/restart/default-profile
+  paths. No schema, authorization, retry or label behavior was broadened.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup coverage plus one separate authorized real-model round trip. Restart, subagents, timeout policy and the full cross-host gate remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. Forked/resumed/cancelled children, restart, timeout policy and the full cross-host gate remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
