@@ -1,26 +1,13 @@
 import { mkdirSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
+import { dirname } from 'node:path';
 import { toolPreflightPack } from '../dist/index.js';
 import { SqliteKernel } from './sqlite-kernel.mjs';
 import { TaskAwareBoundary } from './task-boundary.mjs';
 import { installDeepSeekObserver } from './deepseek-plugin.mjs';
 import { createDeepSeekTaskSource } from './deepseek-task-source.mjs';
+import { validateDeepSeekLoaderConfig } from './deepseek-loader-config.mjs';
 
-const CONFIG_KEYS = new Set(['dbPath', 'tenantId', 'scope', 'intentMode']);
-const safeName = value => typeof value === 'string' && value.length > 0 && value.length <= 64
-  && !/[\u0000-\u001f\u007f]/.test(value);
-
-/** No implicit home path, provider env, credential, or remote-model fallback. */
-export function validateDeepSeekLoaderConfig(config) {
-  if (!config || typeof config !== 'object' || Array.isArray(config)
-    || Object.keys(config).some(key => !CONFIG_KEYS.has(key))) throw new TypeError('Invalid DeepSeek loader configuration');
-  const { dbPath, tenantId, scope, intentMode = 'off' } = config;
-  if (typeof dbPath !== 'string' || !isAbsolute(dbPath) || /[\u0000-\u001f\u007f]/.test(dbPath)
-    || !safeName(tenantId) || !safeName(scope) || !['off', 'explicit-summary'].includes(intentMode)) {
-    throw new TypeError('Explicit DeepSeek database, tenant, scope, and intent mode required');
-  }
-  return { dbPath, tenantId, scope, intentMode };
-}
+export { validateDeepSeekLoaderConfig } from './deepseek-loader-config.mjs';
 
 /** Product loader entrypoint. It observes the host; it never authorizes or executes its tools. */
 const plugin = {

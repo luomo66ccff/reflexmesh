@@ -7,6 +7,10 @@ Harness **0.1.2-rc.1** contracts; other versions need another compatibility chec
 
 ## Start with a private ledger and no task capture
 
+Start with the [read-only doctor](DOCTOR.md) to check the selected installation
+and obtain an escaped configuration snippet. It works even before the build;
+it will explain that missing prerequisite instead of loading the host.
+
 Build ReflexMesh with `npm ci --ignore-scripts` and `npm run build`. Back up the
 profile you intend to change, then add an insertion to that profile's
 `cordis.patch.yml`; no installer changes your settings automatically:
@@ -131,3 +135,9 @@ supplied without `--deepseek-mode agent-cli`. Neither probe certifies a real mod
 arbitrary installed plugins, concurrent whole-host teardown, or the complete
 cross-host cancellation/restart/subagent matrix. See the [validation record](VALIDATION-AGENT-LIFECYCLE.md)
 and [iteration gates](ITERATION-STATE.md).
+
+A separate authorized [real-model validation, t001](VALIDATION-DEEPSEEK-REAL-MODEL-T001.md)
+passed one isolated Agent/tool round trip on the exact PR #5 baseline. It used
+the official DeepSeek adapter, two bounded remote requests and a synthetic
+in-memory reader. That one-off test does not change the account-free probe
+above, enable remote calls in doctor/CI, or certify an arbitrary user profile.

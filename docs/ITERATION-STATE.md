@@ -37,11 +37,14 @@ The original development worktree remains preserved; integration lives on
 - Actual validation, regressions found and evidence limits are recorded in
   [VALIDATION-HOST-EXPERIENCE.md](VALIDATION-HOST-EXPERIENCE.md).
 
-## Current increment: DeepSeek CLI and Agent-loop integration
+## Reviewed increment: DeepSeek CLI and Agent-loop integration
 
-Integration continues on `feat/deepseek-agent-lifecycle`, based on the reviewed
-host-evidence branch. Do not assume either branch has merged; verify the current
-PR base, exact head and checks before any merge.
+Published as [PR #5](https://github.com/luomo66ccff/reflexmesh/pull/5) on
+`feat/deepseek-agent-lifecycle`, stacked on the host-evidence branch. Do not
+assume either branch has merged; verify current base, exact head and checks
+before any merge. Head `a3dfe39b86b0b4a7480486b4c76e6e60e15eb3b7` passed
+[CI 35610401760](https://github.com/luomo66ccff/reflexmesh/actions/runs/35610401760)
+on Ubuntu/Node 22 and Windows/Node 22/24 after a test-only SQLite-warning fix.
 
 - Loader-ready product entrypoint owns its ledger and awaits accepted outcomes
   before closing it. No custom identity callback or implicit provider credential
@@ -53,19 +56,42 @@ PR base, exact head and checks before any merge.
   loop and ToolRuntime using a synthetic model adapter and fixed in-memory tool:
   12/12 assertions, including actual Loader binding and exit-time cleanup proof.
 - Windows/Node 24 local check: 208 tests, 207 passed, one intentional symlink
-  skip. Real-model inference remains untested, not implied by this result.
+  skip. That suite and the synthetic probe do not imply real-model inference.
 - Setup and honest evidence limits: [guide](DEEPSEEK-AGENT.md) and
   [validation](VALIDATION-AGENT-LIFECYCLE.md). Earlier reports remain unchanged.
+
+## Current increment: first-run diagnosis and isolated real-model evidence
+
+`feat/first-run-doctor` is based on PR #5's `a3dfe39` head, not merged main.
+
+- New `npm run doctor -- --help` entrypoint works before build, checks explicit
+  installation/configuration, and prints a safely escaped Loader insertion.
+  No profile discovery/editing, credentials, host startup or database creation.
+- Prerequisites, bounded historical evidence and unverified live loading remain
+  separate. Human and JSON results retain outcome provenance and UNKNOWN
+  warnings; no success observation becomes permission, retry or a truth label.
+- Local final check: **220 tests, 219 passed, 0 failed, 1 expected Windows
+  symlink skip**; four offline demos passed. Installed synthetic Agent probe
+  passed **12/12** after shared configuration/installation extraction.
+- Separately, user-authorized real-model testing of exact product baseline
+  `a3dfe39` passed **11/11** assertions: two official DeepSeek HTTP requests,
+  one in-memory tool, matching tool result in request 2, real final answer,
+  exact Agent/task binding, one harness observation, zero labels and natural
+  exit after observer/kernel closure. No user profile was modified.
+- Reports: [doctor](VALIDATION-FIRST-RUN.md) and
+  [real-model t001](VALIDATION-DEEPSEEK-REAL-MODEL-T001.md). The latter proves
+  one isolated model-driven tool round trip, not the whole lifecycle gate or
+  a second ReflexMesh decision provider.
 
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Authorized DeepSeek real-model E2E and default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. The isolated synthetic CLI/Agent path is now covered, not the full gate. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and real subagent identity matrix. Both isolated synthetic and one authorized real-model DeepSeek CLI/Agent paths are covered, not the full gate. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
-| Easy onboarding | Real first-run validation across supported hosts/platforms, actionable diagnostics, installation guidance without silent credential/settings changes. |
+| Easy onboarding | DeepSeek read-only first-run diagnostics are implemented; other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 Next increments should close the host lifecycle gaps before broadening the

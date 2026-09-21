@@ -35,6 +35,12 @@ npm run demo:evidence
 
 It shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome in this walkthrough is labeled synthetic. No model or host tool runs. To read a real local ledger, use `npm run evidence -- list --db PATH` and `npm run evidence -- inspect --db PATH --key KEY`; see the [evidence CLI guide](docs/EVIDENCE.md).
 
+Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
+[read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
+installation and configuration prerequisites and prints a configuration snippet
+without changing your profile or loading credentials. Historical ledger evidence
+is kept separate from the still-unverified live connection.
+
 For the full development checks and other offline examples:
 
 ```bash
@@ -57,7 +63,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |
 | Codex | Tools-only STDIO MCP advisory endpoint; **does not intercept native shell/file tools** |
 | Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
-| DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; native CLI/Agent loop tested using a synthetic model adapter; real-model E2E still open |
+| DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; isolated CLI/Agent tool round trip verified with synthetic and authorized real-model transport; broader lifecycle matrix remains open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
@@ -67,7 +73,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 
 **Historical CLI baseline (2026-09-19):** Codex CLI 0.155.0-alpha.9.2 passed an isolated STDIO MCP smoke, and Claude Code 2.1.263 passed a prompt/hook/read/outcome path with zero labels. Those paths were not rerun for this increment. See [VALIDATION-REAL-HOSTS.md](docs/VALIDATION-REAL-HOSTS.md) for exact assertions and untested boundaries. Codex/Claude opt-in probes may invoke a logged-in host/model; they are not part of offline CI.
 
-**DeepSeek increments:** the installed 0.1.2-rc.1 native tool pipeline and isolated CLI/profile/Agent loop have been exercised. The latter uses an in-memory synthetic model adapter and fixed-value tool, with ReflexMesh abstaining: **no real model inference or real-model E2E claim**. The [Loader setup guide](docs/DEEPSEEK-AGENT.md) avoids custom identity/lifecycle callbacks; the [programmatic plugin](docs/DEEPSEEK-HOST.md) remains available. See the [Agent-loop validation](docs/VALIDATION-AGENT-LIFECYCLE.md), [earlier tool-pipeline validation](docs/VALIDATION-HOST-EXPERIENCE.md), and [open acceptance gates](docs/ITERATION-STATE.md).
+**DeepSeek increments:** the installed 0.1.2-rc.1 native tool pipeline and isolated CLI/profile/Agent loop have been exercised. The reproducible repository probe uses a synthetic adapter and remains account-free. A separate authorized [real-model validation](docs/VALIDATION-DEEPSEEK-REAL-MODEL-T001.md) passed one isolated tool round trip using the official `deepseek-v4-flash` route (11/11 assertions, two requests). ReflexMesh itself remains abstaining; this is neither a second decision provider nor a default-profile or complete lifecycle certification. The [Loader setup guide](docs/DEEPSEEK-AGENT.md) avoids custom identity/lifecycle callbacks; the [programmatic plugin](docs/DEEPSEEK-HOST.md) remains available. See the [synthetic Agent-loop validation](docs/VALIDATION-AGENT-LIFECYCLE.md), [first-run doctor validation](docs/VALIDATION-FIRST-RUN.md), and [open acceptance gates](docs/ITERATION-STATE.md).
 
 ## Review an unknown execution
 

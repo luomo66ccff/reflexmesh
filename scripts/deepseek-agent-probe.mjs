@@ -1,50 +1,22 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { intentDigest } from '../adapters/task-evidence.mjs';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 import { AGENT_ASSERTIONS, AGENT_EVIDENCE, AGENT_FAILURES } from './deepseek-agent-contract.mjs';
 import { processFailureReason, runBounded } from './real-host-compat.mjs';
 import { FIXTURE_MARKER } from './fixtures/deepseek-agent-fixture.mjs';
+import { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
 
-const HOST_VERSION = '0.1.2-rc.1';
-const PACKAGES = Object.freeze({
-  dsh: HOST_VERSION, 'dsh-llm': HOST_VERSION, 'dsh-tools': HOST_VERSION,
-  'dsh-agent': HOST_VERSION, 'dsh-agent-loop': HOST_VERSION,
-  'dsh-session': HOST_VERSION, 'dsh-session-projection': HOST_VERSION,
-  'dsh-system-prompt': HOST_VERSION, 'dsh-agent-default-model': HOST_VERSION,
-  'dsh-headless': HOST_VERSION, 'cordis': '4.0.2',
-  'cordis-plugin-loader': '1.0.3', 'cordis-plugin-timer': '1.1.4',
-});
+export { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
 const PROFILE = 'reflexmesh-probe';
 const TASK = 'ReflexMesh-Intent: Verify isolated synthetic agent tool result\nUse only the fixed fixture tool.';
 const failed = (reason, hostVersion = 'unknown') => ({ schemaVersion: 1, ...AGENT_EVIDENCE,
   agentLoopExercised: false, hostVersion, status: 'failed',
   reason: AGENT_FAILURES.includes(reason) ? reason : 'evidence_assertion_failed',
   assertions: AGENT_ASSERTIONS.map(name => ({ name, passed: false })) });
-
-export function inspectAgentPackages(packageRoot) {
-  let root;
-  try { root = realpathSync(packageRoot); } catch { return { ok: false, reason: 'host_package_missing', hostVersion: 'unknown' }; }
-  const sibling = dirname(root);
-  let hostVersion = 'unknown';
-  for (const [name, expectedVersion] of Object.entries(PACKAGES)) {
-    const base = name === 'dsh' ? root : join(sibling, name);
-    let manifest;
-    try { manifest = JSON.parse(readFileSync(join(base, 'package.json'), 'utf8')); }
-    catch { return { ok: false, reason: 'host_package_missing', hostVersion }; }
-    if (name === 'dsh') hostVersion = typeof manifest.version === 'string' ? manifest.version : 'unknown';
-    if (manifest.name !== `@deepseek-ai/${name}` || manifest.version !== expectedVersion) {
-      return { ok: false, reason: 'unsupported_host_version', hostVersion };
-    }
-  }
-  if (!existsSync(join(root, 'lib', 'bin.js')) || !existsSync(join(sibling, 'dsh-headless', 'lib', 'startup.js'))) {
-    return { ok: false, reason: 'unsupported_package_layout', hostVersion };
-  }
-  return { ok: true, root, hostVersion };
-}
 
 /** JSON flow rows are valid YAML; only the official lazy task expression needs a YAML tag. */
 export function isolatedPatch({ packageRoot, dbPath, telemetryPath, homePath, cwdPath }) {
