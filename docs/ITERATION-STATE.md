@@ -115,7 +115,7 @@ symlink skip each), plus four offline demos per job. The stack remains unmerged.
   [validation report](VALIDATION-DEEPSEEK-LIFECYCLE.md) record exact scope,
   review corrections, migration limits and untested paths.
 
-## Current increment: official subagent isolation and honest provenance
+## Reviewed increment: official subagent isolation and honest provenance
 
 `feat/deepseek-subagent-isolation` is based on PR #7's `d2073c8`, not main.
 Published as [PR #8](https://github.com/luomo66ccff/reflexmesh/pull/8); verify its
@@ -146,11 +146,38 @@ current exact-head checks before any merge, not an earlier stack member's CI.
   No production SQLite code, busy budget or existing deadline was changed.
   The old failure and uncertainty remain recorded in the validation report.
 
+## Current increment: invocation-bound outcome admission
+
+`fix/deepseek-outcome-admission` is based on PR #8's
+`11c6407e910ab5216195dad02830f297fd373573`, not merged main. It preserves the
+existing stack and does not change any PR's merge state.
+
+- Root reproduced new-task outcomes being attached to an old same-ID decision
+  even though its before-observation had rejected the task conflict. Fixed both
+  in-process DeepSeek and generic function-call wrappers; the host's one
+  execution and original result/error remain unchanged.
+- DeepSeek also checks the accepted normalized call digest and exact optional
+  Agent/session object references at result delivery. Failed observations
+  release their slots; normally accepted late results retain their old task.
+- Root verified the new installed Cordis/ToolRuntime probe **8/8**, with an
+  explicitly injected first-outcome journal failure, same-ID new-task conflict,
+  unchanged old row and new-ID positive control. This is native tool-only
+  evidence, not CLI/Agent/restart or real-model certification.
+- Final local Node 22.23.2 and 24.19.0 suites: **259 tests, 258 passed, 0 failed,
+  1 expected Windows symlink skip**. Four demos passed; existing installed
+  lifecycle and official spawn probes passed **17/17** and **12/12**.
+- Narrow independent review found no blocker. Root added matching in-flight and
+  UNKNOWN controls: host observations do not alter execution state or allow
+  retries. No historical records or SQLite/permission policies were changed.
+- [Validation, reproduction command and historical-data limits](VALIDATION-OUTCOME-ADMISSION.md).
+  Separate-process conflict/outcome pairing, full cold-resume/fork and default
+  profile behavior remain unverified; no paid model calls were made.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. Forked/resumed/cancelled children, restart, timeout policy and the full cross-host gate remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions now cannot attach new-task outcomes to older decisions. Separate-process conflict/outcome pairing, forked/resumed/cancelled children, restart, timeout policy and the full cross-host gate remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |

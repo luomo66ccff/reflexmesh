@@ -59,6 +59,21 @@ At most 256 accepted observations are tracked at once. Overflow emits a fixed
 diagnostic and skips that observation while still delegating to host policy.
 Unpaired result events are ignored; they cannot invent an admission record.
 
+Only a successfully resolved `boundary.before` can own an outcome. A rejected
+admission (for example, a reused call ID with a different task) releases its
+observer slot immediately and cannot append a result to an older ledger row.
+At result delivery, the normalized call must still match the admitted call,
+and any Agent/session object references must be unchanged. Identity is checked
+again against current host state; the old identity is not used as a fallback.
+Changing the current selected task does not invalidate a correctly paired
+result for a tool that already started under the earlier task.
+
+Here “resolved” means that the full semantic input matches the admitted record,
+not that this observer newly acquired its lease or that execution succeeded.
+Matching replay, in-flight and UNKNOWN records can still receive host-reported
+observations. That never completes an UNKNOWN run, releases its tombstone,
+creates a truth label or authorizes another tool execution.
+
 At result notification, current identity and a bounded private result copy are
 captured synchronously; later listener changes cannot rewrite the queued
 observation. Native post-dispatch `ABORTED` is recorded as reported unknown,
@@ -68,6 +83,14 @@ for the mapping, migration boundary and optional installed-host scenarios.
 Duplicate calls can reuse a semantic decision and deduplicate observations.
 They **do not** prevent DeepSeek from executing a tool twice: this is a shadow
 observer, not a host execution lock.
+
+A reused call ID with changed evidence is a conflict, not an invitation to retry
+the tool or rename its existing ledger row. Host integrations should supply a
+unique call ID for each distinct invocation. A fixed observation-failure warning
+and a missing outcome do not mean that the host tool failed or did not execute.
+Historical misattributed observations are not automatically repaired: the
+ledger cannot reconstruct the missing invocation identity. See the
+[admission-pairing validation](VALIDATION-OUTCOME-ADMISSION.md).
 
 ## Opt-in probe using an installed package
 

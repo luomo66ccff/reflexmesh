@@ -91,6 +91,12 @@ when call IDs repeat. Delegated child summaries stay model-reported rather than
 being upgraded to user-origin evidence by the host's message wrapper. See the
 [verification scope](docs/VALIDATION-DEEPSEEK-SUBAGENTS.md).
 
+In-process DeepSeek and function-call observers also require a successful
+before-observation for that invocation before recording its outcome. Conflicting
+call IDs cannot attach new-task results to an old decision; DeepSeek checks that
+the admitted call and Agent/session references have not changed. See the
+[admission-pairing validation](docs/VALIDATION-OUTCOME-ADMISSION.md).
+
 ## Review an unknown execution
 
 The local [recovery CLI](docs/RECOVERY.md) provides bounded listing, read-only inspection, review preview and explicit application. A review is tied to the exact input digest and epoch, records an operator/evidence reference, and rejects stale concurrent submissions.

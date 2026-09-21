@@ -145,6 +145,14 @@ The host must resolve authenticated session/agent identity. We deliberately do n
 
 `observeFunctionCall` in `adapters/openai-compatible.mjs` normalizes `id/type/function.name/function.arguments`, runs the before observer, calls your host-owned `execute` exactly once, records an outcome, and returns/rethrows the original result/error. A thrown tool body is recorded as `unknown`, not evidence that no side effect occurred. Observer failures do not add retries. This is middleware, not a DeepSeek API client or a new agent loop.
 
+An outcome is recorded only when that invocation's before-observation resolved
+successfully. If admission or intent resolution fails, the host still executes
+once and its original return/error is preserved, but its result cannot be
+attached to an older same-ID record. This pairing is also enforced by the
+in-process DeepSeek observer. It does not introduce a cross-process receipt
+protocol for the separate Claude hooks or authenticate MCP client reports. See
+[validation and exclusions](VALIDATION-OUTCOME-ADMISSION.md).
+
 ## Policy replay and labels
 
 `replayPolicy(record,candidatePack)` accepts only completed valid predictions with the same event type and question digest. It evaluates candidate rules locally and returns `hypothetical:true, executionAllowed:false`. It is not a re-run against a new model. Labels require an explicit question ID and independent `human`/`test-oracle` provenance plus source reference; none of the MCP tools can create them.

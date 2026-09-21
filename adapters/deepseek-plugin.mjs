@@ -1,5 +1,8 @@
+import { createHash } from 'node:crypto';
 import { canonical, fromDeepSeekCall } from '../dist/index.js';
 import { resolveHostIntent } from './task-evidence.mjs';
+
+const callDigest = call => createHash('sha256').update(canonical(call)).digest('hex');
 
 /** Source-verified Cordis seams; no dependency on or patching of the DeepSeek agent loop.
  * Target tools source blob: 6be7be61e257cd9e38c8a3122298316bf3df9892.
@@ -13,18 +16,36 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
   const maxActive = 256;
   let closing = false;
   const warn = () => { try { onError('reflexmesh_shadow_observation_failed'); } catch {} };
+  const release = (exec, state) => {
+    if (active.get(exec) === state) active.delete(exec);
+    state.settle();
+  };
   const observePre = async (exec, next) => {
     if (closing) return next();
     if (active.size >= maxActive || active.has(exec)) { warn(); return next(); }
     let settle;
     const done = new Promise(resolve => { settle = resolve; });
-    active.set(exec, { done, settle, resultSeen: false });
+    const state = { done, settle, resultSeen: false, callDigest: null, agent: null, session: null };
+    active.set(exec, state);
     try {
       if (!exec.signal.aborted) {
         const intent = resolveHostIntent(resolveIntent, exec);
-        if (!exec.signal.aborted) await boundary.before(fromDeepSeekCall(exec, identity(exec)), intent);
+        if (!exec.signal.aborted) {
+          const call = fromDeepSeekCall(exec, identity(exec));
+          const digest = callDigest(call);
+          state.agent = exec.agent;
+          state.session = exec.agent?.session;
+          await boundary.before(call, intent);
+          // Only a resolved admission can own a later outcome. A conflicting
+          // call ID must not attach a new task's result to an older journal row.
+          state.callDigest = digest;
+        }
       }
     } catch { warn(); }
+    finally {
+      // No accepted observation remains to drain, including pre-dispatch aborts.
+      if (state.callDigest === null) release(exec, state);
+    }
     // Never return {kind:'allow'}: preserve the rest of the host permission waterfall.
     return next();
   };
@@ -32,13 +53,17 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     const state = active.get(exec);
     if (!state || state.resultSeen) return undefined;
     state.resultSeen = true;
-    const settle = () => { active.delete(exec); state.settle(); };
+    const settle = () => release(exec, state);
     let call, evidence, status;
     try {
       // Capture during the synchronous notification: later host listeners may
       // dispose the Agent or mutate their own execution/result objects. Still
       // validate current identity, never resurrect an invalid admission identity.
       call = fromDeepSeekCall(exec, identity(exec));
+      if (state.callDigest === null || callDigest(call) !== state.callDigest
+        || exec.agent !== state.agent || exec.agent?.session !== state.session) {
+        throw new TypeError('Host result does not match its accepted call');
+      }
       if (!result || typeof result !== 'object' || Array.isArray(result)) throw new TypeError('Invalid host result');
       const serialized = canonical(result);
       if (Buffer.byteLength(serialized) > 1_000_000) throw new TypeError('Outcome evidence too large');

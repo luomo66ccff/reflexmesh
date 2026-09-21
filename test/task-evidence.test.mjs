@@ -294,7 +294,7 @@ test('DeepSeek abort during synchronous resolver does not call the provider or r
   assert.deepEqual(r, { kind: 'cancel' }); assert.equal(assessments, 0);
   handlers.get('tools/result')(exec, { isError: true, content: [] });
   await observer.dispose();
-  assert.equal(outcomes, 1); assert.equal(handlers.size, 0);
+  assert.equal(outcomes, 0); assert.equal(handlers.size, 0);
 });
 test('intent expiring between admission and provider egress is never sent', async t => {
   let now = 1500; const f = fixture(t, { clock: () => now });
