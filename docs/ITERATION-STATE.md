@@ -212,10 +212,15 @@ remains unmerged; verify current heads/checks before any future merge.
   pre-reservation failure detection, mixed-old-worker upgrades and production
   load/privacy/retention certification remain open or explicitly unsupported.
 
-## Current increment: account-free installed Claude local loop
+## Reviewed increment: account-free installed Claude local loop
 
 `feat/claude-local-loop` is based on PR #10's `2e59f2d`, not merged main.
-No existing PR is merged or retargeted by this increment.
+Published as [PR #11](https://github.com/luomo66ccff/reflexmesh/pull/11). Exact head
+`36b73200368e81f0fcd2563d1c5687d23435a0fd` passed
+[CI 35631711129](https://github.com/luomo66ccff/reflexmesh/actions/runs/35631711129):
+Ubuntu/Node 22 passed 354/354; Windows/Node 22 and 24 each passed 353 with one
+expected symlink skip. All four offline demos passed in all three jobs.
+The stack remains unmerged; no existing PR is retargeted by this increment.
 
 - `npm run compat:claude-local` uses installed Windows Claude Code 2.1.263,
   native Read and real hook processes with strict localhost synthetic Messages,
@@ -236,6 +241,37 @@ No existing PR is merged or retargeted by this increment.
   document the observed bare-mode hook omission, version-specific handshake,
   fixture-wrapper boundary and lack of OS sandbox/full host certification.
 
+## Current increment: Claude first-run diagnosis and direct generated setup
+
+`feat/claude-first-run` is based on PR #11's `36b7320`, not merged main. This
+increment does not merge or retarget any existing PR. Check its published exact
+head and remote CI separately from the earlier stack members.
+
+- `npm run doctor:claude -- --help` works before build. Explicit native Windows
+  executable, ledger and namespace choices generate a reviewable seven-event
+  production-hook settings fragment: shadow/abstain, remote disabled, summary
+  capture off by default. No settings/profile/credential discovery or edits,
+  host startup, database creation or history migration.
+- Static prerequisites, bounded historical evidence and unverified current
+  loading stay separate. Reported outcome provenance, UNKNOWN and ambiguous
+  pairing warnings remain visible. Executable presence is not a version claim.
+- `npm run compat:claude-setup` uses the generated env/hooks unchanged with
+  direct production entrypoints and no inherited ReflexMesh deployment values.
+  Root verified both capture-off and explicit-summary scenarios **17/17** on
+  actual installed Claude Code 2.1.263 with Node 22.23.2 and 24.19.0. Local model
+  transport is synthetic; no real-model/account/default-profile claim is added.
+- Omitted-settings actual-host control correctly failed hook/ledger checks
+  despite a successful native Read. Final full suites on both Node versions:
+  **406 tests, 405 passed, zero failed, one expected Windows symlink skip**.
+  The 52 new tests, four offline demos and prior installed wrapper probe
+  (**22/22** plus **22/22**) passed.
+- Review corrected ledger-length mismatch, bad cache target acceptance,
+  pre-metadata UNC/device checks, missing hook entry and Windows drive-relative
+  ambiguity. Root verified fixes and independent final review found no blocker.
+  No execution authorization, retry, labels, schema or production hook behavior
+  was broadened. [Guide](CLAUDE-FIRST-RUN.md) and
+  [validation](VALIDATION-CLAUDE-FIRST-RUN.md) record exclusions and reproduction.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
@@ -244,7 +280,7 @@ No existing PR is merged or retargeted by this increment.
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
-| Easy onboarding | DeepSeek read-only first-run diagnostics are implemented; other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
+| Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 Next increments should close the host lifecycle gaps before broadening the

@@ -1,5 +1,9 @@
 # First-run doctor: prerequisites are not a live-host certificate
 
+This page describes the unchanged DeepSeek `doctor` command. Claude users can
+use the separate [Claude first-run doctor](CLAUDE-FIRST-RUN.md), which generates
+direct production-hook settings without modifying an existing installation.
+
 Use the read-only doctor before connecting DeepSeek or when a first-run record
 is missing. It does not start a host, call a provider, inspect a user profile,
 read credentials or change settings. It can run before the TypeScript build so

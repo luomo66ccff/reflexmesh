@@ -76,7 +76,7 @@ export function parseDoctorOptions(argv) {
   return values;
 }
 
-function historicalProjection(item, selection) {
+export function historicalProjection(item, selection) {
   const byProvenance = Array.isArray(item?.hostOutcome?.byProvenance)
     ? item.hostOutcome.byProvenance.slice(0, 16).map(group => ({
       provenance: publicEnum(group?.provenance, ['harness-reported', 'model-reported', 'test-oracle'], 'unrecognized'),

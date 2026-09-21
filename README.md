@@ -41,6 +41,12 @@ installation and configuration prerequisites and prints a configuration snippet
 without changing your profile or loading credentials. Historical ledger evidence
 is kept separate from the still-unverified live connection.
 
+Connecting Claude on Windows? `npm run doctor:claude -- --help` starts the
+[read-only setup guide](docs/CLAUDE-FIRST-RUN.md): explicit paths, seven generated
+production hooks and capture off by default, with no settings or account changes.
+`npm run compat:claude-setup` separately verifies the generated fragment through
+installed Claude Code 2.1.263 with account-free synthetic local transport.
+
 Already have Claude Code 2.1.263 on Windows? `npm run compat:claude-local`
 checks a real native Read and hook/ledger lifecycle with **local synthetic
 Messages, no account and no model inference**. It also checks that an injected

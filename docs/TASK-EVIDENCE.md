@@ -22,6 +22,12 @@ The demonstration uses synthetic predictions/outcomes. It shows no provider call
 
 ## Claude Code: explicitly select a summary
 
+The [Claude first-run doctor](CLAUDE-FIRST-RUN.md) now generates the seven
+production-hook entries and explicit environment below as a reviewable settings
+fragment. It defaults capture off, never edits existing settings, and has a
+separate installed-CLI check of the generated configuration with synthetic
+localhost transport. The manual example remains available for reference.
+
 Use the new entrypoint **instead of** the previous `claude-hook.mjs` for tool hooks; do not configure both for the same call. Build first. Merge only these entries with your existing settings and replace the absolute path:
 
 Both entrypoints now use [durable pre/post pairing](CLAUDE-HOOK-PAIRING.md).

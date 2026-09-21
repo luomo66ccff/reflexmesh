@@ -1,5 +1,10 @@
 # Check installed Claude hooks without an account
 
+For first-time production setup, start with [doctor:claude](CLAUDE-FIRST-RUN.md).
+Its separate `compat:claude-setup` probe verifies the generated direct hooks.
+The probe on this page retains its test wrapper for duplicate-delivery injection
+and Stop-specific receipt capture; the two evidence levels are distinct.
+
 `compat:claude-local` exercises an **installed Claude Code CLI**, its native
 `Read`, and actual hook processes against a **synthetic localhost Messages
 fixture**. No real model inference or account is used. ReflexMesh stays shadow

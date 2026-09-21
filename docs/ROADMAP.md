@@ -30,6 +30,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
 - [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [x] Offer an account-free installed Claude CLI/native Read/hook loop using strict synthetic localhost Messages, including duplicate-observer rejection; see [setup and limits](CLAUDE-LOCAL-LOOP.md).
+- [x] Generate Claude production hooks through a read-only first-run doctor and verify that exact settings fragment in isolated installed CLI capture-off/explicit-summary scenarios; see [guide](CLAUDE-FIRST-RUN.md).
 - [ ] Exercise default-profile compatibility and the broader lifecycle matrix; one isolated real-model result does not close this gate.
 - [ ] Run an authorized real-Jev contract smoke test. Never put its key in the repository.
 
