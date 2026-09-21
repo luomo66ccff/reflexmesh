@@ -61,6 +61,11 @@ Elapsed time is a diagnostic, not a performance benchmark.
   product cleanup getters and natural `beforeExit` observation.
 - A historical approximately five-second run has no established root cause and
   is not counted as cleanup evidence or a demonstrated host deadlock fix.
+- Initial Node 22 CI on Ubuntu and Windows caught an overly strict test-only
+  stderr assertion: importing built-in SQLite emits an experimental warning on
+  Node 22. The test now permits only that exact warning (or empty stderr), while
+  retaining the nonzero failure exit, fixed diagnostic and no-path-leak checks.
+  Runtime warnings are not disabled and arbitrary stderr remains a failure.
 
 ## Checks
 

@@ -32,7 +32,9 @@ test('agent probe has a fixed sanitized failure contract without installed host 
       cwd: new URL('..', import.meta.url), encoding: 'utf8', timeout: 10_000,
     });
     assert.equal(child.status, 1);
-    assert.equal(child.stderr, '');
+    // Node 22 emits this built-in warning on import; reject every other stderr
+    // byte instead of disabling warnings or allowing arbitrary error output.
+    assert.match(child.stderr, /^(?:\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n)?$/);
     assert.equal(JSON.parse(child.stdout).reason, 'host_package_missing');
     assert.equal(child.stdout.includes(root), false);
   } finally { cleanup(root); }
