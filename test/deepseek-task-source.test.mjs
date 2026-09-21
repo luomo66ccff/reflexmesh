@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDeepSeekTaskSource } from '../adapters/deepseek-task-source.mjs';
+import { inspectTaskIntent } from '../adapters/task-evidence.mjs';
 
 function fixture() {
   const listeners = new Map();
@@ -106,4 +107,104 @@ test('default off never reads message body; bounded active agents and disposal a
   assert.equal(source.size, 0);
   source.dispose();
   for (const callbacks of f.listeners.values()) assert.equal(callbacks.size, 0);
+});
+
+test('parent hints and shared signals do not transfer selected summaries between Agents', () => {
+  const f = fixture();
+  const parent = f.agent('parent');
+  const child = f.agent('child');
+  child.parent = parent;
+  child.session.parentId = parent.id;
+  const source = createDeepSeekTaskSource(f.ctx, { intentMode: 'explicit-summary' });
+  const signal = new AbortController().signal;
+  const parentExec = { agent: parent, signal };
+  const childExec = { agent: child, signal };
+  f.start(parent, 1);
+  f.start(child, 1);
+  f.claim(parent, 1, 'ReflexMesh-Intent: Parent selected task');
+  f.claim(child, 1, 'Child task without selected summary');
+  f.step(parent, 1, signal);
+  f.step(child, 1, signal);
+  const parentIntent = source.resolveIntent(parentExec);
+  assert.equal(parentIntent.summary, 'Parent selected task');
+  assert.equal(source.resolveIntent(childExec), null);
+
+  f.claim(child, 1, 'ReflexMesh-Intent: Child selected task');
+  const childIntent = source.resolveIntent(childExec);
+  assert.equal(childIntent.summary, 'Child selected task');
+  assert.notEqual(childIntent.id, parentIntent.id);
+  assert.deepEqual(childIntent.scope, { harness: 'deepseek-harness', sessionId: 'child', agentId: 'child' });
+  assert.deepEqual(source.resolveIntent(parentExec), parentIntent);
+  // A projection returned to one caller cannot mutate the retained selection.
+  childIntent.scope.agentId = 'parent';
+  childIntent.summary = 'Changed outside task source';
+  assert.equal(source.resolveIntent(childExec).scope.agentId, 'child');
+  assert.equal(source.resolveIntent(childExec).summary, 'Child selected task');
+  f.emit('agent/disposed', { agent: child });
+  assert.equal(source.resolveIntent(childExec), null);
+  assert.deepEqual(source.resolveIntent(parentExec), parentIntent);
+  source.dispose();
+});
+
+test('a replacement Agent with the same public IDs cannot inherit prior in-memory task evidence', () => {
+  const f = fixture();
+  const original = f.agent('reused-id');
+  const source = createDeepSeekTaskSource(f.ctx, { intentMode: 'explicit-summary' });
+  const signal = new AbortController().signal;
+  f.start(original, 1);
+  f.claim(original, 1, 'ReflexMesh-Intent: Original task');
+  f.step(original, 1, signal);
+  assert.ok(source.resolveIntent({ agent: original, signal }));
+  const copy = { ...original };
+  assert.equal(source.resolveIntent({ agent: copy, signal }), null);
+  assert.throws(() => source.identity({ agent: copy }), /Live DeepSeek agent required/);
+
+  const replacement = f.agent('reused-id');
+  assert.equal(source.resolveIntent({ agent: original, signal }), null);
+  assert.throws(() => source.identity({ agent: original }), /Live DeepSeek agent required/);
+  assert.equal(source.resolveIntent({ agent: replacement, signal }), null);
+  f.start(replacement, 1);
+  f.step(replacement, 1, signal);
+  assert.equal(source.resolveIntent({ agent: replacement, signal }), null);
+  f.claim(replacement, 1, 'ReflexMesh-Intent: Replacement task');
+  // Late disposal of the old object must not clear the new object's task.
+  f.emit('agent/disposed', { agent: original });
+  f.emit('session/disposed', original.session);
+  assert.equal(source.resolveIntent({ agent: replacement, signal }).summary, 'Replacement task');
+  source.dispose();
+});
+
+test('delegated user-shaped prompts remain model-reported with a private TTL', () => {
+  for (const header of [
+    { origin: 'subagent', parentSession: 'parent' },
+    { origin: 'subagent' },
+    { parentSession: 'parent' },
+  ]) {
+    const f = fixture();
+    const agent = f.agent('child');
+    agent.session.header = header;
+    let now = 1000;
+    const source = createDeepSeekTaskSource(f.ctx, { intentMode: 'explicit-summary', clock: () => now, ttlMs: 50 });
+    const signal = new AbortController().signal;
+    const exec = { agent, signal };
+    f.start(agent, 1);
+    f.claim(agent, 1, 'ReflexMesh-Intent: Independently selected child text');
+    f.step(agent, 1, signal);
+    const intent = source.resolveIntent(exec);
+    assert.equal(intent.source, 'model-reported');
+    assert.equal(intent.issuedAt, null);
+    assert.equal(intent.expiresAt, null);
+    const receipt = inspectTaskIntent(intent, intent.scope, now).receipt;
+    assert.equal(receipt.status, 'ready');
+    assert.equal(receipt.freshness, 'unverified');
+    now = 999;
+    assert.equal(source.resolveIntent(exec), null);
+    now = 1049;
+    assert.ok(source.resolveIntent(exec));
+    now = 1050;
+    assert.equal(source.resolveIntent(exec), null);
+    f.claim(agent, 1, 'Unmarked replacement invalidates the delegated summary');
+    assert.equal(source.resolveIntent(exec), null);
+    source.dispose();
+  }
 });

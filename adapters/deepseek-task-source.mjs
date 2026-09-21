@@ -38,7 +38,7 @@ export function createDeepSeekTaskSource(ctx, {
       forgetSession(session);
       const agent = ctx.agents.get(session.id);
       if (live(agent) && agent.session === session && active.size < maxAgents) {
-        active.set(agent, { session, turn, signal: null, intent: null });
+        active.set(agent, { session, turn, signal: null, intent: null, capturedAt: null, localExpiresAt: null });
       }
     });
     register('agent/inbox/claimed', ({ agent, message, turn } = {}) => {
@@ -58,12 +58,18 @@ export function createDeepSeekTaskSource(ctx, {
       if (selected.status !== 'ready' || issuedAt === null || issuedAt > Number.MAX_SAFE_INTEGER - ttlMs
         || typeof message.id !== 'string'
         || message.id.length < 1 || message.id.length > 256) return;
+      // The official subagent driver wraps delegated prompts as source:user.
+      // That wrapper is not proof that a human supplied the selected text.
+      const header = agent.session.header;
+      const delegated = header?.origin === 'subagent' || header?.parentSession !== undefined;
+      state.capturedAt = issuedAt;
+      state.localExpiresAt = issuedAt + ttlMs;
       state.intent = {
         schemaVersion: 1,
         id: intentDigest([agent.id, turn, message.id, 'deepseek-claimed-summary']),
         scope: { harness: 'deepseek-harness', sessionId: agent.session.id, agentId: agent.id },
-        source: 'host-declared', summary: selected.summary,
-        issuedAt, expiresAt: issuedAt + ttlMs,
+        source: delegated ? 'model-reported' : 'host-declared', summary: selected.summary,
+        issuedAt: delegated ? null : issuedAt, expiresAt: delegated ? null : state.localExpiresAt,
       };
     });
     register('agent/pre-step', (payload, next) => {
@@ -92,7 +98,7 @@ export function createDeepSeekTaskSource(ctx, {
     const state = active.get(agent);
     const now = time();
     if (!state || now === null || state.session !== agent.session || state.signal !== exec.signal
-      || !state.intent || now < state.intent.issuedAt || now >= state.intent.expiresAt) return null;
+      || !state.intent || now < state.capturedAt || now >= state.localExpiresAt) return null;
     return { ...state.intent, scope: { ...state.intent.scope } };
   };
   const dispose = () => {
