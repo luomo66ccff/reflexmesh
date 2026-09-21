@@ -26,6 +26,17 @@ Codex STDIO MCP       Claude Code hooks       DeepSeek Harness hooks
 
 Node.js **22.16+**, npm. TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages are required. The new adapter uses Node's built-in, experimental `node:sqlite` API on a **single machine / local filesystem**.
 
+Start with an account-free, explained walkthrough:
+
+```bash
+npm ci --ignore-scripts
+npm run demo:evidence
+```
+
+It shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome in this walkthrough is labeled synthetic. No model or host tool runs. To read a real local ledger, use `npm run evidence -- list --db PATH` and `npm run evidence -- inspect --db PATH --key KEY`; see the [evidence CLI guide](docs/EVIDENCE.md).
+
+For the full development checks and other offline examples:
+
 ```bash
 npm ci --ignore-scripts
 npm run check
@@ -48,6 +59,7 @@ The demos use explicitly labeled synthetic fixtures, not real Jev predictions. T
 | Claude Code | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` shadow CLI; always abstains from permission changes |
 | DeepSeek Harness | Source-matched `tools/pre-execute` + `tools/result` observer; preserves `next()` and supports disposal |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
+| Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
 | Policy replay | Same question contract, different policy; no model calls, execution callbacks or side effects |
 | Existing v0.1 modules | Memory admission suggestions, Jev/Mock, deterministic policy, authorized reads, Brier/ECE and speculation planner retained |
 

@@ -20,6 +20,8 @@
     "mcp:stdio": "node adapters/mcp-server.mjs",
     "hook:claude": "node adapters/claude-hook.mjs",
     "recovery": "node adapters/recovery-cli.mjs",
+    "evidence": "node adapters/evidence-cli.mjs",
+    "demo:evidence": "npm run build && node examples/task-intent.mjs --explain",
     "demo:recovery": "npm run build && node examples/recovery-review.mjs"
   },
   "devDependencies": {

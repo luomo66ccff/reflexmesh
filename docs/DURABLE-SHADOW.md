@@ -143,7 +143,7 @@ The host must resolve authenticated session/agent identity. We deliberately do n
 
 ## Limits
 
-This alpha is local-first, shadow-first, and unaudited. No HTTP authentication, distributed broker, credential isolation, automatic raw-text secret redaction, transparent encryption, tamper-proof ledger, retention policy, manual recovery protocol, full calibrated-provider migration, real speculation, Saga compensator, memory DB or UI is shipped.
+This alpha is local-first, shadow-first, and unaudited. Local metadata-only operator reviews are available in [RECOVERY.md](RECOVERY.md), and [the evidence CLI](EVIDENCE.md) reads bounded decision/outcome metadata. No HTTP authentication, distributed broker, credential isolation, automatic raw-text secret redaction, transparent encryption, tamper-proof ledger, retention policy, independently authenticated recovery service, full calibrated-provider migration, real speculation, Saga compensator, memory DB or dashboard is shipped.
 
 Raw input/output is not saved by the new boundary, but it may be sent to a configured remote provider. Digests are not anonymization; pack prompts, selected labels, identifiers and prediction metadata may contain information. SQLite namespace keys do not authenticate clients, and arbitrary processes with database access can modify records. Do not expose the local protocol as an unauthenticated network service. An unknown execution remains uncertain even after the process restarts.
 

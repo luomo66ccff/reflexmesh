@@ -58,4 +58,4 @@ Use task-specific held-out labels, report sample counts and class balance, and s
 
 ## Current deployment recommendation
 
-Use an in-process library inside a trusted local app. Start in shadow mode. Do not expose `run()` as an unauthenticated public endpoint. Add distributed storage, authenticated ingress and failure-recovery tests before a multi-service gateway. MCP, Next.js/FastAPI integration and a dashboard are roadmap items, not shipped integrations.
+Use an in-process library inside a trusted local app. Start in shadow mode. Do not expose `run()` as an unauthenticated public endpoint. The optional durable layer now includes local SQLite admission, advisory STDIO MCP, host observers and metadata-only recovery review; see [DURABLE-SHADOW.md](DURABLE-SHADOW.md). Add distributed storage and authenticated ingress before a multi-service gateway. HTTP/Next.js/FastAPI distribution and a dashboard remain roadmap items.
