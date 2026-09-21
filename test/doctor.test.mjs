@@ -298,6 +298,23 @@ test('historical missing task, conflicting outcome and UNKNOWN never become live
   } finally { w.cleanup(); }
 });
 
+test('a completed shadow decision with an UNKNOWN reported host outcome still warns against retries', async () => {
+  const w = workspace();
+  try {
+    fakePackages(w.packageRoot);
+    database(w.db, 2, { key: 'cancelled-host-call', state: 'completed', outcomes: ['unknown'],
+      evidence: { mode: 'shadow', taskEvidence: { status: 'ready', coverage: 'summary-only' } },
+      result: { status: 'shadow', verdict: { effect: 'escalate' } } });
+    const { report } = await diagnoseDoctor(args(w));
+    assert.equal(report.historicalEvidence.runState, 'completed');
+    assert.equal(report.historicalEvidence.outcomeStatus, 'unknown');
+    assert.equal(report.historicalEvidence.recoveryRequired, false);
+    assert.equal(report.historicalEvidence.executionAuthorized, false);
+    assert.ok(codes(report).includes('historical_unknown_execution'));
+    assert.match(formatDoctor(report), /不得自动重试/);
+  } finally { w.cleanup(); }
+});
+
 test('historical summary distinguishes harness- and model-reported outcomes without authorizing execution', async () => {
   const w = workspace();
   try {

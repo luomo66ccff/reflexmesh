@@ -1,4 +1,4 @@
-import { fromDeepSeekCall } from '../dist/index.js';
+import { canonical, fromDeepSeekCall } from '../dist/index.js';
 import { resolveHostIntent } from './task-evidence.mjs';
 
 /** Source-verified Cordis seams; no dependency on or patching of the DeepSeek agent loop.
@@ -32,10 +32,26 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     const state = active.get(exec);
     if (!state || state.resultSeen) return undefined;
     state.resultSeen = true;
-    // tools/result is a synchronous observe-only event. Track async work without changing its return type.
-    const task = Promise.resolve().then(() => boundary.after(fromDeepSeekCall(exec, identity(exec)),
-      result.isError === true ? 'failed' : result.isError === false ? 'succeeded' : 'unknown', result, 'harness-reported'))
-      .catch(warn).finally(() => { active.delete(exec); state.settle(); });
+    const settle = () => { active.delete(exec); state.settle(); };
+    let call, evidence, status;
+    try {
+      // Capture during the synchronous notification: later host listeners may
+      // dispose the Agent or mutate their own execution/result objects. Still
+      // validate current identity, never resurrect an invalid admission identity.
+      call = fromDeepSeekCall(exec, identity(exec));
+      if (!result || typeof result !== 'object' || Array.isArray(result)) throw new TypeError('Invalid host result');
+      const serialized = canonical(result);
+      if (Buffer.byteLength(serialized) > 1_000_000) throw new TypeError('Outcome evidence too large');
+      evidence = JSON.parse(serialized); // Private bounded copy, not a freeze/mutation of host data.
+      // Installed dsh-tools uses ABORTED after body invocation, even if that
+      // body returned success. Cancellation is not proof of absent effects.
+      status = evidence.isError === true
+        ? evidence.error?.info?.code === 'ABORTED' ? 'unknown' : 'failed'
+        : evidence.isError === false ? 'succeeded' : 'unknown';
+    } catch { warn(); settle(); return undefined; }
+    // tools/result remains synchronous and observe-only; only journal work is deferred.
+    const task = Promise.resolve().then(() => boundary.after(call, status, evidence, 'harness-reported'))
+      .catch(warn).finally(settle);
     void task;
     return undefined;
   };

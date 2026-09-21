@@ -179,7 +179,8 @@ export async function diagnoseDoctor(argv, {
             add(diagnostics, 'historical_evidence_only');
             if (historicalEvidence.taskStatus !== 'ready') add(diagnostics, 'historical_task_not_ready');
             if (historicalEvidence.outcomeStatus === 'conflicting') add(diagnostics, 'historical_outcome_conflict');
-            if (historicalEvidence.runState === 'unknown' || historicalEvidence.recoveryRequired) add(diagnostics, 'historical_unknown_execution');
+            if (historicalEvidence.runState === 'unknown' || historicalEvidence.outcomeStatus === 'unknown'
+              || historicalEvidence.recoveryRequired) add(diagnostics, 'historical_unknown_execution');
           } else historicalEvidence = { status: 'none', selection: input.key === undefined ? 'first_key_order_not_latest' : 'explicit_key' };
         } catch {
           database = 'invalid'; historicalEvidence = { status: 'not_inspected' };
