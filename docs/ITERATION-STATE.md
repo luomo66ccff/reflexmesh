@@ -343,6 +343,7 @@ expected skip, plus all four offline demos. That CI is not this next branch's CI
 ## Current increment: independent provider and capability-bound evidence
 
 `feat/independent-provider` is based on PR #14's `ed8754d`, not merged main.
+Published as [PR #15](https://github.com/luomo66ccff/reflexmesh/pull/15).
 No existing PR is merged or retargeted. Verify this increment's exact published
 head and its own CI before any merge.
 
@@ -367,6 +368,16 @@ head and its own CI before any merge.
   help passed. Actual isolated Claude generated setup remained **17/17** per
   scenario and cold resume **20/20** per scenario on both Node versions, using
   synthetic model transport. Published exact-head CI is checked separately.
+- A clean-head second real-provider request on `feed283` also passed 11/11;
+  two requests total, zero tools/labels. Initial CI passed Ubuntu/Node 22 and
+  Windows/Node 24 but Windows/Node 22 returned an unexpected generic probe
+  error in an existing ignored-hooks negative control. Its exact cause was
+  not logged. The follow-up preserves the failure record and assertion,
+  uses OS-selected Fetch-compatible loopback ports, and adds redacted fixed
+  phase/error diagnostics. Final local suites: **638 tests, 637 passed,
+  zero failed, one expected skip** on both Node versions. Production provider
+  code is unchanged; no additional paid call was needed. See the separate
+  [t002 receipt](VALIDATION-INDEPENDENT-PROVIDER-T002.md) and final PR CI.
 - [Usage](DEEPSEEK-PROVIDER.md), [contract](PROVIDER-CONFORMANCE.md) and
   [validation t001](VALIDATION-INDEPENDENT-PROVIDER-T001.md) retain migration,
   model-alias, latency, quality and full-host exclusions. No paid demo in CI.

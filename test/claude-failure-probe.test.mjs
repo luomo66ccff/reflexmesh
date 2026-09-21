@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { createClaudeSettings } from '../adapters/claude-setup.mjs';
@@ -112,9 +112,32 @@ for (const mode of ['timeout', 'stdout_limit', 'ignored_hooks']) test(`${mode} c
     return mode === 'ignored_hooks' ? { ok: true, stdout: valid().stdout } : { ok: false, kind: mode };
   } });
   assert.equal(result.status, 'failed');
-  assert.equal(result.reason, { timeout: 'host_timeout', stdout_limit: 'host_stdout_limit_exceeded', ignored_hooks: 'probe_assertion_failed' }[mode]);
+  assert.equal(result.reason, { timeout: 'host_timeout', stdout_limit: 'host_stdout_limit_exceeded', ignored_hooks: 'probe_assertion_failed' }[mode],
+    JSON.stringify(result.diagnostic));
+  assert.equal(result.diagnostic, undefined);
   assert.equal(existsSync(directory), false); assert.equal(readFileSync(f.canary, 'utf8'), 'preserve');
   await assert.rejects(fetch(endpoint, { signal: AbortSignal.timeout(500) }));
+});
+
+for (const [name, code, expected] of [
+  ['fixture bind EACCES', 'EACCES', 'EACCES'],
+  ['unknown private fixture error', 'PRIVATE_FAILURE_CODE', 'unknown'],
+]) test(`${name} reports only a fixed diagnostic and leaves no listener`, async t => {
+  const f = workspace(t);
+  let hostCalls = 0;
+  const privateText = 'PRIVATE_TOKEN C:\\private\\ledger.sqlite';
+  const result = await runClaudeFailureProbe({}, { ...f.deps,
+    startFixture: async () => { throw Object.assign(new Error(privateText), { code }); },
+    runHost: async () => { hostCalls++; throw new Error('host must not start'); },
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.reason, 'probe_execution_failed');
+  assert.deepEqual(result.diagnostic, { phase: 'fixture_bind', code: expected });
+  assert.equal(hostCalls, 0);
+  assert.deepEqual(readdirSync(f.root), ['unrelated']);
+  assert.equal(readFileSync(f.canary, 'utf8'), 'preserve');
+  assert.equal(JSON.stringify(result).includes(privateText), false);
+  assert.equal(JSON.stringify(result).includes('PRIVATE_FAILURE_CODE'), false);
 });
 
 test('doctor refusal and policy refusal never start a host', async t => {

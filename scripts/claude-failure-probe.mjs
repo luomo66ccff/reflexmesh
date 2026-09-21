@@ -20,6 +20,12 @@ const row = (name, passed) => ({ name, passed: passed === true });
 const EVENTS = { UserPromptSubmit: 1, PreToolUse: 2, PostToolUse: 1, PostToolUseFailure: 1, Stop: 1 };
 const ALL_EVENTS = [...Object.keys(EVENTS), 'StopFailure', 'SessionEnd'];
 const sqliteWarningOnly = text => typeof text === 'string' && /^(?:\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n)?$/.test(text);
+const DIAGNOSTIC_CODES = new Set(['EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EPERM', 'EMFILE', 'ENFILE']);
+function diagnosticCode(error) {
+  let code;
+  try { code = error?.code; } catch { return 'unknown'; }
+  return DIAGNOSTIC_CODES.has(code) ? code : 'unknown';
+}
 
 export function evaluateClaudeFailureRun({ stdout, settings, childEnv, records, pairs, receipts,
   transport, ledger, intent, schemaVersion, pairCount, cacheCount, minimized }) {
@@ -127,11 +133,12 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
   runHost = runBounded, doctor = diagnoseClaudeDoctor, runVersion = runBounded, resolveHost = resolveExecutable,
   platform = process.platform, systemTemp = process.env.SystemRoot && join(process.env.SystemRoot, 'Temp'),
   ancestorCheck = ancestorContextAbsent, managedCheck = managedConfigurationAbsent, remove = rmSync,
+  startFixture = startClaudeFailureFixture,
 } = {}) {
   const report = { schemaVersion: 1, evidenceLevel: 'installed_claude_mixed_outcomes',
     modelInference: false, modelTransport: 'loopback_fixture', defaultProfileUsed: false,
     hostVersion: 'unverified', status: 'failed', reason: 'probe_execution_failed', assertions: [] };
-  let temporaryRoot, directory, service;
+  let temporaryRoot, directory, service, phase = 'preflight';
   try {
     if (typeof claudeCommand !== 'string' || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120000) { report.reason = 'invalid_options'; return report; }
     if (platform !== 'win32' || !systemTemp) { report.reason = 'unsupported_host_platform'; return report; }
@@ -140,6 +147,7 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
     const version = await runVersion(executable, ['--version'], { cwd: ROOT, env: {}, timeoutMs: 10000, stdoutLimitBytes: 1024, stderrLimitBytes: 1024 });
     if (!version.ok || version.stdout.trim() !== '2.1.263 (Claude Code)') { report.reason = 'unsupported_host_version'; return report; }
     report.hostVersion = '2.1.263';
+    phase = 'isolation_setup';
     temporaryRoot = realpathSync(systemTemp);
     if (!ancestorCheck(temporaryRoot)) { report.reason = 'ambient_context_unverified'; return report; }
     directory = mkdtempSync(join(temporaryRoot, PREFIX));
@@ -147,6 +155,7 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
     for (const key of Object.keys(env)) if (/^REFLEXMESH_/i.test(key)) delete env[key];
     for (const key of ['CLAUDE_CONFIG_DIR', 'ANTHROPIC_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR']) mkdirSync(env[key], { mode: 0o700 });
     if (!await managedCheck(env, directory)) { report.reason = 'managed_configuration_unverified'; return report; }
+    phase = 'doctor_setup';
     const ledger = join(directory, 'ledger.sqlite'), intent = join(directory, 'intent.sqlite');
     const checked = await doctor(['--claude-executable', executable, '--db', ledger, '--tenant', 'synthetic-failure-probe',
       '--scope', 'mixed-outcomes', '--intent-mode', 'explicit-summary', '--intent-db', intent]);
@@ -157,7 +166,8 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
     const receiptPath = join(directory, 'tool-receipts.jsonl');
     const mcp = { mcpServers: { reflexmesh_fixture: { type: 'stdio', command: process.execPath,
       args: [join(ROOT, 'scripts', 'claude-failure-tools.mjs'), receiptPath, okText, failText] } } };
-    service = await startClaudeFailureFixture({ model: MODEL, token, okText, failText, marker: MARKER });
+    phase = 'fixture_bind';
+    service = await startFixture({ model: MODEL, token, okText, failText, marker: MARKER });
     env.ANTHROPIC_BASE_URL = service.baseUrl; env.ANTHROPIC_API_KEY = token;
     const args = ['--restricted', '--print', '--output-format', 'stream-json', '--verbose', '--include-hook-events',
       '--no-session-persistence', '--setting-sources', '', '--disable-slash-commands', '--no-chrome', '--settings', settingsPath,
@@ -165,7 +175,9 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
       '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--model', MODEL, '--max-turns', '3',
       '--system-prompt', 'Isolated compatibility fixture. Use only the supplied synthetic MCP tool.',
       `ReflexMesh-Intent: ${FAILURE_SUMMARY}\nRun the fixture batch once.`];
+    phase = 'host_run';
     const host = await runHost(executable, args, { cwd: directory, env, timeoutMs, stdoutLimitBytes: 1024 * 1024, stderrLimitBytes: 65536 });
+    phase = 'evidence_read';
     report.transport = service.snapshot();
     if (!host.ok) { report.reason = processFailureReason(host); return report; }
     let records = [], pairs = [], schemaVersion = null, pairCount = null, cacheCount = null;
@@ -184,12 +196,16 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
       try { cacheCount = cache.prepare('SELECT count(*) n FROM intents').get().n; } finally { cache.close(); }
     }
     const receipts = existsSync(receiptPath) ? readFileSync(receiptPath, 'utf8').trim().split(/\r?\n/).map(JSON.parse) : [];
+    phase = 'evidence_verify';
     report.assertions = evaluateClaudeFailureRun({ stdout: host.stdout, settings, childEnv: env, records, pairs, receipts,
       transport: report.transport, ledger, intent, schemaVersion, pairCount, cacheCount,
       minimized: ![okText, failText, token, FAILURE_SUMMARY].some(value => JSON.stringify(records).includes(value)) });
     report.status = report.assertions.every(item => item.passed) ? 'passed' : 'failed';
     report.reason = report.status === 'passed' ? 'mixed_outcomes_passed' : 'probe_assertion_failed';
-  } catch { report.reason = 'probe_execution_failed'; }
+  } catch (error) {
+    report.reason = 'probe_execution_failed';
+    report.diagnostic = { phase, code: diagnosticCode(error) };
+  }
   finally {
     try {
       await service?.close();
