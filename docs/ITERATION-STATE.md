@@ -340,7 +340,7 @@ expected skip, plus all four offline demos. That CI is not this next branch's CI
   retain unattended resume, cancellation, default-profile, child/fork, platform,
   external effects and descendant-termination exclusions.
 
-## Current increment: independent provider and capability-bound evidence
+## Reviewed increment: independent provider and capability-bound evidence
 
 `feat/independent-provider` is based on PR #14's `ed8754d`, not merged main.
 Published as [PR #15](https://github.com/luomo66ccff/reflexmesh/pull/15).
@@ -382,21 +382,57 @@ head and its own CI before any merge.
   [validation t001](VALIDATION-INDEPENDENT-PROVIDER-T001.md) retain migration,
   model-alias, latency, quality and full-host exclusions. No paid demo in CI.
 
+## Current increment: paired provider comparison
+
+`feat/provider-comparison` is based on PR #15's
+`102bb5bd31ac08e61a61b7ed483956b2a752977b`, not merged main. That exact base's
+CI 35646673391 passed Ubuntu/Node 22 (638/638) and Windows/Node 22/24 (637
+passed, one expected skip), plus four offline demos. This is historical base
+evidence, not the new branch's CI. No existing PR is merged or retargeted.
+
+- `evaluation validate/run/compare` now separates strict versioned datasets,
+  independently supplied label files and distinct bound prediction artifacts.
+  Local validation/comparison loads no credentials or provider factory. The
+  bounded opt-in runner sends the full question contract, preserves every case,
+  stops after failure/timeout/cancel, and never retries or invokes tools.
+- Per-question paired deltas use the same labeled/both-successful cohort;
+  available subsets, failure/missing coverage and class/provenance balance stay
+  explicit. Policy disagreements may include unlabeled cases, never claiming
+  false-allow/false-deny rates. No automatic winner/promotion or calibration
+  transfer; source independence and origin remain operator declarations.
+- New account-free `demo:comparison` explains missingness bias and can keep
+  five editable synthetic JSON files in a new directory. New-only, pre-reserved
+  output receipts prevent automatic same-path paid reruns, without promising
+  atomic publication or remote idempotency.
+- Windows Node 22.23.2 and 24.19.0: **676 tests, 675 passed, zero failed, one
+  expected skip** each; **38/38 new regressions** and all five offline demos
+  passed. Scoped independent review and root verification found no remaining
+  P1/P2 in the new boundaries. CI now includes the fifth demo.
+- User-authorized real workflow smoke on clean `ff450ca`: **14/14 assertions**,
+  four HTTP 200 requests, 948 input/60 output tokens, zero tools or profile
+  changes. Two deployments use the same `deepseek-flash` route and two fixed
+  synthetic cases with independent equality-oracle labels; local comparison
+  adds zero requests. This is not an independent-model quality/calibration
+  comparison. See [guide](PROVIDER-COMPARISON.md) and
+  [validation t001](VALIDATION-PROVIDER-COMPARISON-T001.md).
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
 | Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
-| Independent providers | Initial immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress shared conformance and binding propagation are implemented and narrowly tested. Quality/calibration, independent labeled comparisons, real Jev acceptance for this increment, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
-| Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
+| Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
+| Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
 | Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
-After the initial independent-provider boundary, the next product milestone is
-a usable independently labeled, separately bound comparison/report workflow.
-Retention and lifecycle gates remain open; newly discovered lifecycle blockers
-take priority. This engineering sequence does not certify the broad host gate
+The independently labeled, separately bound comparison/report workflow is now
+implemented with an explicit provenance and descriptive-only boundary. Next,
+prioritize safe operational retention/review and remaining lifecycle evidence;
+newly discovered lifecycle blockers take priority. Real comparative quality
+requires suitable independent labels and distinct approved provider routes,
+not repeated same-model synthetic calls. This sequence does not certify the broad host gate
 or enlarge supported scope. See the dated [roadmap decision](ROADMAP.md).
 No dashboard, new agent framework, automatic writes, or
 automatic threshold loosening is part of this plan. Missing real-host credentials
