@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
 import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
-import { evidenceColumns, evidenceView } from './evidence-view.mjs';
+import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
 
 export const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 const requireValue = (ok, message) => { if (!ok) throw new ContractError(message); };
@@ -420,6 +420,35 @@ export class SqliteKernel {
       const page = rows.slice(0, limit);
       for (const row of page) requireValue(text(row.key), 'Invalid stored evidence key');
       return { items: page.map(row => evidenceView(row, now)), nextCursor: rows.length > limit ? page.at(-1).key : null };
+    });
+  }
+  listAttention({ limit = 20, after = '' } = {}) {
+    requireValue(Number.isSafeInteger(limit) && limit >= 1 && limit <= 100
+      && typeof after === 'string' && after.length <= 1024, 'Invalid attention page');
+    return this.#readEvidence(now => {
+      const pairing = this.#schemaVersion >= 3 ? `OR EXISTS (
+        SELECT 1 FROM claude_hook_pairs p WHERE p.key=r.key AND p.state IN ('pending','blocked'))` : '';
+      // Filter before LIMIT: ordinary rows between two attention keys never consume a page.
+      // EXISTS uses observations' (run_key,id) primary key; output remains at most limit+1.
+      const rows = this.#db.prepare(`SELECT ${evidenceColumns(this.#schemaVersion)} FROM runs r
+        WHERE r.key>? AND (
+          r.state='unknown' OR (r.state='executing' AND r.lease_until<=?)
+          ${pairing}
+          OR (r.state='completed' AND json_extract(r.evidence,'$.mode')='shadow'
+            AND NOT EXISTS (SELECT 1 FROM observations o WHERE o.run_key=r.key))
+          OR EXISTS (SELECT 1 FROM observations o WHERE o.run_key=r.key
+            AND COALESCE(json_extract(o.body,'$.status'),'') NOT IN ('succeeded','failed'))
+          OR (EXISTS (SELECT 1 FROM observations o WHERE o.run_key=r.key
+                AND json_extract(o.body,'$.status')='succeeded')
+            AND EXISTS (SELECT 1 FROM observations o WHERE o.run_key=r.key
+                AND json_extract(o.body,'$.status')='failed'))
+        ) ORDER BY r.key LIMIT ?`).all(after, now, limit + 1);
+      const page = rows.slice(0, limit);
+      for (const row of page) requireValue(text(row.key), 'Invalid stored evidence key');
+      const items = page.map(row => evidenceAttentionView(row, now));
+      for (const item of items) requireValue(item.attention.reasons.length > 0, 'Attention filter mismatch');
+      return { items, nextCursor: rows.length > limit ? page.at(-1).key : null,
+        coverage: { population: 'decision_rows', pairOnlyReservations: 'excluded' } };
     });
   }
   inspect(key) {

@@ -55,6 +55,42 @@ An operator conclusion such as `confirmed_not_executed` never converts an
 UNKNOWN tombstone into retry permission. Use the separate [recovery
 runbook](RECOVERY.md) to investigate and record a review.
 
+## Find evidence that needs attention
+
+```bash
+npm run evidence -- attention --db /private/path/shadow.sqlite
+node adapters/evidence-cli.mjs attention --db /private/path/shadow.sqlite --limit 20 --json
+```
+
+Use this after reconnecting or restarting a host to find recorded decisions
+whose evidence needs independent review. Unlike `list --state unknown`, it also
+finds a **completed shadow decision** with a missing or uncertain reported
+outcome. It never runs a tool/provider, updates recovery, or changes execution
+state. Selection occurs before the bounded keyset page limit.
+
+Each item adds `attention.reasons`, with one or more fixed codes:
+
+| Code | What needs review |
+| --- | --- |
+| `shadow_outcome_missing` | Completed shadow decision, zero recorded outcome observations. The tool may still be running, may not have run, or its report may be missing; no crash/failure is inferred. |
+| `reported_unknown` | Recorded outcome is unknown, with its original provenance retained; not automatically run UNKNOWN. |
+| `outcome_conflict` | Recorded observation statuses disagree. No winner is selected. |
+| `outcome_unrecognized` | The stored observation status is unsupported; raw text is not displayed. |
+| `hook_pairing_pending` / `hook_pairing_blocked` | Claude invocation association is incomplete or ambiguous. |
+| `execution_unknown` / `execution_lease_expired` | Durable run UNKNOWN or executing with an expired lease; an operator review does not enable retry. |
+
+The JSON `coverage` explicitly limits the population to decision rows and
+excludes pair-only reservations. This is an evidence review list, **not an error
+inventory**: ordinary failed reports, admitted/healthy executing calls and
+active completed runs without host reports do not enter merely for those
+conditions. An empty result proves neither safety nor non-execution. Read the
+reported source groups; model-reported data is never upgraded to host evidence.
+
+`attention` accepts `--limit` and `--after`, but not `--state` or `--key`. Use
+`inspect` for a returned key. Schema/read-only/privacy limits below still apply.
+The [actual Claude cold-resume check](CLAUDE-COLD-RESUME.md) exercises this public
+CLI on both uninterrupted and missing-result ledgers, with synthetic transport.
+
 ## Pagination and machine-readable receipts
 
 Pages use stable **key order, not chronological order**. The default is 20 rows;

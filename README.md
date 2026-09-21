@@ -35,6 +35,12 @@ npm run demo:evidence
 
 It shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome in this walkthrough is labeled synthetic. No model or host tool runs. To read a real local ledger, use `npm run evidence -- list --db PATH` and `npm run evidence -- inspect --db PATH --key KEY`; see the [evidence CLI guide](docs/EVIDENCE.md).
 
+After a restart, `npm run evidence -- attention --db PATH` gives a read-only,
+paged list of decision rows with missing/uncertain outcome evidence, ambiguous
+hook pairing, or execution recovery requirements. It never infers a crash or
+authorizes a retry; missing shadow reports remain separate from run UNKNOWN.
+An empty list is not a health certificate. See the [attention guide](docs/EVIDENCE.md#find-evidence-that-needs-attention).
+
 Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 [read-only first-run diagnostics](docs/DOCTOR.md). It explains missing build,
 installation and configuration prerequisites and prints a configuration snippet
@@ -123,6 +129,13 @@ Claude failure hooks now preserve an explicit interruption as a reported
 `npm run compat:claude-failure` check exercises an actual overlapping success
 and failure through isolated MCP tools and direct production hooks. Real host
 cancellation is not implied; see [failure evidence and limits](docs/CLAUDE-FAILURE-EVIDENCE.md).
+
+`npm run compat:claude-resume` verifies two separate installed Claude processes
+using the same isolated synthetic session: clean exit and an owned-process kill
+at a persisted tool-entry barrier. New prompts replace or clear old task summaries;
+missing prior results stay visible through `evidence attention`. This does not
+certify unattended continuation, default profiles or exactly-once execution.
+See [cold-resume usage and verification boundaries](docs/CLAUDE-COLD-RESUME.md).
 
 ## Review an unknown execution
 

@@ -6,8 +6,10 @@ import { isDirectRun } from './direct-run.mjs';
 
 const USAGE = `ReflexMesh evidence: explain decisions separately from host outcomes (read-only)
   npm run evidence -- list --db PATH [--limit 20] [--after KEY] [--state STATE] [--json]
+  npm run evidence -- attention --db PATH [--limit 20] [--after KEY] [--json]
   npm run evidence -- inspect --db PATH --key KEY [--json]
 States: admitted, executing, completed, unknown. Pages are ordered by key, not recency.
+Attention covers decision rows only; pair-only reservations are excluded, and this is not a complete error inventory.
 No provider, tool, permission change or replay is invoked. Use --json for metadata receipts.
 The database must already exist. Build once with npm run build before using this CLI.
 `;
@@ -15,8 +17,9 @@ const fail = message => { throw new ContractError(message); };
 export function parseEvidenceOptions(argv) {
   if (!argv.length || (argv.length === 1 && argv[0] === '--help')) return { help: true };
   const [command, ...rest] = argv;
-  if (!['list','inspect'].includes(command)) fail('Expected list or inspect; use --help');
-  const allowed = command === 'list' ? ['db','limit','after','state','json'] : ['db','key','json'];
+  if (!['list','attention','inspect'].includes(command)) fail('Expected list, attention or inspect; use --help');
+  const allowed = command === 'list' ? ['db','limit','after','state','json']
+    : command === 'attention' ? ['db','limit','after','json'] : ['db','key','json'];
   const options = { command };
   for (let i = 0; i < rest.length; i++) {
     const name = rest[i].startsWith('--') ? rest[i].slice(2) : '';
@@ -40,6 +43,18 @@ export function parseEvidenceOptions(argv) {
 export function formatEvidence(result, command) {
   const quote = value => JSON.stringify(value ?? 'not recorded');
   const sources = item => item.hostOutcome.byProvenance.map(group => `${group.provenance}:${group.status}=${group.count}`).join(', ') || 'none';
+  if (command === 'attention') {
+    const lines = ['ReflexMesh attention (read-only; key order, not chronological)',
+      'Decision rows only; pair-only reservations without runs are excluded. This is not a complete error inventory.'];
+    for (const item of result.items) {
+      lines.push(`${quote(item.key)} | run: ${item.run.state} | outcome observations: ${item.hostOutcome.status} [${sources(item)}] | hook pairing: ${item.hostOutcome.hookPairing.state}`);
+      for (const reason of item.attention.reasons) lines.push(`  ${reason.code}: ${reason.explanation}`);
+    }
+    if (!result.items.length) lines.push('No matching decision rows; absence is not proof of host safety or non-execution.');
+    if (result.nextCursor !== null) lines.push(`Next page: --after ${quote(result.nextCursor)}`);
+    lines.push('Use inspect --db PATH --key KEY for bounded decision and outcome detail; this command never authorizes a retry.');
+    return lines.join('\n') + '\n';
+  }
   if (command === 'list') {
     const lines = ['ReflexMesh evidence (read-only; key order, not chronological)'];
     for (const item of result.items) lines.push(`${quote(item.key)} | run: ${item.run.state} | decision: ${item.decision.effect ?? 'not recorded'} | host outcome: ${item.hostOutcome.status} [${sources(item)}] | task: ${item.taskEvidence.recordedStatus} | hook pairing: ${item.hostOutcome.hookPairing?.state ?? 'not_recorded'}`);
@@ -69,7 +84,11 @@ export async function evidenceMain(argv, output = process.stdout) {
   if (options.help) { output.write(USAGE); return; }
   const kernel = new SqliteKernel(resolve(options.db), { readOnly: true });
   try {
-    const result = options.command === 'list' ? kernel.listEvidence({ limit: options.limit ?? 20, after: options.after ?? '', state: options.state ?? null }) : kernel.evidenceSnapshot(options.key);
+    const result = options.command === 'list'
+      ? kernel.listEvidence({ limit: options.limit ?? 20, after: options.after ?? '', state: options.state ?? null })
+      : options.command === 'attention'
+        ? kernel.listAttention({ limit: options.limit ?? 20, after: options.after ?? '' })
+        : kernel.evidenceSnapshot(options.key);
     if (!result) fail('Unknown evidence key');
     output.write(options.json ? JSON.stringify(result, null, 2) + '\n' : formatEvidence(result, options.command));
   } finally { kernel.close(); }

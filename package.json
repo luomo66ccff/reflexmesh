@@ -20,6 +20,7 @@
     "compat:claude-local": "npm run build && node scripts/claude-local-probe.mjs",
     "compat:claude-setup": "npm run build && node scripts/claude-setup-probe.mjs",
     "compat:claude-failure": "npm run build && node scripts/claude-failure-probe.mjs",
+    "compat:claude-resume": "npm run build && node scripts/claude-resume-probe.mjs",
     "mcp:stdio": "node adapters/mcp-server.mjs",
     "hook:claude": "node adapters/claude-hook.mjs",
     "recovery": "node adapters/recovery-cli.mjs",

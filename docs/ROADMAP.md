@@ -45,6 +45,15 @@ The real-host baseline covers one Codex MCP smoke, one Claude prompt/hook/read/o
 
 The proposed capability schema and rejection/conformance matrix are recorded in [PROVIDER-CONFORMANCE.md](PROVIDER-CONFORMANCE.md). This is a design boundary only; capability negotiation and a second non-fixture provider are not implemented yet.
 
+**2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
+read-only attention increment, the next implementation milestone moves to
+capability declarations and a genuinely independent provider. This is an
+engineering priority adjustment, **not closure of the first gate**. Restart of
+one pinned isolated Claude session is now exercised; the broader host matrix
+stays open, support claims do not expand, and newly discovered lifecycle
+blockers take priority. Repeatedly adding isolated happy-path probes must not
+indefinitely defer the defining question: does ReflexMesh still stand without Jev?
+
 **Third gate: recovery and retention.** Local operator review is now available ([runbook](RECOVERY.md)), including read-only preview, atomic review/audit and schema-1 migration tests. It records conclusions without authorizing retries or rewriting execution truth. Remaining work: independently authenticated operator evidence, crash-safe retention that preserves action tombstones, lease-budget validation and cancellation propagation. Audit storage and idempotency storage remain distinct concepts. No external exactly-once claim.
 
 ## v0.3: memory governance and calibrated comparison

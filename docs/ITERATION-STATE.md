@@ -276,7 +276,7 @@ expected symlink skip. All four offline demos passed in all three jobs.
   was broadened. [Guide](CLAUDE-FIRST-RUN.md) and
   [validation](VALIDATION-CLAUDE-FIRST-RUN.md) record exclusions and reproduction.
 
-## Current increment: trustworthy Claude failure and interruption evidence
+## Reviewed increment: trustworthy Claude failure and interruption evidence
 
 `fix/claude-interrupted-outcomes` is based on PR #12's `967e714`, not merged
 main. No existing PR is merged or retargeted; verify this increment's exact
@@ -306,19 +306,52 @@ published head and CI independently.
   default-profile, restart, platform and operational exclusions. No paid model
   calls or user settings changes were made.
 
+## Current increment: cold-resume evidence and attention
+
+`feat/evidence-attention` is based on PR #13's `380b156`, not merged main.
+This increment does not merge or retarget any existing PR.
+
+- `evidence attention --db PATH` now gives a read-only, bounded keyset page of
+  existing decision rows needing evidence review. Missing completed-shadow
+  outcomes stay separate from durable UNKNOWN; model/test/host provenance is
+  preserved. Pair-only reservations are explicitly excluded, ordinary failures
+  are not automatically retried, and an empty list is not a health certificate.
+- `npm run compat:claude-resume` passed **20/20** per scenario on installed
+  Windows Claude Code 2.1.263 with Node 22.23.2 and 24.19.0. Two distinct native
+  processes restore one explicitly selected synthetic session, both after a
+  clean exit and after an observed/persisted tool-entry barrier followed by an
+  owned-process kill. New prompts replace or clear prior cached task evidence.
+- Root verified the old missing result stays unchanged and appears through the
+  public attention CLI. Zero labels are created; no actual account, paid model,
+  default profile or real user transcript is used. An omitted-hooks actual-host
+  negative control fails despite successful native tool completion.
+- The **57 new offline regressions** and four offline demos passed. Independent
+  review counterexamples for history order/roles, protocol failure receipts,
+  hook warnings/order and provenance wording were fixed and root-verified.
+  Final full local suites on both Node versions: **539 tests, 538 passed, zero
+  failed, one expected Windows symlink skip**. Exact CI receipts must be read
+  from this PR's published head.
+- [Guide](CLAUDE-COLD-RESUME.md) and [validation](VALIDATION-CLAUDE-COLD-RESUME.md)
+  retain unattended resume, cancellation, default-profile, child/fork, platform,
+  external effects and descendant-termination exclusions.
+
 ## Unfinished acceptance gates
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection and actual overlapping fixed MCP success/failure pass with local synthetic transport. Real cancellation/missing-hook paths, broader concurrency/subagents, forked/resumed children, restart and timeout policy remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
 | Independent providers | Runtime-validated capability declarations, a genuinely independent non-fixture provider, fail-before-egress conformance and binding propagation. See [design](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned labeled datasets, usable eval/replay/compare reports, separately bound champion/challenger deployments; no automatic truth labels. |
 | Safe operations | Retention preserving idempotency tombstones, independently authenticated recovery evidence, lease/cancellation budgets, migration and privacy/load testing. |
 | Easy onboarding | DeepSeek and Windows Claude read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
-Next increments should close the host lifecycle gaps before broadening the
-provider surface. No dashboard, new agent framework, automatic writes, or
+Next milestone moves to runtime capability declarations and an independent
+provider after this bounded cold-resume increment. This deliberate engineering
+sequence adjustment does not close the first host gate or enlarge supported
+scope: open matrix entries above remain open, and discovered lifecycle blockers
+take priority. See the dated [roadmap decision](ROADMAP.md).
+No dashboard, new agent framework, automatic writes, or
 automatic threshold loosening is part of this plan. Missing real-host credentials
 or a new external authority requirement should be stated precisely; it does not
 justify fabricated evidence or abandoning independently verifiable work.

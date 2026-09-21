@@ -56,6 +56,33 @@ export function evidenceView(row, now) {
   };
 }
 
+const attentionReason = Object.freeze({
+  shadow_outcome_missing: 'A completed shadow decision has no recorded outcome observation; this does not prove the action did not run.',
+  reported_unknown: 'A recorded outcome observation reports unknown; this is separate from the durable run state.',
+  outcome_conflict: 'Recorded outcome observations disagree; no successful or failed result is selected.',
+  outcome_unrecognized: 'A stored outcome observation has an unrecognized status; verify it independently.',
+  hook_pairing_pending: 'Claude pre-hook association is not ready; a post result arriving now cannot establish it.',
+  hook_pairing_blocked: 'Claude pre/post association is blocked or ambiguous; retained reports need independent verification.',
+  execution_unknown: 'The durable run is UNKNOWN; a review conclusion does not make it replayable.',
+  execution_lease_expired: 'The execution lease expired while the run remains executing; reconcile externally before any action.',
+});
+
+/** Attention is a read-only view of decision rows, never a retry or permission instruction. */
+export function evidenceAttentionView(row, now) {
+  const item = evidenceView(row, now), codes = [];
+  if (item.run.state === 'completed' && item.run.mode === 'shadow' && item.hostOutcome.status === 'missing')
+    codes.push('shadow_outcome_missing');
+  if (item.hostOutcome.status === 'unknown') codes.push('reported_unknown');
+  if (item.hostOutcome.status === 'conflicting') codes.push('outcome_conflict');
+  if (item.hostOutcome.status === 'unrecognized') codes.push('outcome_unrecognized');
+  if (['pending', 'blocked'].includes(item.hostOutcome.hookPairing.state))
+    codes.push(`hook_pairing_${item.hostOutcome.hookPairing.state}`);
+  if (item.run.state === 'unknown') codes.push('execution_unknown');
+  else if (item.run.state === 'executing' && item.recovery.leaseExpired)
+    codes.push('execution_lease_expired');
+  return { ...item, attention: { reasons: codes.map(code => ({ code, explanation: attentionReason[code] })) } };
+}
+
 // Paths/columns are fixed implementation constants, never interpolated user input.
 const textField = (column, path, alias) => `CASE WHEN json_type(${column}, '${path}')='text'
   AND length(json_extract(${column}, '${path}'))<=256 THEN json_extract(${column}, '${path}') ELSE NULL END AS ${alias}`;
