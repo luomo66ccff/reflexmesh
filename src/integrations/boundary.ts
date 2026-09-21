@@ -24,11 +24,16 @@ function call(value: HarnessCall): HarnessCall { validateCall(value); return sna
 export function fromClaudeHook(payload: unknown): { call: HarnessCall; phase: 'before' | 'after'; status?: 'succeeded' | 'failed' | 'unknown'; evidence?: Json } {
   assertJson(payload);
   if (!record(payload) || !['PreToolUse','PostToolUse','PostToolUseFailure'].includes(payload.hook_event_name as string)) throw new ContractError('Unsupported Claude hook');
+  if (payload.hook_event_name === 'PostToolUse' && (Object.hasOwn(payload, 'is_interrupt') || Object.hasOwn(payload, 'error')))
+    throw new ContractError('Failure fields on successful Claude hook');
+  if (payload.hook_event_name === 'PostToolUseFailure' && Object.hasOwn(payload, 'is_interrupt')
+    && typeof payload.is_interrupt !== 'boolean') throw new ContractError('Invalid Claude interruption flag');
   const normalized = call({ schemaVersion: 1, harness: 'claude-code', sessionId: payload.session_id as string,
     agentId: (payload.agent_id ?? 'root') as string, callId: payload.tool_use_id as string,
     toolName: payload.tool_name as string, arguments: payload.tool_input as Json });
   if (payload.hook_event_name === 'PreToolUse') return { call: normalized, phase: 'before' };
-  return { call: normalized, phase: 'after', status: payload.hook_event_name === 'PostToolUseFailure' ? 'failed' : 'succeeded',
+  return { call: normalized, phase: 'after', status: payload.hook_event_name === 'PostToolUseFailure'
+    ? payload.is_interrupt === true ? 'unknown' : 'failed' : 'succeeded',
     evidence: (payload.tool_response ?? payload.error ?? null) as Json };
 }
 /** Host resolves identity from its authenticated session; never serialize the agent/context object. */

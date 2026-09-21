@@ -2,19 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { ReflexMesh, canonical, snapshot, validateEvent, validatePack, ContractError, evaluatePolicy, validateResult } from '../dist/index.js';
 import { digest } from './sqlite-kernel.mjs';
 import { taskReceiptFromState, INTENT_POLICY } from './task-evidence.mjs';
+import { normalizeProviderBinding } from './provider-binding.mjs';
+import { snapshotProvider } from '../dist/core/provider-capabilities.js';
 
 export const eventKey = event => digest([event.tenantId, event.source, event.id]);
 /** Reuses the v0.1 execution/policy engine; adds durable admission and evidence, not another agent loop. */
 export class DurableMesh {
   #kernel; #options; #binding; #packs = new Map(); #tools = new Map(); #inFlight = new Map();
   constructor({ kernel, binding, leaseMs = 30000, ...options }) {
-    for (const name of ['providerId','modelId','revision','authorizationRevision','toolsetRevision']) {
-      if (typeof binding?.[name] !== 'string' || !binding[name].trim()) throw new ContractError(`Missing deployment ${name}`);
-    }
-    if (binding.providerId !== options.provider.id) throw new ContractError('Provider binding mismatch');
+    const provider = snapshotProvider(options.provider);
+    const normalizedBinding = normalizeProviderBinding(provider, binding);
     if (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || leaseMs > 3600000) throw new ContractError('Invalid lease');
-    this.#kernel = kernel; this.#binding = snapshot(binding);
-    this.#options = { ...options, mode: options.mode ?? 'shadow', leaseMs };
+    this.#kernel = kernel; this.#binding = normalizedBinding;
+    this.#options = { ...options, provider, mode: options.mode ?? 'shadow', leaseMs };
     // Validate options now rather than after durable admission.
     new ReflexMesh({ ...options, ledger: { append: async () => {} } });
   }
@@ -53,14 +53,16 @@ export class DurableMesh {
     const admission = this.#kernel.claim({ key, requestDigest, owner: randomUUID(), leaseMs: this.#options.leaseMs,
       evidence: { schemaVersion: 1, eventId: event.id, tenantId: event.tenantId, source: event.source, eventType: event.type,
         inputDigest: requestDigest, actionDigest: digest(options.action ?? event.state?.proposedAction ?? null), pack: { id: pack.id, version: pack.version, digest: digest(pack), questionsDigest: digest(pack.questions) },
-        binding: this.#binding, mode: this.#options.mode, ...(taskEvidence ? { taskEvidence } : {}) },
+        binding: this.#binding, providerCapabilities: this.#options.provider.capabilities,
+        mode: this.#options.mode, ...(taskEvidence ? { taskEvidence } : {}) },
     });
     if (admission.kind === 'replay') return snapshot({ ...admission.result, replayed: true });
     if (admission.kind !== 'claimed') return snapshot({ eventId: event.id, status: admission.kind === 'busy' ? 'in_flight' : 'recovery_required', verdict: { effect: 'escalate', ruleId: 'durable_admission' }, reasonCode: admission.kind });
     const handle = admission.handle;
     try {
       const native = this.#options.provider, binding = this.#binding;
-      const provider = { id: binding.providerId, evaluate: async (...args) => {
+      const provider = { id: binding.providerId, ...(native.model === undefined ? {} : { model: native.model }),
+        capabilities: native.capabilities, evaluate: async (...args) => {
         const result = await native.evaluate(...args);
         if (result.model !== binding.modelId) throw new ContractError('Provider model changed; redeploy and recalibrate');
         return result;

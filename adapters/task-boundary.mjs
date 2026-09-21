@@ -1,14 +1,16 @@
 import { snapshot, ContractError } from '../dist/index.js';
 import { ShadowBoundary } from './shadow-boundary.mjs';
 import { inspectTaskIntent, taskReceiptFromState, scopeOfCall, intentDigest, INTENT_POLICY } from './task-evidence.mjs';
+import { snapshotProvider } from '../dist/core/provider-capabilities.js';
 
 /** Opt-in task-aware observer. No envelope can authorize a tool or turn observation into truth. */
 export class TaskAwareBoundary extends ShadowBoundary {
   #clock;
   constructor({ clock = Date.now, ...options }) {
     if (typeof clock !== 'function') throw new ContractError('Invalid intent clock');
-    const provider = options.provider;
-    const guarded = { id: provider.id, evaluate: async (state, questions, signal) => {
+    const provider = snapshotProvider(options.provider);
+    const guarded = { id: provider.id, ...(provider.model === undefined ? {} : { model: provider.model }),
+      capabilities: provider.capabilities, evaluate: async (state, questions, signal) => {
       const receipt = taskReceiptFromState(state);
       if (!receipt || receipt.status !== 'ready') throw new ContractError('Usable task intent is required');
       // Recheck immediately before egress, not only before a possibly delayed admission.

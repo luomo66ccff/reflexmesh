@@ -22,8 +22,27 @@ export interface ProviderResult {
   readonly answers: Answers;
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
 }
+export interface ProviderCapabilitiesV1 {
+  readonly schemaVersion: 1;
+  readonly resultContract: 'probabilistic-v1' | 'label-only-v1';
+  /** Provenance of numeric probabilities, not a calibration claim. */
+  readonly probabilitySemantics: 'provider-native' | 'elicited-estimate' | 'synthetic-fixture' | 'none';
+  readonly answers: {
+    readonly noul: 'probability' | 'unsupported';
+    readonly choice: 'distribution-with-confidence' | 'label-only' | 'unsupported';
+    readonly score: 'distribution-with-confidence-and-expected-value' | 'unsupported';
+  };
+  readonly limits: {
+    readonly maxStateBytes: number;
+    readonly maxQuestions: number;
+    readonly maxChoicesPerQuestion: number;
+  };
+}
 export interface DecisionProvider {
   readonly id: string;
+  /** Explicit selected model when the provider has one; adapters must not drop it. */
+  readonly model?: string;
+  readonly capabilities: ProviderCapabilitiesV1;
   evaluate(state: Json, questions: Questions, signal: AbortSignal): Promise<ProviderResult>;
 }
 export type Effect = 'allow' | 'deny' | 'confirm' | 'escalate';

@@ -1,4 +1,5 @@
 export * from './core/types.js';
+export * from './core/provider-capabilities.js';
 export * from './core/validation.js';
 export * from './core/policy.js';
 export * from './runtime/mesh.js';
@@ -6,6 +7,7 @@ export * from './observability/memory-ledger.js';
 export * from './observability/calibration.js';
 export * from './providers/mock.js';
 export * from './providers/jev.js';
+export * from './providers/deepseek.js';
 export * from './packs/index.js';
 export * from './scheduler/speculation.js';
 export * from './core/portable.js';

@@ -28,7 +28,32 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node adapters/runtime-cli.mjs --json
       - run: npm run check
       - run: npm run demo
       - run: npm run demo:durable
       - run: npm run demo:recovery
+      - run: npm run demo:evidence
+      - run: npm run demo:comparison
+      - run: npm run demo:storage
+      - run: npm run demo:backup
+      - run: npm run demo:compaction
+      - run: npm run demo:archival
+  affected-runtime-negative:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22.16.0'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: node scripts/sqlite-runtime-negative.mjs

@@ -2,6 +2,18 @@
 
 This follow-up to Durable Shadow Protocol adds **operator review**, not automatic retry, rollback, compensation or a replacement for authorization. It is an alpha feature for a private local SQLite database. The original in-memory runtime and the Codex/Claude/DeepSeek shadow boundaries are unchanged.
 
+For a consistent local archive before an operational change, use the separate
+[ledger backup create/verify workflow](LEDGER-BACKUP.md). It never overwrites a
+current ledger or turns a valid older snapshot into restoration authority;
+newer admission/pairing guards and external effects still require reconciliation.
+
+Explicit [audit archival](AUDIT-ARCHIVAL.md) can move older audit bodies out of
+the online ledger. All reviews, observations and execution guards remain online.
+Use its `history/query` with the exact external archive to inspect older audit;
+an absent online row is not proof of non-execution. A new schema-4 backup contains
+coverage references, not the earlier archives' bodies. Retrieval never grants
+retry/restore authority or changes the operator-review requirements below.
+
 ## Operational meaning
 
 Two facts remain separate:
@@ -58,11 +70,11 @@ A duplicate review ID with the identical normalized body returns its original re
 
 The model observation, operator review and supervised label are three different record classes. A review digest binds the recorded declaration; it is not a cryptographic proof of who submitted it or what happened externally. Database owners can tamper with records. No remote attestation is claimed.
 
-## Schema 1 → 2 migration
+## Schema 1 / 2 → 3 migration
 
-Schema 2 adds `recovery_reviews` and a queue index while preserving existing runs, journal rows, observations and labels. A writable open upgrades schema 1 transactionally; a read-only open can inspect/preview schema 1 without upgrading it. The schema version is checked again after acquiring the migration write lock. Future unsupported versions are rejected.
+Schema 2 introduced `recovery_reviews` and a queue index; schema 3 adds durable `claude_hook_pairs`. A writable open upgrades schemas 1 and 2 transactionally while preserving existing runs, journal rows, observations, reviews and labels. Read-only opens inspect schemas 1, 2 and 3 without upgrading them. The version is checked again after acquiring the migration write lock. Future unsupported versions are rejected. Historical runs do not receive invented pairing receipts; see [Claude pairing](CLAUDE-HOOK-PAIRING.md).
 
-Before upgrade, stop all old workers and make a SQLite-consistent backup. Do not copy only the main database file out from under an active WAL writer. Old alpha-1 binaries reject schema 2: mixed old/new workers and in-place downgrades are not supported. Do not merely reset `PRAGMA user_version` to bypass that guard. Restoring an old backup can discard newer tombstones and re-enable duplicates; reconcile outstanding actions before any rollback to old software/data.
+Before upgrade, stop all old workers and make a SQLite-consistent backup. Do not copy only the main database file out from under an active WAL writer. Previous schema-1/2 software rejects schema 3 on a fresh open, but that guard does not fence already-open old connections. Mixed old/new workers and in-place downgrades are not supported. Do not reset `PRAGMA user_version` or remove pairing rows to bypass a guard. Restoring an old backup can discard newer tombstones and re-enable duplicates; reconcile outstanding actions before any rollback to old software/data.
 
 No automatic retention, garbage collection, vacuum policy, encryption, lease renewal, distributed coordination, external exactly-once effect, or full operator recovery service is added. Reviews only concern library-managed admissions in this local database; they do not retroactively coordinate arbitrary host-owned actions observed in shadow mode.
 
@@ -93,4 +105,10 @@ The demo uses a temporary database, synthetic clock and synthetic evidence. It r
 - SQLite transaction and `BEGIN IMMEDIATE` behavior: https://www.sqlite.org/lang_transaction.html
 - WAL local-filesystem, checkpoint and backup considerations: https://www.sqlite.org/wal.html
 
-The implementation uses only APIs available in the tested Node 22.16 environment. This is an engineering extension of the project's evidence-bound decision contract, not a claim of a novel database algorithm or production safety certification.
+The API floor remains Node 22.16, but that version's SQLite 3.49.1 does not meet
+the current persistent WAL write gate. Writable opens, including review apply,
+require an actual SQLite runtime containing the known WAL-reset fix before any
+file open or migration. Read-only inspection remains available; see
+[runtime requirements and manual restart guidance](SQLITE-RUNTIME.md).
+This is an engineering extension of the project's evidence-bound decision
+contract, not a claim of a novel database algorithm or production safety certification.

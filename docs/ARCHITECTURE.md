@@ -26,6 +26,16 @@ The JSONL ledger records decisions and outcomes but **cannot reconstruct/reinsta
 
 Audit append failure before tool execution prevents the tool call. Failure after execution rejects the run and retains a failed promise. The caller must not reinterpret that rejection as proof that nothing happened.
 
+The separate, explicit local [audit archival workflow](AUDIT-ARCHIVAL.md) is not
+a host/model tool permission. Its exclusive transaction upgrades SQLite 3 to 4,
+retains all six non-audit tables and existing archival metadata, deletes only
+the backup-bound selected audit rows, and preserves a sequence highwater anchor.
+Ordinary ledgers remain schema 3; all other ledger connections must close for
+archival. Online per-run coverage and explicit one-batch archive lookup prevent
+silently treating archived rows as never recorded. External archives remain
+unencrypted and separately required; metadata integrity is not authenticity,
+complete chain availability, external truth or production restore authority.
+
 The runtime omits raw event state, action args, outputs and provider error bodies from its audit. Hashes are unsalted fingerprints, not anonymization. Pack names, choice labels, event identifiers and model metadata may still be sensitive. Audit storage still needs ACLs, retention/deletion controls and tamper protection.
 
 ## Memory Governor
@@ -58,4 +68,4 @@ Use task-specific held-out labels, report sample counts and class balance, and s
 
 ## Current deployment recommendation
 
-Use an in-process library inside a trusted local app. Start in shadow mode. Do not expose `run()` as an unauthenticated public endpoint. Add distributed storage, authenticated ingress and failure-recovery tests before a multi-service gateway. MCP, Next.js/FastAPI integration and a dashboard are roadmap items, not shipped integrations.
+Use an in-process library inside a trusted local app. Start in shadow mode. Do not expose `run()` as an unauthenticated public endpoint. The optional durable layer now includes local SQLite admission, advisory STDIO MCP, host observers and metadata-only recovery review; see [DURABLE-SHADOW.md](DURABLE-SHADOW.md). Add distributed storage and authenticated ingress before a multi-service gateway. HTTP/Next.js/FastAPI distribution and a dashboard remain roadmap items.

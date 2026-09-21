@@ -24,11 +24,21 @@ export function assertJson(value: unknown, depth = 0, seen = new Set<object>()):
   invariant(Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null, 'Non-plain JSON object');
   seen.add(value);
   if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) { invariant(i in value, 'Sparse JSON array'); assertJson(value[i], depth + 1, seen); }
+    invariant(Object.getPrototypeOf(value) === Array.prototype, 'Non-plain JSON array');
+    invariant(Object.getOwnPropertySymbols(value).length === 0, 'Symbol key in JSON array');
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    invariant(Object.keys(descriptors).length === value.length + 1, 'Extra or sparse JSON array property');
+    for (let i = 0; i < value.length; i++) {
+      const descriptor = descriptors[String(i)];
+      invariant(descriptor !== undefined, 'Sparse JSON array');
+      invariant('value' in descriptor, 'JSON accessor rejected');
+      assertJson(descriptor.value, depth + 1, seen);
+    }
   } else {
     invariant(Object.getOwnPropertySymbols(value).length === 0, 'Symbol key in JSON');
     for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
       invariant('value' in descriptor, 'JSON accessor rejected');
+      invariant(descriptor.enumerable === true, 'Non-enumerable JSON property rejected');
       assertJson(descriptor.value, depth + 1, seen);
     }
   }

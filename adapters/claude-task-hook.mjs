@@ -15,7 +15,7 @@ export function taskHookScope(payload) {
   return validateIntentScope({ harness: 'claude-code', sessionId: payload.session_id, agentId: payload.agent_id ?? 'root' });
 }
 /** A missing/invalid new summary invalidates the old summary; no transcript or filesystem reads. */
-export async function observeClaudeTask(payload, { cache, boundary }) {
+export async function observeClaudeTask(payload, { cache, boundary, resolveIntent }) {
   const scope = taskHookScope(payload);
   switch (payload.hook_event_name) {
     case 'UserPromptSubmit':
@@ -27,8 +27,9 @@ export async function observeClaudeTask(payload, { cache, boundary }) {
       cache?.clearSession(scope); break;
     default: {
       const event = fromClaudeHook(payload);
-      if (event.phase === 'before') await boundary.before(event.call, cache?.current(scope) ?? null);
-      else await boundary.after(event.call, event.status, event.evidence, 'harness-reported');
+      if (event.phase === 'before') await boundary.beforeClaudeHook(event.call,
+        () => resolveIntent ? resolveIntent(scope) : cache?.current(scope) ?? null);
+      else await boundary.afterClaudeHook(event.call, event.status, event.evidence);
     }
   }
   return {}; // Never issue a permission decision, replacement prompt, or additional context.
@@ -66,7 +67,7 @@ export async function main(input = process.stdin, output = process.stdout, error
     taskHookScope(payload); // Known lifecycle and scope before opening a file.
     const isTool = ['PreToolUse','PostToolUse','PostToolUseFailure'].includes(payload.hook_event_name);
     if (isTool) fromClaudeHook(payload); // Validate tool identity before opening a file.
-    const needsCache = payload.hook_event_name === 'UserPromptSubmit' || payload.hook_event_name === 'PreToolUse' || ['Stop','StopFailure','SessionEnd'].includes(payload.hook_event_name);
+    const needsCache = payload.hook_event_name === 'UserPromptSubmit' || ['Stop','StopFailure','SessionEnd'].includes(payload.hook_event_name);
     // Clear/read paths do not create a missing cache. Prompt capture is explicit opt-in.
     if (options && needsCache && (payload.hook_event_name === 'UserPromptSubmit' || existsSync(options.path))) {
       mkdirSync(dirname(options.path), { recursive: true, mode: 0o700 });
@@ -74,7 +75,12 @@ export async function main(input = process.stdin, output = process.stdout, error
     }
     let boundary;
     if (isTool) { const opened = openLocalBoundary(env, { taskAware: true }); kernel = opened.kernel; boundary = opened.boundary; }
-    await observeClaudeTask(payload, { cache, boundary });
+    await observeClaudeTask(payload, { cache, boundary, resolveIntent: scope => {
+      // A tool's durable pairing reservation precedes cache open/read failure.
+      if (!options || !existsSync(options.path)) return null;
+      cache ??= new IntentCache(options.path, options);
+      return cache.current(scope);
+    } });
   } catch {
     warn();
     // A failed new observation must not leave older evidence eligible for reuse.

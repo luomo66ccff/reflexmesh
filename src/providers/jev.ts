@@ -1,5 +1,6 @@
 import type { DecisionProvider, Json, ProviderResult, Questions } from '../core/types.js';
-import { assertJson, ContractError, record, validateQuestions, validateResult } from '../core/validation.js';
+import { ContractError, record, validateResult } from '../core/validation.js';
+import { assertProviderInput, validateProviderCapabilities } from '../core/provider-capabilities.js';
 
 export interface JevOptions {
   apiKey: string;
@@ -12,6 +13,12 @@ export interface JevOptions {
 /** Server-only HTTP adapter. Contract verified against official typesafe-sdk-js source. */
 export class JevProvider implements DecisionProvider {
   readonly id = 'typesafe/jev';
+  readonly capabilities = validateProviderCapabilities({
+    schemaVersion: 1, resultContract: 'probabilistic-v1', probabilitySemantics: 'provider-native',
+    answers: { noul: 'probability', choice: 'distribution-with-confidence',
+      score: 'distribution-with-confidence-and-expected-value' },
+    limits: { maxStateBytes: 256_000, maxQuestions: 128, maxChoicesPerQuestion: 255 },
+  });
   readonly model: string;
   readonly #apiKey: string;
   readonly #fetch: typeof globalThis.fetch;
@@ -25,12 +32,13 @@ export class JevProvider implements DecisionProvider {
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#maxResponseBytes = options.maxResponseBytes ?? 1_048_576;
     if (!Number.isSafeInteger(this.#maxResponseBytes) || this.#maxResponseBytes < 1) throw new ContractError('Invalid response limit');
+    Object.freeze(this);
   }
   async evaluate(state: Json, questions: Questions, signal: AbortSignal): Promise<ProviderResult> {
-    signal.throwIfAborted();
-    assertJson(state); validateQuestions(questions);
+    assertProviderInput(this.capabilities, state, questions, signal);
     const body = JSON.stringify({ state, questions, model: this.model });
     if (new TextEncoder().encode(body).length > 256_000) throw new ContractError('Jev request byte limit exceeded');
+    assertProviderInput(this.capabilities, state, questions, signal);
     // Intentionally one attempt: callers control latency/cost budgets and retries.
     const response = await this.#fetch('https://api.typesafe.ai/v1/systemone', {
       method: 'POST', signal, redirect: 'error',
@@ -63,6 +71,7 @@ export class JevProvider implements DecisionProvider {
     if (!record(raw)) throw new ContractError('Invalid TypeSafe result');
     if (raw.usage !== undefined && !record(raw.usage)) throw new ContractError('Invalid TypeSafe usage');
     const usage = record(raw.usage) ? { inputTokens: raw.usage.input_tokens, outputTokens: raw.usage.output_tokens } : undefined;
+    if (raw.model !== this.model) throw new ContractError('TypeSafe model mismatch');
     return validateResult(questions, { model: raw.model, answers: raw.answers, ...(usage === undefined ? {} : { usage }) });
   }
 }

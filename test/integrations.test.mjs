@@ -113,7 +113,8 @@ test('DeepSeek observation failures cannot replace the host decision', async () 
   const exec = { callId: 'c', name: 'Read', arguments: {}, signal: new AbortController().signal };
   assert.deepEqual(await handlers.get('tools/pre-execute')(exec, async () => ({ kind: 'deny', reason: 'host denied' })), { kind: 'deny', reason: 'host denied' });
   handlers.get('tools/result')(exec, { isError: true, error: { message: 'PRIVATE' } }); await observer.dispose();
-  assert.equal(diagnostics.length, 2); assert.ok(diagnostics.every(x => !x.includes('SECRET')));
+  // The rejected admission is reported once; its result is not journaled.
+  assert.equal(diagnostics.length, 1); assert.ok(diagnostics.every(x => !x.includes('SECRET')));
 });
 test('OpenAI-compatible wrapper executes once when observer fails and preserves original errors', async () => {
   const fn = { id: 'c', type: 'function', function: { name: 'Read', arguments: '{"path":"README.md"}' } };

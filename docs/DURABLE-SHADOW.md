@@ -98,7 +98,7 @@ A model can skip these tools. Native Codex shell/files are untouched. Mandatory 
 
 ## Claude Code: lifecycle shadow hooks
 
-Merge these entries into the appropriate Claude settings; do not overwrite unrelated hooks. Replace each path. The hook inherits the shared configuration from the host process environment.
+Merge these entries into the appropriate Claude settings; do not overwrite unrelated hooks. Replace each path. The hook inherits the shared configuration from the host process environment. Configure only one ReflexMesh entrypoint per event, not both this legacy entrypoint and the task-aware one. Both now use [schema-3 durable pairing](CLAUDE-HOOK-PAIRING.md); read its duplicate-delivery tradeoff, trust limits and upgrade instructions first.
 
 ```json
 {
@@ -131,11 +131,27 @@ await observer.dispose();
 
 `tools/pre-execute(exec,next)` observes `exec.callId`, `exec.name`, **`exec.arguments`**, then delegates with `next()`; it does not return a replacement allow decision. `tools/result(exec,result)` is a synchronous final-outcome observer, not the post-execute waterfall. It queues bounded observation work and exposes `flush`/`dispose`. Host result and permission decisions remain owned by DeepSeek. Errors are reported using fixed diagnostic codes. Queue overflow records a diagnostic and drops that observation instead of growing without bound.
 
-The host must resolve authenticated session/agent identity. We deliberately do not guess a version-dependent `exec.agent.session` field or serialize the live context. This module was tested against callback fixtures derived from the reviewed tools source (Git blob `6be7be61e257cd9e38c8a3122298316bf3df9892`), **not an installed DeepSeek Harness runtime**. Plugin-loader registration, cancellation/latency behavior and actual host compatibility remain a release gate. The observer does not automatically extract the user request from the agent context; supply such evidence explicitly before evaluating intent-match quality.
+The observer captures current identity, normalized call and a private bounded
+result snapshot inside that synchronous notification, before later host
+listeners can change them. Native `isError:true` with `error.info.code:ABORTED`
+means post-dispatch cancellation and is recorded as harness-reported `unknown`.
+Other host error results remain reported failures, not proof of no side
+effects. Existing historical rows are not rewritten. See
+[DeepSeek lifecycle checks](DEEPSEEK-LIFECYCLE.md).
+
+The host must resolve authenticated session/agent identity. We deliberately do not guess a version-dependent `exec.agent.session` field or serialize the live context. Callback fixtures cover the reviewed tools source (Git blob `6be7be61e257cd9e38c8a3122298316bf3df9892`). A separate [Cordis plugin wrapper and opt-in probe](DEEPSEEK-HOST.md) now exercise the installed 0.1.2-rc.1 native tool pipeline; classification remains synthetic. CLI profile loading, actual Agent identity propagation, and model E2E remain release gates. The observer does not automatically extract the user request from the agent context; supply such evidence explicitly before evaluating intent-match quality.
 
 ## Generic function-call harnesses
 
 `observeFunctionCall` in `adapters/openai-compatible.mjs` normalizes `id/type/function.name/function.arguments`, runs the before observer, calls your host-owned `execute` exactly once, records an outcome, and returns/rethrows the original result/error. A thrown tool body is recorded as `unknown`, not evidence that no side effect occurred. Observer failures do not add retries. This is middleware, not a DeepSeek API client or a new agent loop.
+
+An outcome is recorded only when that invocation's before-observation resolved
+successfully. If admission or intent resolution fails, the host still executes
+once and its original return/error is preserved, but its result cannot be
+attached to an older same-ID record. This pairing is also enforced by the
+in-process DeepSeek observer. Claude hooks separately use the
+[durable pairing protocol](CLAUDE-HOOK-PAIRING.md). Neither authenticates MCP client reports. See
+[validation and exclusions](VALIDATION-OUTCOME-ADMISSION.md).
 
 ## Policy replay and labels
 
@@ -143,7 +159,7 @@ The host must resolve authenticated session/agent identity. We deliberately do n
 
 ## Limits
 
-This alpha is local-first, shadow-first, and unaudited. No HTTP authentication, distributed broker, credential isolation, automatic raw-text secret redaction, transparent encryption, tamper-proof ledger, retention policy, manual recovery protocol, full calibrated-provider migration, real speculation, Saga compensator, memory DB or UI is shipped.
+This alpha is local-first, shadow-first, and unaudited. Local metadata-only operator reviews are available in [RECOVERY.md](RECOVERY.md), and [the evidence CLI](EVIDENCE.md) reads bounded decision/outcome metadata. No HTTP authentication, distributed broker, credential isolation, automatic raw-text secret redaction, transparent encryption, tamper-proof ledger, retention policy, independently authenticated recovery service, full calibrated-provider migration, real speculation, Saga compensator, memory DB or dashboard is shipped.
 
 Raw input/output is not saved by the new boundary, but it may be sent to a configured remote provider. Digests are not anonymization; pack prompts, selected labels, identifiers and prediction metadata may contain information. SQLite namespace keys do not authenticate clients, and arbitrary processes with database access can modify records. Do not expose the local protocol as an unauthenticated network service. An unknown execution remains uncertain even after the process restarts.
 
