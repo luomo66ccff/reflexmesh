@@ -53,6 +53,10 @@ npm run demo:recovery
 
 The demos use explicitly labeled synthetic fixtures, not real Jev predictions. The durable demo closes and reopens SQLite, reuses the decision without another model call, and tests a stricter policy without executing any tool. Generated `dist/` is ignored by Git; build before running adapter entrypoints.
 
+The test runner processes independent test files sequentially to limit unrelated
+resource contention. Tests that explicitly spawn competing OS processes retain
+that concurrency; this setting does not serialize the production runtime.
+
 ## What is implemented
 
 | Capability | Scope in this alpha |

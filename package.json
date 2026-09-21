@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",
     "demo": "npm run build && node examples/workflow.mjs",
     "demo:jev": "npm run build && node examples/jev.mjs",
     "check": "npm run typecheck && npm test",

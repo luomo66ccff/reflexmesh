@@ -117,3 +117,53 @@ evidence of human origin. Restart the observer to load the fix and use a new
 deployment scope when replaying previously observed events. This does not grant
 retry permission, alter UNKNOWN tombstones, infer ground-truth labels or
 authorize any host tool.
+
+## CI follow-up: bounded startup contention, not a new retry policy
+
+Initial head `264dd48d7c7e7f82c061cae091e8fe2dc4d31a12` passed Ubuntu/Node 22
+and Windows/Node 24 in [CI 35619595935](https://github.com/luomo66ccff/reflexmesh/actions/runs/35619595935).
+Windows/Node **22.23.2** failed the existing eight-round, four-process SQLite
+startup race: one child reported `ERR_SQLITE_ERROR`, code 5, at `stage=open`.
+That old diagnostic covered the entire constructor, so it did not identify
+the exact SQL phase. The 13.8-second test duration was not a measurement of
+one opener's lock wait.
+
+A checksum-verified portable copy of the same official Node version passed the
+unchanged full suite locally (240 tests, 239 passed, one expected skip), and
+12 focused repetitions passed all 96 four-process rounds. This does **not**
+disprove the CI failure or establish its precise cause. A separate controlled
+exclusive-lock experiment confirmed that the existing startup path can exhaust
+its busy budget and reject before admission; no production retry change was
+justified by the available evidence.
+
+The follow-up limits independent Node test files to one at a time, reducing
+unrelated process/CPU/disk contention. Explicit process concurrency inside tests
+is preserved, including all four racers, eight rounds and the original result
+assertion. Neither the production two-second busy setting nor existing test
+deadlines are increased. Fixture diagnostics now bind a fixed operation label
+to the actual thrown Error and record elapsed time; a successful timeout-restore
+statement cannot overwrite the failing operation's label. They emit no SQL,
+paths or raw exception messages.
+
+The journal helper's monotonic retry budget covers journal configuration, not
+the constructor's initial schema read and later schema transaction as a whole.
+SQLite's [busy handler](https://sqlite.org/c3ref/busy_handler.html) may return
+BUSY without waiting to avoid deadlock, and a [busy timeout](https://sqlite.org/c3ref/busy_timeout.html)
+does not guarantee that all competing openers eventually succeed. The old CI
+failure's exact phase remains unknown; do not label this as a proven/fixed
+SQLite product defect or treat startup rejection as permission to retry a tool.
+
+A new deterministic regression holds an exclusive lock in another process until
+the opening fixture has reported its failure. Its explicit 100 ms test budget
+does not change the original race's default budget. It requires the fixed
+schema-read phase/BUSY error and proves no admission exists after the holder
+releases the lock. No fixed sleep is used to assume the lock was released.
+Parent cleanup waits for owned child exits and validates the canonical temporary
+directory before removal.
+
+Root's final local checks after this test-only follow-up: Node **24.19.0**
+`npm run check`, and Node **22.23.2** `node --test --test-concurrency=1
+test/*.test.mjs`, both **241 tests, 240 passed, 0 failed, one expected Windows
+symlink skip**. The product subagent source/observer remained unchanged from
+the successful installed-host checks above. The updated remote head still needs
+its own CI evidence; the earlier failed run is retained, not relabeled successful.

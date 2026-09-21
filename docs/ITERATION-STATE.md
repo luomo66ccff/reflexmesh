@@ -118,6 +118,8 @@ symlink skip each), plus four offline demos per job. The stack remains unmerged.
 ## Current increment: official subagent isolation and honest provenance
 
 `feat/deepseek-subagent-isolation` is based on PR #7's `d2073c8`, not main.
+Published as [PR #8](https://github.com/luomo66ccff/reflexmesh/pull/8); verify its
+current exact-head checks before any merge, not an earlier stack member's CI.
 
 - Fixed a reproduced source upgrade: official child prompts wrapped as user
   messages now remain model-reported/unverified. Private resolver TTL remains
@@ -128,13 +130,21 @@ symlink skip each), plus four offline demos per job. The stack remains unmerged.
   bindings, including per-call native payload digests and zero labels.
 - Source-shaped regressions also cover shared signals, same-ID replacement
   objects and late disposal without inheriting or clearing another task.
-- Full local suite: **240 tests, 239 passed, 0 failed, one expected Windows
-  symlink skip**; four offline demos passed. Existing lifecycle matrix rerun:
+- Final local suite on Node 22.23.2 and 24.19.0: **241 tests, 240 passed,
+  0 failed, one expected Windows symlink skip**; four offline demos passed
+  before the test-only CI follow-up. Existing lifecycle matrix rerun:
   **17/17**. Final narrow independent review found no remaining blocker.
 - [Subagent guide](DEEPSEEK-SUBAGENTS.md) and
   [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md) explain source APIs, exact
   assertions, historical-record limits and untested fork/restart/default-profile
   paths. No schema, authorization, retry or label behavior was broadened.
+- Initial PR #8 Windows/Node 22 CI exposed a SQLite startup BUSY during the
+  existing four-process race. Its exact phase was not logged, and 96 local
+  rounds on the same Node version did not reproduce it. Added fixed phase
+  diagnostics and a controlled lock-exhaustion/no-admission regression; limited
+  unrelated test-file concurrency while preserving all explicit process races.
+  No production SQLite code, busy budget or existing deadline was changed.
+  The old failure and uncertainty remain recorded in the validation report.
 
 ## Unfinished acceptance gates
 

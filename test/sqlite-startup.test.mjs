@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fork } from 'node:child_process';
 import { configureJournal } from '../adapters/sqlite-startup.mjs';
+import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 
 const busy = () => Object.assign(new Error('fixture busy'), { code: 'ERR_SQLITE_ERROR', errcode: 5 });
 function mockDb(read) {
@@ -46,8 +47,14 @@ test('journal setup verifies WAL, permits only explicit in-memory mode, and reje
   for (const budget of [-1, 1.5, 10001, NaN]) assert.throws(() => configureJournal(mockDb(() => ({})), { busyTimeoutMs: budget }), /budget/);
 });
 
-function worker(path) {
-  const child = fork(new URL('./fixtures/admission-racer.mjs', import.meta.url), [path], { stdio: ['ignore','ignore','pipe','ipc'] });
+async function removeStartupTempDir(dir) {
+  const target = await realpath(dir);
+  assert.equal(dirname(target), await realpath(tmpdir()));
+  assert.match(basename(target), /^reflexmesh-startup-[A-Za-z0-9_-]+$/);
+  await rm(target, { recursive: true, force: true });
+}
+function worker(path, { fixture = new URL('./fixtures/admission-racer.mjs', import.meta.url), args = [] } = {}) {
+  const child = fork(fixture, [path, ...args], { stdio: ['ignore','ignore','pipe','ipc'] });
   let stderr = '', ended = false, waiter;
   const queued = [];
   child.stderr.on('data', b => { stderr = (stderr + b.toString()).slice(-4096); });
@@ -75,6 +82,33 @@ test('repeated fresh-database startup races still yield one admission across fou
       const replies = workers.map(w => w.next()); workers.forEach(w => w.send());
       const results = await Promise.all(replies);
       assert.deepEqual(results.map(r => r.kind).sort(), ['busy','busy','busy','claimed'], JSON.stringify(results));
-    } finally { await Promise.all(workers.map(w => w.stop())); await rm(dir, { recursive: true, force: true }); }
+    } finally { await Promise.all(workers.map(w => w.stop())); await removeStartupTempDir(dir); }
+  }
+});
+
+test('exclusive startup lock fails closed without claiming or retrying admission', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-startup-'));
+  const path = join(dir, 'state.sqlite');
+  const holder = worker(path, { fixture: new URL('./fixtures/startup-lock-holder.mjs', import.meta.url) });
+  let racer;
+  try {
+    assert.equal((await holder.next()).ready, true);
+    racer = worker(path, { args: ['--busy-100'] });
+    const ready = await racer.next();
+    assert.equal(ready.ready, true);
+    racer.send();
+    const result = await racer.next();
+    assert.deepEqual({ kind: result.kind, stage: result.stage, sqliteOperation: result.sqliteOperation,
+      code: result.code, errcode: result.errcode },
+    { kind: 'fixture_error', stage: 'open', sqliteOperation: 'schema_version_read', code: 'ERR_SQLITE_ERROR', errcode: 5 });
+    assert.ok(Number.isSafeInteger(result.elapsedMs) && result.elapsedMs >= 0);
+    holder.send();
+    assert.equal((await holder.next()).released, true);
+    const kernel = new SqliteKernel(path);
+    try { assert.equal(kernel.inspect('race'), undefined); }
+    finally { kernel.close(); }
+  } finally {
+    await Promise.all([holder.stop(), racer?.stop()]);
+    await removeStartupTempDir(dir);
   }
 });
