@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: declared model-route plan guard
+## Latest merged milestone: declared model-route plan guard
 
 On 2026-09-25, the account-free evaluation plan gained optional declared
 model ID and provider revision fields with a separate route guard digest.
@@ -25,8 +25,13 @@ route drift, not alias retargeting, account spending or data-egress
 authorization. See the [local validation](VALIDATION-EVALUATION-ROUTE-PLAN-T001.md).
 Local checks passed **862 tests: 860 passed, zero failed, two local
 symlink-privilege skips** and four offline demos. No paid request ran;
-DeepSeek key, model and revision were absent from this process. Remote
-review/CI, independent quality and broader host acceptance remain open.
+DeepSeek key, model and revision were absent from this process.
+[PR #45](https://github.com/luomo66ccff/reflexmesh/pull/45) merged the
+reviewed tree `d4a36063b790a640a36f7107ce4b776b9a1e2938`; all five
+jobs passed on its [exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36059045485)
+and again on the [main merge commit](https://github.com/luomo66ccff/reflexmesh/actions/runs/36059710985).
+See the distinct [integration readback](VALIDATION-EVALUATION-ROUTE-PLAN-INTEGRATION-T001.md).
+Independent quality and broader host acceptance remain open.
 
 ## Previous merged milestone: narrated first-run evidence
 
