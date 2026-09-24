@@ -130,6 +130,8 @@ runtime hook latency result.
 The [t007 narrated first-run lesson](VALIDATION-FIRST-RUN-T007.md) now
 explains the task/decision/host-outcome/label separation in its default
 summary and gives a next step, without adding a host or model dependency.
+Its [t008 integration readback](VALIDATION-FIRST-RUN-T008.md) keeps exact
+PR/main CI evidence separate from the local user-facing check.
 
 **2026-09-24 Claude host compatibility:** [PR #27](https://github.com/luomo66ccff/reflexmesh/pull/27)
 merged strict support for installed Claude Code 2.1.280, with isolated native
