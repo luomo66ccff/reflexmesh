@@ -43,6 +43,11 @@ npm run first-run
 
 The command first checks this Node process's SQLite WAL-write requirement, builds the project, then shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome is synthetic; no model, account, user profile or host tool is used. The temporary lesson is removed at exit.
 
+The default summary now follows the actual fixture evidence from missing task
+through shadow decision, separate host report and task clear, then points to
+`npm run demo:evidence` for a detailed read-only walkthrough. A shadow
+`allow` is never a host permission.
+
 To keep an inspectable synthetic ledger in a **new directory** and try the read-only CLI against it, use `npm run first-run -- --out-dir evidence-lesson`. Existing paths are never overwritten. The output's `START-HERE.md` contains copyable `list`, `attention` and `inspect` commands. This is still a fixture, not your deployment data. For a real local ledger, see the [evidence CLI guide](docs/EVIDENCE.md).
 
 After a restart, `npm run evidence -- attention --db PATH` gives a read-only,

@@ -51,10 +51,23 @@ test('default walkthrough uses fixtures only and removes its temporary data', as
   assert.equal(report.missingIntent.providerCalls, 0);
   assert.equal(report.totalFixturePredictions, 1);
   assert.equal(report.duplicate.replayed, true);
+  assert.deepEqual(report.hostOutcomeTransition, { before: 'missing', after: 'succeeded', observations: 1 });
   assert.equal(report.selectedSummaryInJournal, false);
   assert.equal(report.unselectedBodyInCache, false);
   assert.equal(report.labelsCreated, 0);
   assert.equal(report.retainedLedger, undefined);
+});
+
+test('default first-run summary explains the evidence chain and a safe next step', async () => {
+  const output = sink();
+  assert.equal(await main(['--summary'], output), 0);
+  assert.match(output.text, /No selected task -> escalate; fixture provider calls: 0/);
+  assert.match(output.text, /Selected task summary -> allow in shadow mode; repeated call reused the decision: true/);
+  assert.match(output.text, /Fixture host report: missing -> succeeded \(1 observation\); labels created: 0/);
+  assert.match(output.text, /After task clear -> escalate; coverage: none \(old summary not reused\)/);
+  assert.match(output.text, /A shadow allow is not host permission/);
+  assert.match(output.text, /Temporary ledger and task-summary cache were removed/);
+  assert.match(output.text, /Next: npm run demo:evidence/);
 });
 
 test('cleanup failure cannot print a completed or removed first-run receipt', async t => {
@@ -96,6 +109,12 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
 
   assert.match(output.text, /WAL write gate passed/);
   assert.match(output.text, /3 decisions, 1 fixture prediction, 0 labels/);
+  assert.match(output.text, /No selected task -> escalate; fixture provider calls: 0/);
+  assert.match(output.text, /Selected task summary -> allow in shadow mode; repeated call reused the decision: true/);
+  assert.match(output.text, /Fixture host report: missing -> succeeded \(1 observation\); labels created: 0/);
+  assert.match(output.text, /After task clear -> escalate; coverage: none \(old summary not reused\)/);
+  assert.match(output.text, /A shadow allow is not host permission/);
+  assert.match(output.text, /Next: open START-HERE\.md/);
   assert.match(output.text, /No model, external provider, user profile or host tool was accessed/);
   assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'ledger.sqlite']);
   if (process.platform !== 'win32') {
@@ -158,6 +177,7 @@ test('npm first-run forwards a Unicode/spaced output path and leaves no task-sum
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Synthetic evidence: 3 decisions, 1 fixture prediction, 0 labels/);
+  assert.match(result.stdout, /Fixture host report: missing -> succeeded \(1 observation\)/);
   assert.equal(result.stdout.includes('SYNTHETIC-SECRET'), false);
   assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'ledger.sqlite']);
   assert.equal(lstatSync(outputDir).isSymbolicLink(), false);

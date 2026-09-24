@@ -12,7 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest merged milestone: plan-to-run mismatch guard
+## Latest local milestone: narrated first-run evidence
+
+On 2026-09-25, the default account-free `npm run first-run` summary was
+changed from counts alone to the fixture's actual task/decision/outcome
+sequence. It now shows why missing task evidence skips the provider, that
+the selected-task decision is shadow-only, that the fixture host report is
+separate from a label, and that clearing the task prevents stale reuse.
+It points to the existing detailed walkthrough or a retained, new-directory
+fixture without changing cleanup, permissions or remote access. See the
+[local t007 validation](VALIDATION-FIRST-RUN-T007.md). Local checks passed
+**860 tests: 858 passed, zero failed, two local symlink-privilege skips**,
+`npm run first-run`, `npm run demo` and `npm run demo:evidence`.
+Publication and CI are not claimed in this local snapshot. Real-user
+onboarding, model quality and broader host acceptance remain open.
+
+## Previous merged milestone: plan-to-run mismatch guard
 
 On 2026-09-25, the offline evaluation preview gained an optional
 `guardDigest`, and paid `run --expect-plan-digest` now refuses changed
