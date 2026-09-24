@@ -12,7 +12,33 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: Claude Code 2.1.280 isolated host compatibility
+## Latest milestone: bounded DeepSeek observer result reception
+
+On 2026-09-24, [PR #29](https://github.com/luomo66ccff/reflexmesh/pull/29)
+closed a documented shutdown gap: an accepted DeepSeek call with no
+`tools/result` previously kept observer disposal pending forever. Shutdown now
+has a validated result-reception window (five seconds by default), then leaves
+unreported calls **missing** with read-only attention rather than inventing an
+outcome or retry. In-flight admission and captured-result writes still drain
+before the Loader closes its kernel. An adversarial early result can no longer
+release a pending admission, and a zero-budget diagnostic reentry cannot start
+a second shutdown or double-count a missing call. See the
+[dated local validation and limits](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
+
+Local Windows Node 24 checks passed **838 tests: 836 passed, zero failed, two
+symlink-privilege skips**, plus `npm run demo`. Installed DeepSeek Harness
+0.1.2-rc.1 isolated synthetic-transport probes passed native **13/13**,
+CLI/Agent **12/12** and lifecycle matrix **17/17**; those host probes had
+terminal results and do not prove the new missing-result deadline in the
+installed host. All five jobs passed on
+[PR exact-head CI 36022213089](https://github.com/luomo66ccff/reflexmesh/actions/runs/36022213089)
+and [main CI 36022911086](https://github.com/luomo66ccff/reflexmesh/actions/runs/36022911086).
+Merge commit `ab0a71b12d703d01b935e1c52b3d34a297f65f1b` has the reviewed
+tree `acebd0bdc02ed0b72ae9668a1e986dc2e6552e81`. A permanently hung
+admission or storage callback can still prevent safe closure; no total host
+shutdown or cancellation guarantee is claimed.
+
+## Previous milestone: Claude Code 2.1.280 isolated host compatibility
 
 On 2026-09-24, [PR #27](https://github.com/luomo66ccff/reflexmesh/pull/27)
 added exact-version support for installed Claude Code 2.1.280 alongside the
