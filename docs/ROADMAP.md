@@ -50,6 +50,10 @@ One bounded authorized real-provider shadow round trip is separate from host
 model transport; see [validation](VALIDATION-INDEPENDENT-PROVIDER-T001.md).
 This closes the initial capability/transport implementation, not provider
 quality, calibration, broad host latency or champion/challenger acceptance.
+An account-free [evaluation preflight](VALIDATION-EVALUATION-PLAN-T001.md)
+now previews trusted capability coverage and a request upper bound before
+paid comparison; it does not replace independent quality labels, money
+budgets, model-route checks or user review of the outbound dataset.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

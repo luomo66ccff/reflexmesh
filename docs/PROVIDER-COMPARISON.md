@@ -41,6 +41,25 @@ Use `--json` for the complete machine-readable report, `--bins N` to select
 `npm run build` before invoking the adapter directly on a clean checkout.
 Validate and compare do not load provider configuration or credentials.
 
+Before authorizing a paid run, preview the same trusted capability gate used
+by the runner, without a key, model, label file or network request:
+
+```bash
+npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 2
+npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 2 --json
+```
+
+`plan` reports the dataset digest, compatible/unsupported case counts, the
+maximum requests under the supplied cap, and how many otherwise compatible
+cases that cap would defer if requests succeeded. It totals canonical
+`{state, questions}` bytes for the selected cases without printing raw state,
+case IDs or question text. This is **not** actual HTTP wire size: provider
+wrappers add data. The selected model route, endpoint availability, response
+validity, latency, remote billing and monetary cost remain unverified; a first
+failure or cancellation can reduce the actual request count. `plan` does not
+read labels, but it cannot detect labels or secrets already embedded in a
+dataset state. Review the dataset and account budget separately before run.
+
 ## Three separate input artifacts
 
 All schemas have `schemaVersion: 1`, exact fields and finite plain JSON.

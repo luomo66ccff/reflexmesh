@@ -3,13 +3,16 @@ import { ContractError } from '../dist/index.js';
 import { compareEvaluations } from './evaluation-report.mjs';
 import { evaluationDatasetDigest, validateEvaluationDataset, validateEvaluationLabels } from './evaluation-contract.mjs';
 import { readEvaluationJson, reserveEvaluationOutput } from './evaluation-files.mjs';
+import { planEvaluation } from './evaluation-plan.mjs';
 import { isDirectRun } from './direct-run.mjs';
 
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
+  npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--json]
   npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
-Validate/compare are local only. Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
+Validate/plan/compare are local only. Plan checks declared capabilities, not model quality, endpoint availability or cost.
+Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
 Run never reads labels, loads a host profile or executes tools. Each case keeps its full question contract.
 Outputs must be new files. Interrupted/failed remote requests are never retried automatically.
 Comparison uses only the same labeled cases where both sides succeeded; missing/failure coverage stays visible.
@@ -20,9 +23,10 @@ export function parseEvaluationOptions(argv) {
   if (!argv.length || argv.length === 1 && ['--help', '-h'].includes(argv[0])) return { help: true };
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
+    plan: ['dataset', 'provider', 'max-requests', 'json'],
     run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
-  if (!allowed) fail('Expected validate, run or compare; use --help');
+  if (!allowed) fail('Expected validate, plan, run or compare; use --help');
   const options = { command };
   for (let i = 0; i < args.length; i++) {
     const key = args[i].startsWith('--') ? args[i].slice(2) : '';
@@ -30,7 +34,8 @@ export function parseEvaluationOptions(argv) {
     if (['json', 'allow-remote'].includes(key)) options[key] = true;
     else { const value = args[++i]; if (!value || value.startsWith('--')) fail('Missing evaluation option value'); options[key] = value; }
   }
-  const required = { validate: ['dataset'], run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote'],
+  const required = { validate: ['dataset'], plan: ['dataset', 'provider', 'max-requests'],
+    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote'],
     compare: ['dataset', 'labels', 'champion', 'challenger'] }[command];
   if (required.some(key => !Object.hasOwn(options, key))) fail('Missing required evaluation option; use --help');
   for (const [key, max] of [['max-requests', 1000], ['timeout-ms', 120000], ['max-output-tokens', 4096], ['bins', 100]]) {
@@ -80,6 +85,15 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
     const result = { valid: true, datasetDigest: evaluationDatasetDigest(dataset), cases: dataset.cases.length,
       questions: Object.keys(dataset.pack.questions).length, labels: labels?.labels.length ?? null, labelIndependenceVerified: false };
     output.write(options.json ? JSON.stringify(result) + '\n' : `Valid dataset: ${result.cases} cases, ${result.questions} questions; labels=${result.labels ?? 'not supplied'}.\nDataset digest: ${result.datasetDigest}\nIndependent label provenance is an operator assertion, not authenticated.\n`);
+    return 0;
+  }
+  if (options.command === 'plan') {
+    const plan = planEvaluation({ dataset, provider: options.provider, maxRequests: options['max-requests'] });
+    output.write(options.json ? JSON.stringify(plan) + '\n'
+      : `Offline evaluation plan: ${plan.dataset.cases} cases, ${plan.dataset.questions} questions; provider=${plan.provider}.\n`
+        + `Compatible=${plan.eligibleCases}, unsupported=${plan.unsupportedCases}; at most ${plan.requestUpperBound} requests under cap ${plan.maxRequests}.\n`
+        + `Deferred by cap if requests succeed=${plan.deferredByRequestCapIfNoFailure}; selected canonical state+question bytes=${plan.selectedCanonicalInputBytes}.\n`
+        + `Dataset digest: ${plan.dataset.digest}\nNo key, label, host profile or network was accessed. This is not a wire-size, model-quality or cost guarantee.\n`);
     return 0;
   }
   if (options.command === 'compare') {

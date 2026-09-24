@@ -122,6 +122,9 @@ appear better simply by failing harder cases. Keep editable inputs with
 `npm run evaluation -- --help` workflow separates datasets, independently
 supplied labels and separately bound prediction runs. Its main delta uses the
 same labeled, both-successful cases, with missing/failure coverage beside it.
+Before a paid run, `npm run evaluation -- plan --dataset FILE --provider deepseek --max-requests N`
+shows offline capability coverage and a request upper bound;
+it does not read credentials, send data or estimate cost.
 Validate and compare stay offline; paid runs need explicit opt-in and budgets.
 See the [paired comparison guide](docs/PROVIDER-COMPARISON.md). No automatic
 winner, calibration transfer, model promotion or tool execution is implied.
