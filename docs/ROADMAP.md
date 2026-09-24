@@ -127,8 +127,20 @@ and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36016402182
 are distinct. The 2.1.263 binary was not rerun in this increment, and broad
 host compatibility remains open.
 
+**2026-09-24 DeepSeek shutdown boundary:** [PR #29](https://github.com/luomo66ccff/reflexmesh/pull/29)
+merged bounded observer result reception, truthful missing-outcome attention,
+and early-result/reentrant-disposal protections. The Loader keeps its kernel
+open until already running admission and captured-result writes settle. See
+[local validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md),
+[exact-head CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36022213089),
+and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36022911086).
+The installed host's missing-result teardown and indefinitely hung callback
+paths remain outside those passing host scenarios; the reception window is not
+a host-tool timeout or total shutdown deadline.
+
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
-first-run gaps within the existing adapters, followed by representative
+first-run gaps within the existing adapters, especially installed-host
+missing-result teardown and safe handling of hung callbacks, followed by representative
 independent-model quality and larger operational tests. The merged first-run
 lesson does not close those gates or authorize a release, profile change or
 new paid model work.
