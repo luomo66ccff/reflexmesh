@@ -34,14 +34,16 @@ TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages
 are required. The adapter uses Node's built-in, experimental `node:sqlite` API
 on a **single machine / local filesystem**.
 
-Start with an account-free, explained walkthrough:
+Start with an account-free first-run check and synthetic evidence lesson:
 
 ```bash
 npm ci --ignore-scripts
-npm run demo:evidence
+npm run first-run
 ```
 
-It shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome in this walkthrough is labeled synthetic. No model or host tool runs. To read a real local ledger, use `npm run evidence -- list --db PATH` and `npm run evidence -- inspect --db PATH --key KEY`; see the [evidence CLI guide](docs/EVIDENCE.md).
+The command first checks this Node process's SQLite WAL-write requirement, builds the project, then shows why a missing task suppresses assessment, why a completed decision is not a host result, and why a new task cannot inherit old evidence. Every prediction/outcome is synthetic; no model, account, user profile or host tool is used. The temporary lesson is removed at exit.
+
+To keep an inspectable synthetic ledger in a **new directory** and try the read-only CLI against it, use `npm run first-run -- --out-dir evidence-lesson`. Existing paths are never overwritten. The output's `START-HERE.md` contains copyable `list`, `attention` and `inspect` commands. This is still a fixture, not your deployment data. For a real local ledger, see the [evidence CLI guide](docs/EVIDENCE.md).
 
 After a restart, `npm run evidence -- attention --db PATH` gives a read-only,
 paged list of decision rows with missing/uncertain outcome evidence, ambiguous

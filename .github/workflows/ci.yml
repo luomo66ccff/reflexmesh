@@ -34,6 +34,7 @@ jobs:
       - run: npm run demo:durable
       - run: npm run demo:recovery
       - run: npm run demo:evidence
+      - run: npm run first-run
       - run: npm run demo:comparison
       - run: npm run demo:storage
       - run: npm run demo:backup

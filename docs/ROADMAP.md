@@ -100,6 +100,17 @@ This does not certify external archive availability, production recovery, total
 space reduction, privacy compliance or large-ledger load. Further pruning of
 observations/labels/reviews/packs still requires ID/body/version tombstones.
 
+**2026-09-24 first-run iteration:** `npm run first-run` combines the actual
+SQLite WAL-write preflight, build, and a concise synthetic evidence lesson. An
+optional new-only output directory keeps a local lesson ledger and copyable
+read-only `list` / `attention` / `inspect` commands; task-summary text remains
+temporary. This reduces first-run friction, but it is not live-host setup or
+proof of real provider quality. See the bounded
+[validation report](VALIDATION-FIRST-RUN-T003.md).
+Review follow-up [t004](VALIDATION-FIRST-RUN-T004.md) prevents a successful
+first-run receipt from claiming temporary cleanup before it is verified;
+injected cleanup failures now fail instead of being silently ignored.
+
 **Next integration priority:** independently review and integrate the stacked
 increments into a release candidate, with exact-head CI and first-run validation.
 Unmerged feature branches are not the default checkout experience. This roadmap
