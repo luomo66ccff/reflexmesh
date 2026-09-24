@@ -39,6 +39,7 @@
     "doctor:runtime": "node adapters/runtime-cli.mjs",
     "doctor:claude": "node adapters/claude-doctor-cli.mjs",
     "demo:evidence": "npm run build && node examples/task-intent.mjs --explain",
+    "first-run": "node adapters/runtime-cli.mjs && npm run build && node examples/task-intent.mjs --summary",
     "demo:recovery": "npm run build && node examples/recovery-review.mjs"
   },
   "devDependencies": {

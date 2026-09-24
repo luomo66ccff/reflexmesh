@@ -19,16 +19,33 @@ creates a persistent ledger also needs the
 
 ```bash
 npm ci --ignore-scripts
-npm run demo:evidence
+npm run first-run
 ```
 
-The walkthrough builds the project and shows four stages: missing task evidence,
+The first-run command checks the actual SQLite WAL-write gate, builds the project
+and shows four stages: missing task evidence,
 a recorded decision with no host result yet, a separately reported result, and a
 cleared task. Repeating the same decision reuses its evidence. Clearing the task
 does not reuse its old summary. Classification and outcomes are explicitly
 **synthetic fixtures**; no model or real host tool runs. Temporary SQLite files
 are closed and removed at exit. This is a product walkthrough, not an accuracy
 benchmark or a live integration test.
+
+To keep a synthetic ledger for trying the read-only evidence commands, select a
+new output directory:
+
+```bash
+npm run first-run -- --out-dir evidence-lesson
+```
+
+The command refuses any existing target and writes only `ledger.sqlite` and
+`START-HERE.md`; the selected task-summary cache is temporary and removed. The
+guide includes copyable `list`, `attention` and `inspect` commands. It never
+opens or changes a real ledger. Read-only SQLite access can still create or
+interact with WAL/SHM sidecars; it is not a byte-for-byte filesystem
+immutability guarantee. On Windows, quote paths with spaces; after the build,
+direct invocation is available as
+`node examples/task-intent.mjs --summary --out-dir "NEW DIRECTORY"`.
 
 ## Inspect your own local shadow deployment
 
