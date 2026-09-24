@@ -61,6 +61,9 @@ now rejects accidental dataset/provider/request-cap drift before key access;
 it is not authenticated approval or a monetary budget.
 Its [PR/main integration readback](VALIDATION-EVALUATION-PLAN-GUARD-INTEGRATION-T001.md)
 keeps CI evidence separate from local behavior checks.
+A separate [declared-route guard](VALIDATION-EVALUATION-ROUTE-PLAN-T001.md)
+also detects accidental model ID/revision drift before key access. It does
+not verify backend weights, authenticate an account or cap monetary spend.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

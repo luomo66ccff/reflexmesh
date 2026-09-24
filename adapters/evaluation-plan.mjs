@@ -5,14 +5,23 @@ import { assertProviderInput } from '../dist/core/provider-capabilities.js';
 import { evaluationDatasetDigest, validateEvaluationDataset } from './evaluation-contract.mjs';
 
 const CAPABILITIES = Object.freeze({ deepseek: DEEPSEEK_ESTIMATE_CAPABILITIES, jev: JEV_CAPABILITIES });
+export const EVALUATION_PROVIDER_IDS = Object.freeze({
+  deepseek: 'deepseek/binary-json-estimate-v1', jev: 'typesafe/jev',
+});
+const validRouteText = value => typeof value === 'string' && value.length > 0 && value.length <= 256
+  && value.trim() === value && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
 
 /** Account-free capability preview. It never constructs a provider or reads a label/key. */
-export function planEvaluation({ dataset: input, provider, maxRequests }) {
+export function planEvaluation({ dataset: input, provider, maxRequests, modelId, revision }) {
   const dataset = validateEvaluationDataset(input);
   if (typeof provider !== 'string' || !Object.hasOwn(CAPABILITIES, provider))
     throw new ContractError('Select deepseek or jev for evaluation plan');
   if (!Number.isSafeInteger(maxRequests) || maxRequests < 1 || maxRequests > 1000)
     throw new ContractError('Invalid evaluation request budget');
+  const routeDeclared = modelId !== undefined || revision !== undefined;
+  if (routeDeclared && (!validRouteText(modelId) || !validRouteText(revision)
+    || (provider === 'deepseek' && !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(modelId))))
+    throw new ContractError('Explicit valid evaluation model ID and provider revision required');
   const capabilities = CAPABILITIES[provider];
   const eligible = [];
   for (const item of dataset.cases) {
@@ -28,10 +37,15 @@ export function planEvaluation({ dataset: input, provider, maxRequests }) {
   const guardDigest = createHash('sha256').update(canonical({ schemaVersion: 1,
     kind: 'reflexmesh-evaluation-plan-guard', datasetDigest, provider, maxRequests,
     capabilitiesDigest })).digest('hex');
+  const route = routeDeclared ? { providerId: EVALUATION_PROVIDER_IDS[provider], modelId, revision } : null;
+  const routeGuardDigest = routeDeclared ? createHash('sha256').update(canonical({
+    schemaVersion: 1, kind: 'reflexmesh-evaluation-route-plan-guard',
+    guardDigest, route })).digest('hex') : null;
   return snapshot({ schemaVersion: 1, kind: 'reflexmesh-evaluation-plan',
     dataset: { id: dataset.id, revision: dataset.revision, digest: datasetDigest,
       dataKind: dataset.dataKind, cases: dataset.cases.length, questions: Object.keys(dataset.pack.questions).length },
     provider, probabilitySemantics: capabilities.probabilitySemantics, capabilitiesDigest, guardDigest,
+    ...(routeDeclared ? { declaredRoute: route, routeGuardDigest } : {}),
     maxRequests, eligibleCases: eligible.length, unsupportedCases: dataset.cases.length - eligible.length,
     requestUpperBound: selected.length, deferredByRequestCapIfNoFailure: eligible.length - selected.length,
     selectedCanonicalInputBytes: canonicalInputBytes,
