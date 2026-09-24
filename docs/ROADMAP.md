@@ -173,8 +173,11 @@ truthful drain/close receipts and retention of already committed evidence.
 See [local validation](VALIDATION-DEEPSEEK-FENCE-T001.md) and the distinct
 [PR/main CI readback](VALIDATION-DEEPSEEK-FENCE-INTEGRATION-T001.md).
 Installed-host regressions passed without injected forever-pending callbacks.
-Next: installed-host permanent-result-loss
-and hung-callback scenarios, then representative independent-model quality.
+Next: installed-host permanent-result-loss and broader hung-callback
+scenarios, then representative independent-model quality. An isolated
+[installed-host fence probe](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md) now
+exercises one deliberately delayed `after` callback through the official
+Loader and native Agent, but does not prove arbitrary or permanent hangs.
 This feature does not certify whole-host cancellation or arbitrary callbacks.
 
 ## v0.3: memory governance and calibrated comparison

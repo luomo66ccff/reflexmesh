@@ -12,7 +12,24 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: fenced DeepSeek Loader drain
+## Latest local milestone: installed DeepSeek fenced-result probe
+
+On 2026-09-25, an opt-in, isolated installed DeepSeek Harness 0.1.2-rc.1
+probe exercised the Loader's existing fenced-drain option with one genuine
+native tool result and a deliberately delayed observer `after` write. The
+official Loader completed observer unload while that callback was pending;
+the late storage continuation was refused after revocation, the owned kernel
+closed, and the Agent still consumed the native result once. The ledger
+truthfully retained a missing observer outcome and zero labels. See the
+[local installed-host receipt](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md).
+The new mode passed **10/10** assertions; local checks passed **857 tests:
+855 passed, zero failed, two symlink-privilege skips**, the demo, and the
+existing installed teardown regression **9/9**. Publication, review and CI
+are not claimed in this local snapshot. This injected asynchronous delay is
+not proof of arbitrary or permanently hung callback safety, a blocked event
+loop, default-profile behavior, or total host shutdown.
+
+## Previous milestone: fenced DeepSeek Loader drain
 
 On 2026-09-25, [PR #35](https://github.com/luomo66ccff/reflexmesh/pull/35)
 merged an opt-in `shutdownDrainWaitMs` with a Loader-owned

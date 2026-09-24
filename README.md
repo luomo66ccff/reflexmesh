@@ -181,6 +181,10 @@ The Loader also has an opt-in, fenced SQLite drain deadline for callbacks that
 never settle. It separates safely isolated callbacks from actually drained
 ones; it is not host-tool cancellation or a guarantee for arbitrary boundaries.
 See the [Loader shutdown guide](docs/DEEPSEEK-AGENT.md).
+An account-free [installed-host fence probe](docs/VALIDATION-DEEPSEEK-FENCE-HOST-T001.md)
+also exercises one deliberately delayed result-storage callback through the
+installed CLI/Loader/Agent. It checks safe observer unload and native Agent
+completion without treating the absent observer outcome as a failed tool.
 
 In-process DeepSeek and function-call observers also require a successful
 before-observation for that invocation before recording its outcome. Conflicting
