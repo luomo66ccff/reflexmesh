@@ -12,6 +12,20 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## First-run cleanup review t004
+
+During review of open PR #23 on 2026-09-24, the first-run script was found to
+print a successful deletion claim before its `finally` cleanup, while the
+cleanup helper silently swallowed errors. The PR worktree now defers its
+completion receipt until cleanup succeeds and treats unverified temporary
+cleanup as a failed run. A deterministic injected-failure regression covers
+the default and retained-lesson paths. Local Node 24 checks passed: `npm ci
+--ignore-scripts`, `npm run check` (817 tests: 815 passed, zero failed, two
+Windows symlink skips), `npm run demo` and `npm run first-run`. Node 22 passed
+the focused first-run suite (five passed, one npm-environment-only skip).
+See [validation t004](VALIDATION-FIRST-RUN-T004.md). This is not yet a merged
+or exact-head remote-CI claim; the broader product and host gates remain open.
+
 ## Current milestone: reviewed stack integrated into main
 
 On 2026-09-22 (Asia/Shanghai), Amahane-Hikari integrated PRs #4–#21 through

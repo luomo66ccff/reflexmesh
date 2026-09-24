@@ -107,6 +107,9 @@ read-only `list` / `attention` / `inspect` commands; task-summary text remains
 temporary. This reduces first-run friction, but it is not live-host setup or
 proof of real provider quality. See the bounded
 [validation report](VALIDATION-FIRST-RUN-T003.md).
+Review follow-up [t004](VALIDATION-FIRST-RUN-T004.md) prevents a successful
+first-run receipt from claiming temporary cleanup before it is verified;
+injected cleanup failures now fail instead of being silently ignored.
 
 **Next integration priority:** independently review and integrate the stacked
 increments into a release candidate, with exact-head CI and first-run validation.

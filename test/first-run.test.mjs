@@ -57,6 +57,36 @@ test('default walkthrough uses fixtures only and removes its temporary data', as
   assert.equal(report.retainedLedger, undefined);
 });
 
+test('cleanup failure cannot print a completed or removed first-run receipt', async t => {
+  const tempRoot = realpathSync(tmpdir()), paths = [];
+  t.after(() => {
+    for (const path of paths) {
+      if (!existsSync(path)) continue;
+      const target = realpathSync(path), stat = lstatSync(target);
+      assert.equal(dirname(target), tempRoot);
+      assert.ok(basename(target).startsWith('rm-task-demo-') || basename(target).startsWith('rm-task-cache-'));
+      assert.ok(stat.isDirectory() && !stat.isSymbolicLink());
+      rmSync(target, { recursive: true, force: false });
+    }
+  });
+  for (const args of [['--summary'], ['--explain']]) {
+    const output = sink();
+    await assert.rejects(main(args, output, {
+      removeTemporaryDirectory(path) { paths.push(path); throw new Error('Injected cleanup failure'); },
+    }), /Temporary cleanup could not be verified/);
+    assert.equal(output.text.includes('lesson complete'), false);
+    assert.equal(output.text.includes('were removed'), false);
+    assert.equal(output.text.includes('is deleted on exit'), false);
+    assert.ok(paths.length > 0);
+  }
+  const retained = join(temporaryRoot(t), 'retained'), output = sink();
+  await assert.rejects(main(['--summary', '--out-dir', retained], output, {
+    removeTemporaryDirectory(path) { paths.push(path); throw new Error('Injected cache cleanup failure'); },
+  }), /Temporary cleanup could not be verified/);
+  assert.equal(output.text, '');
+  assert.ok(existsSync(join(retained, 'ledger.sqlite')));
+});
+
 test('retained lesson is private, read-only inspectable synthetic evidence and never overwrites', async t => {
   const root = temporaryRoot(t), outputDir = join(root, '证据 lesson'), output = sink();
   const savedFetch = globalThis.fetch;

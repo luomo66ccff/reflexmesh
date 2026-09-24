@@ -20,6 +20,7 @@ For paths with spaces, build first and pass the quoted path directly to node.
 `;
 
 export class DemoOptionsError extends Error {}
+export class DemoCleanupError extends Error {}
 
 export function parseTaskIntentArgs(argv) {
   const options = { mode: 'json', outDir: null };
@@ -77,9 +78,9 @@ function removeTemporaryDirectory(path, prefix, tempRoot) {
   if (!path) return;
   try {
     const target = realpathSync(path);
-    if (dirname(target) !== tempRoot || !basename(target).startsWith(prefix)) return;
+    if (dirname(target) !== tempRoot || !basename(target).startsWith(prefix)) throw new Error('Cleanup target changed');
     rmSync(target, { recursive: true, force: false });
-  } catch {}
+  } catch { throw new DemoCleanupError('Temporary cleanup could not be verified'); }
 }
 
 function retainInstructions(directory) {
@@ -109,7 +110,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
   const runtime = (dependencies.assertRuntime ?? assertSqliteWalRuntime)();
   const tempRoot = realpathSync(tmpdir());
   let outputDir, cacheDir, ownership = null, tempOutput = false;
-  let cache, kernel, successful = false, predictions = 0;
+  let cache, kernel, successful = false, predictions = 0, completionText = '';
   const retained = options.outDir !== null;
   try {
     if (retained) {
@@ -165,7 +166,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
     if (retained) retainInstructions(outputDir);
     successful = true;
 
-    if (options.mode === 'summary') output.write(summaryOutput({ runtime, report, outputDir, retained }));
+    if (options.mode === 'summary') completionText = summaryOutput({ runtime, report, outputDir, retained });
     else if (options.mode === 'explain') {
       output.write('ReflexMesh evidence walkthrough\nSYNTHETIC classification and outcomes; no real model or host tool runs.\n\n');
       // Re-opened read-only views demonstrate what the public evidence CLI reads.
@@ -179,16 +180,20 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
         ]) output.write(title + '\n' + formatEvidence(snapshot ?? view.evidenceSnapshot(key), 'inspect'));
       } finally { view.close(); }
       output.write(`Fixture provider calls: ${predictions}; duplicate replayed: ${replay.replayed}; labels created: ${receipt.labels.length}.\n`);
-      output.write(retained ? `Synthetic lesson retained in ${JSON.stringify(outputDir)}; see START-HERE.md for read-only commands.\n`
-        : 'The temporary ledger and summary cache are removed when this walkthrough exits.\n');
-    } else output.write(JSON.stringify(report, null, 2) + '\n');
-    return 0;
+      completionText = retained ? `Synthetic lesson retained in ${JSON.stringify(outputDir)}; see START-HERE.md for read-only commands.\n`
+        : 'The temporary ledger and summary cache are removed when this walkthrough exits.\n';
+    } else completionText = JSON.stringify(report, null, 2) + '\n';
   } finally {
-    cache?.close(); kernel?.close();
-    if (cacheDir && retained) removeTemporaryDirectory(cacheDir, 'rm-task-cache-', tempRoot);
-    if (tempOutput) removeTemporaryDirectory(outputDir, 'rm-task-demo-', tempRoot);
-    else if (retained && !successful) removeOwnedDirectory(outputDir, ownership);
+    const failures = [], cleanup = action => { try { action(); } catch (error) { failures.push(error); } };
+    cleanup(() => cache?.close()); cleanup(() => kernel?.close());
+    const removeTemporary = dependencies.removeTemporaryDirectory ?? removeTemporaryDirectory;
+    if (cacheDir && retained) cleanup(() => removeTemporary(cacheDir, 'rm-task-cache-', tempRoot));
+    if (tempOutput) cleanup(() => removeTemporary(outputDir, 'rm-task-demo-', tempRoot));
+    else if (retained && !successful) cleanup(() => removeOwnedDirectory(outputDir, ownership));
+    if (failures.length) throw new DemoCleanupError('Temporary cleanup could not be verified');
   }
+  output.write(completionText);
+  return 0;
 }
 
 if (isDirectRun(import.meta.url)) {
@@ -196,6 +201,7 @@ if (isDirectRun(import.meta.url)) {
   catch (error) {
     if (error instanceof DemoOptionsError) process.stderr.write('Invalid first-run options; use --help. Existing paths are never overwritten.\n');
     else if (error instanceof SqliteRuntimeError) process.stderr.write('Persistent SQLite WAL write gate is blocked. Run node adapters/runtime-cli.mjs and choose a fixed Node runtime; no lesson files were created.\n');
+    else if (error instanceof DemoCleanupError) process.stderr.write('ReflexMesh first-run lesson could not verify temporary cleanup. Inspect the OS temporary directory before treating the run as complete.\n');
     else process.stderr.write('ReflexMesh first-run lesson failed; existing paths were not modified. Check the runtime gate, build, parent directory and output-path availability.\n');
     process.exitCode = 1;
   }
