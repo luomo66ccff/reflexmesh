@@ -64,6 +64,8 @@ keeps CI evidence separate from local behavior checks.
 A separate [declared-route guard](VALIDATION-EVALUATION-ROUTE-PLAN-T001.md)
 also detects accidental model ID/revision drift before key access. It does
 not verify backend weights, authenticate an account or cap monetary spend.
+Its [PR/main integration readback](VALIDATION-EVALUATION-ROUTE-PLAN-INTEGRATION-T001.md)
+keeps remote CI separate from the local behavior evidence.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
