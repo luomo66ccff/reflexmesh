@@ -148,9 +148,19 @@ and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36027994173
 It does not cover permanent result absence, hung callbacks, real-model
 transport or the default user profile.
 
+**2026-09-25 DeepSeek live drain diagnostics:** [PR #33](https://github.com/luomo66ccff/reflexmesh/pull/33)
+fixed a waiting-period missing-count misreport and added payload-free live
+drain snapshots plus one fixed warning when callbacks are still pending at
+the result-window boundary. The Loader still waits for in-flight storage
+before closing its kernel. See [local validation](VALIDATION-DEEPSEEK-DRAIN-T001.md),
+[exact-head CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36032221796)
+and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36032645585).
+This is diagnosability, not a bounded total unload or cancellation protocol.
+
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
 first-run gaps within the existing adapters, especially permanent missing-result
-and hung-callback behavior, followed by representative
+and hung-callback behavior with a safe storage-write barrier or isolation
+contract, followed by representative
 independent-model quality and larger operational tests. The merged first-run
 lesson does not close those gates or authorize a release, profile change or
 new paid model work.
