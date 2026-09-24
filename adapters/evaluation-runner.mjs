@@ -24,6 +24,11 @@ export async function runEvaluation({ dataset: input, provider, binding, deploym
     if (stopReason) { artifact.rows.push({ ...row, status: 'not_attempted', reasonCode: stopReason }); continue; }
     try { assertProviderInput(selected.capabilities, item.state, dataset.pack.questions, new AbortController().signal); }
     catch { artifact.rows.push({ ...row, status: 'unsupported', reasonCode: 'input_incompatible' }); continue; }
+    // Only a preflight registered by trusted provider construction survives snapshotProvider.
+    // A deterministic oversized local body has made no request and spends no slot.
+    if (selected.preflightInput && !selected.preflightInput(item.state, dataset.pack.questions, new AbortController().signal)) {
+      artifact.rows.push({ ...row, status: 'unsupported', reasonCode: 'input_incompatible' }); continue;
+    }
     if (invocations >= maxRequests) { artifact.rows.push({ ...row, status: 'not_attempted', reasonCode: 'budget_exhausted' }); continue; }
     const controller = new AbortController(); let timer, timedOut = false, cancelled = false, rejectCancellation;
     const cancellation = new Promise((_, reject) => { rejectCancellation = reject; });

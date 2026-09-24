@@ -1,6 +1,16 @@
 import type { DecisionProvider, Json, ProviderCapabilitiesV1, Questions } from './types.js';
 import { assertJson, canonical, ContractError, record, snapshot, validateQuestions } from './validation.js';
 
+type InputPreflight = (state: Json, questions: Questions) => boolean;
+const providerInputPreflights = new WeakMap<DecisionProvider, InputPreflight>();
+
+/** Trusted adapter construction hook; never select preflight by a model-supplied ID. */
+export function registerProviderInputPreflight(provider: DecisionProvider, preflight: InputPreflight): void {
+  if (typeof preflight !== 'function' || providerInputPreflights.has(provider))
+    throw new ContractError('Invalid provider input preflight');
+  providerInputPreflights.set(provider, preflight);
+}
+
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   return Object.keys(value).sort().join(',') === [...keys].sort().join(',');
 }
@@ -68,17 +78,29 @@ export function assertProviderInput(caps: ProviderCapabilitiesV1, state: Json, q
 }
 
 /** Capture id, declaration and method once; later mutation cannot widen this wrapper's authority. */
-export function snapshotProvider(provider: DecisionProvider): DecisionProvider {
+export function snapshotProvider(provider: DecisionProvider): DecisionProvider & {
+  readonly preflightInput?: (state: Json, questions: Questions, signal: AbortSignal) => boolean;
+} {
   const id = provider?.id, model = provider?.model, evaluate = provider?.evaluate;
   if (typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/.test(id)
     || typeof evaluate !== 'function'
     || (model !== undefined && (typeof model !== 'string' || !model.trim() || model.length > 256
       || /[\u0000-\u001f\u007f-\u009f]/.test(model)))) throw new ContractError('Invalid decision provider');
   const capabilities = validateProviderCapabilities(provider.capabilities);
-  return Object.freeze({ id, ...(model === undefined ? {} : { model }), capabilities,
+  const preflight = providerInputPreflights.get(provider);
+  const wrapped = Object.freeze({ id, ...(model === undefined ? {} : { model }), capabilities,
+    ...(preflight === undefined ? {} : { preflightInput(state: Json, questions: Questions, signal: AbortSignal) {
+      assertProviderInput(capabilities, state, questions, signal);
+      const supported = preflight(state, questions);
+      if (typeof supported !== 'boolean') throw new ContractError('Invalid provider input preflight result');
+      signal.throwIfAborted();
+      return supported;
+    } }),
     evaluate(state: Json, questions: Questions, signal: AbortSignal) {
       assertProviderInput(capabilities, state, questions, signal);
       return evaluate.call(provider, state, questions, signal);
     },
   });
+  if (preflight !== undefined) providerInputPreflights.set(wrapped, preflight);
+  return wrapped;
 }

@@ -8,10 +8,10 @@ import { isDirectRun } from './direct-run.mjs';
 
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
-  npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV] [--json]
+  npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV [--max-output-tokens N]] [--json]
   npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
-Validate/plan/compare are local only. Plan checks declared capabilities, not model quality, endpoint availability or cost.
+Validate/plan/compare are local only. A plan without a declared route checks capabilities only; a route also checks local request-body size, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
 Run never reads labels, loads a host profile or executes tools. Each case keeps its full question contract.
 Outputs must be new files. Interrupted/failed remote requests are never retried automatically.
@@ -23,7 +23,7 @@ export function parseEvaluationOptions(argv) {
   if (!argv.length || argv.length === 1 && ['--help', '-h'].includes(argv[0])) return { help: true };
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
-    plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'json'],
+    plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'max-output-tokens', 'json'],
     run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
   if (!allowed) fail('Expected validate, plan, run or compare; use --help');
@@ -50,6 +50,9 @@ export function parseEvaluationOptions(argv) {
     fail('Invalid evaluation route plan digest');
   if (command === 'plan' && (Object.hasOwn(options, 'model-id') !== Object.hasOwn(options, 'provider-revision')))
     fail('Model ID and provider revision must be supplied together');
+  if (command === 'plan' && options['max-output-tokens'] !== undefined
+    && (options.provider !== 'deepseek' || options['model-id'] === undefined))
+    fail('DeepSeek output token limit requires a declared route');
   return options;
 }
 const quote = value => JSON.stringify(value);
@@ -95,14 +98,17 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
   }
   if (options.command === 'plan') {
     const plan = planEvaluation({ dataset, provider: options.provider, maxRequests: options['max-requests'],
-      modelId: options['model-id'], revision: options['provider-revision'] });
+      modelId: options['model-id'], revision: options['provider-revision'], maxOutputTokens: options['max-output-tokens'] });
     output.write(options.json ? JSON.stringify(plan) + '\n'
       : `Offline evaluation plan: ${plan.dataset.cases} cases, ${plan.dataset.questions} questions; provider=${plan.provider}.\n`
-        + `Compatible=${plan.eligibleCases}, unsupported=${plan.unsupportedCases}; at most ${plan.requestUpperBound} requests under cap ${plan.maxRequests}.\n`
+        + `Capability-compatible=${plan.eligibleCases}, capability-unsupported=${plan.unsupportedCases}; capability upper bound ${plan.requestUpperBound} under cap ${plan.maxRequests}.\n`
         + `Deferred by cap if requests succeed=${plan.deferredByRequestCapIfNoFailure}; selected canonical state+question bytes=${plan.selectedCanonicalInputBytes}.\n`
+        + (plan.wirePreflight.status === 'checked'
+          ? `Local request-body check: sendable=${plan.wirePreflight.sendableCases}, wire-rejected=${plan.wirePreflight.wireRejectedCases}; at most ${plan.wirePreflight.requestUpperBound} requests under cap; selected body bytes=${plan.wirePreflight.selectedRequestBodyBytes}${plan.wirePreflight.maxOutputTokens === undefined ? '' : ` at max-output-tokens=${plan.wirePreflight.maxOutputTokens}`}.\n`
+          : 'Local request-body check: not checked without a declared model route.\n')
         + `Dataset digest: ${plan.dataset.digest}\nPlan guard: ${plan.guardDigest}\n`
         + (plan.declaredRoute ? `Declared route: ${quote(plan.declaredRoute.modelId)} @ ${quote(plan.declaredRoute.revision)}.\nRoute guard: ${plan.routeGuardDigest}\n` : '')
-        + 'No key, label, host profile or network was accessed. A declared route is not verified model weights, wire size, quality or cost.\n');
+        + 'No key, label, host profile or network was accessed. A declared route checks only local serialization; route guards do not bind output tokens or serializer version, and neither model weights nor endpoint, quality or cost are verified.\n');
     return 0;
   }
   if (options.command === 'compare') {

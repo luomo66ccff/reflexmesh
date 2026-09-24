@@ -50,16 +50,21 @@ npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider d
 npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 2 --json
 ```
 
-`plan` reports the dataset digest, compatible/unsupported case counts, the
-maximum requests under the supplied cap, and how many otherwise compatible
-cases that cap would defer if requests succeeded. It totals canonical
-`{state, questions}` bytes for the selected cases without printing raw state,
-case IDs or question text. This is **not** actual HTTP wire size: provider
-wrappers add data. The selected model route, endpoint availability, response
-validity, latency, remote billing and monetary cost remain unverified; a first
-failure or cancellation can reduce the actual request count. `plan` does not
-read labels, but it cannot detect labels or secrets already embedded in a
-dataset state. Review the dataset and account budget separately before run.
+Without a declared model route, `plan` reports **capability-only** compatible
+and unsupported counts, the capability request upper bound, and canonical
+`{state, questions}` bytes for selected cases. `wirePreflight.status` is
+`not_checked`: those counts do not promise that a full HTTP body can be sent.
+With both `--model-id` and `--provider-revision`, the separate
+`wirePreflight` section checks the exact locally serialized provider request
+body against its byte limit. It reports sendable and wire-rejected cases, a
+wire-aware request upper bound, and selected request-body bytes. DeepSeek uses
+512 output tokens by default; `plan --max-output-tokens N` checks another
+explicit DeepSeek limit. Jev has no output-token option. Neither mode prints
+raw state, case IDs or question text, reads labels or accesses a key/network.
+The model route, endpoint availability, response validity, latency, remote
+billing and monetary cost remain unverified; a first failure or cancellation
+can reduce the actual request count. A dataset can already contain secrets or
+labels, so review outbound data and account budget separately before run.
 
 The preview also prints a `Plan guard` (JSON field `guardDigest`). To catch an
 accidental edit or route/cap change between preview and a paid run, copy that
@@ -95,8 +100,10 @@ and does **not** bind model/revision. Both options may be supplied.
 The model ID and revision are operator declarations, not independently
 verified remote identity. Aliases can change weights; the digest is not a
 signature, authorization, price or monetary limit. It does not bind the
-account, output-token cap, timeout, actual request bytes or labels. Review
-data egress and account controls separately.
+account, output-token cap, timeout, serializer version, actual request bytes
+or labels. A route-declared local body check is not a guard for that body:
+the run rechecks its actual provider configuration before every request.
+Review data egress and account controls separately.
 
 ## Three separate input artifacts
 

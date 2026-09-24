@@ -66,6 +66,11 @@ also detects accidental model ID/revision drift before key access. It does
 not verify backend weights, authenticate an account or cap monetary spend.
 Its [PR/main integration readback](VALIDATION-EVALUATION-ROUTE-PLAN-INTEGRATION-T001.md)
 keeps remote CI separate from the local behavior evidence.
+The next [wire-size preflight](VALIDATION-EVALUATION-WIRE-PREFLIGHT-T001.md)
+separates capability compatibility from exact locally serialized request-body
+compatibility when a route is declared. The runner skips known unsendable
+cases without spending a request slot; endpoint, model quality and cost are
+still outside this check.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

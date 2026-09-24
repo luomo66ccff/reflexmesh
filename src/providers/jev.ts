@@ -1,6 +1,6 @@
 import type { DecisionProvider, Json, ProviderResult, Questions } from '../core/types.js';
 import { ContractError, record, validateResult } from '../core/validation.js';
-import { assertProviderInput, validateProviderCapabilities } from '../core/provider-capabilities.js';
+import { assertProviderInput, registerProviderInputPreflight, validateProviderCapabilities } from '../core/provider-capabilities.js';
 
 export interface JevOptions {
   apiKey: string;
@@ -17,6 +17,12 @@ export const JEV_CAPABILITIES = validateProviderCapabilities({
     score: 'distribution-with-confidence-and-expected-value' },
   limits: { maxStateBytes: 256_000, maxQuestions: 128, maxChoicesPerQuestion: 255 },
 });
+export const JEV_REQUEST_BYTE_LIMIT = 256_000;
+
+/** Exact local HTTP body, shared by account-free preview and the live adapter. */
+export function jevRequestBody(model: string, state: Json, questions: Questions): string {
+  return JSON.stringify({ state, questions, model });
+}
 export class JevProvider implements DecisionProvider {
   readonly id = 'typesafe/jev';
   readonly capabilities = JEV_CAPABILITIES;
@@ -33,12 +39,14 @@ export class JevProvider implements DecisionProvider {
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#maxResponseBytes = options.maxResponseBytes ?? 1_048_576;
     if (!Number.isSafeInteger(this.#maxResponseBytes) || this.#maxResponseBytes < 1) throw new ContractError('Invalid response limit');
+    registerProviderInputPreflight(this, (state, questions) => new TextEncoder().encode(
+      jevRequestBody(this.model, state, questions)).length <= JEV_REQUEST_BYTE_LIMIT);
     Object.freeze(this);
   }
   async evaluate(state: Json, questions: Questions, signal: AbortSignal): Promise<ProviderResult> {
     assertProviderInput(this.capabilities, state, questions, signal);
-    const body = JSON.stringify({ state, questions, model: this.model });
-    if (new TextEncoder().encode(body).length > 256_000) throw new ContractError('Jev request byte limit exceeded');
+    const body = jevRequestBody(this.model, state, questions);
+    if (new TextEncoder().encode(body).length > JEV_REQUEST_BYTE_LIMIT) throw new ContractError('Jev request byte limit exceeded');
     assertProviderInput(this.capabilities, state, questions, signal);
     // Intentionally one attempt: callers control latency/cost budgets and retries.
     const response = await this.#fetch('https://api.typesafe.ai/v1/systemone', {
