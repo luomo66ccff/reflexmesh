@@ -77,6 +77,8 @@ The follow-up [wire-plan guard](VALIDATION-EVALUATION-WIRE-GUARD-T001.md)
 lets an operator detect changed local request bodies and DeepSeek output-token
 settings before an opted-in paid run. Existing plan/route guards keep their
 narrower meanings; this fingerprint is not remote identity, cost or approval.
+Its [PR/main integration readback](VALIDATION-EVALUATION-WIRE-GUARD-INTEGRATION-T001.md)
+records the exact reviewed tree and CI results separately from local evidence.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
