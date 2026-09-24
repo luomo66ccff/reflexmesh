@@ -117,6 +117,16 @@ The subsequent Windows Node 22 hook-fixture CI failure and bounded test-only
 repair are recorded in [t006](VALIDATION-FIRST-RUN-T006.md); this is not a
 runtime hook latency result.
 
+**2026-09-24 Claude host compatibility:** [PR #27](https://github.com/luomo66ccff/reflexmesh/pull/27)
+merged strict support for installed Claude Code 2.1.280, with isolated native
+Read/hook, generated setup, failure, and two-process cold-resume probes. The
+different interrupted-tool transcript is checked without promoting a synthetic
+error result into execution success. [Local evidence](VALIDATION-CLAUDE-HOST-2-1-280-T001.md),
+[exact-head CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36015864180),
+and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36016402182)
+are distinct. The 2.1.263 binary was not rerun in this increment, and broad
+host compatibility remains open.
+
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
 first-run gaps within the existing adapters, followed by representative
 independent-model quality and larger operational tests. The merged first-run
