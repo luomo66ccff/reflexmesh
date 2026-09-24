@@ -165,6 +165,16 @@ independent-model quality and larger operational tests. The merged first-run
 lesson does not close those gates or authorize a release, profile change or
 new paid model work.
 
+**2026-09-25 local fenced-drain candidate:** the Loader now has an opt-in
+`shutdownDrainWaitMs` with a revocable, built-in synchronous SQLite boundary.
+Local tests prove deadline isolation of pending callbacks, late-access refusal,
+truthful drain/close receipts and retention of already committed evidence.
+See [local validation](VALIDATION-DEEPSEEK-FENCE-T001.md). Installed-host
+regressions passed without injected forever-pending callbacks; reviewed PR and
+remote CI are still separate gates. Next: installed-host permanent-result-loss
+and hung-callback scenarios, then representative independent-model quality.
+This feature does not certify whole-host cancellation or arbitrary callbacks.
+
 ## v0.3: memory governance and calibrated comparison
 
 Connect the existing Memory Engine through an adapter, not a new memory database. Add read-time relevance/staleness/conflict assessment; enforce consent, tenant namespace, TTL and deletion in host code. Preserve competing facts and provenance rather than overwriting them on a model's opinion.

@@ -177,6 +177,10 @@ the host later sends a result; it does not imply a total host shutdown deadline.
 Read-only [drain diagnostics](docs/DEEPSEEK-AGENT.md) expose live missing and
 pending observation counts if an unload is still waiting on storage work; see
 their [local validation and limits](docs/VALIDATION-DEEPSEEK-DRAIN-T001.md).
+The Loader also has an opt-in, fenced SQLite drain deadline for callbacks that
+never settle. It separates safely isolated callbacks from actually drained
+ones; it is not host-tool cancellation or a guarantee for arbitrary boundaries.
+See the [Loader shutdown guide](docs/DEEPSEEK-AGENT.md).
 
 In-process DeepSeek and function-call observers also require a successful
 before-observation for that invocation before recording its outcome. Conflicting

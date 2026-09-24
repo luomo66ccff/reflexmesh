@@ -101,8 +101,9 @@ sets that window to a safe integer from 0 to 60000 milliseconds; 0 closes it
 immediately. After the window, calls without a result remain **missing** in the
 ledger and appear in read-only attention. The observer never cancels or retries
 the host tool, fabricates a result, or treats absence as proof of no effects.
-It still waits for any in-flight admission or captured-result write before
-closing its ledger. `reflexmeshObserverReady.shutdownMissingResults` reports
+Without the optional fenced drain deadline below, it still waits for any
+in-flight admission or captured-result write before closing its ledger.
+`reflexmeshObserverReady.shutdownMissingResults` reports
 the live number abandoned at shutdown, including while storage work still
 prevents completion. The read-only `shutdownDrain` getter returns a frozen
 scalar snapshot: `closing`, `resultWindowClosed`, `pendingBefore`,
@@ -111,10 +112,37 @@ Agent or result payloads. If the result window closes with admission or
 captured-result storage pending, one fixed
 `reflexmesh_shadow_shutdown_drain_pending` warning is emitted; it means
 pending at that instant, not necessarily permanently hung. `observerDrained`
-means observer storage work is actually drained, not that every host call
-produced an outcome. `kernelClosed` becomes true only after that drain. A
-custom before/after callback that never settles can still prevent safe
-closure; do not interpret the warning as permission to force-close the ledger.
+means observer storage work actually drained, not that every host call
+produced an outcome. By default, `kernelClosed` becomes true only after that
+drain. A custom caller-owned before/after callback that never settles can
+still prevent safe closure; do not interpret the warning as permission to
+force-close its ledger.
+The product Loader additionally supports optional `shutdownDrainWaitMs` (a safe
+integer from 0 to 60000). If configured, this second window starts **after**
+the result-reception window closes. When its deadline finds unfinished Loader
+storage callbacks, a Loader-owned synchronous SQLite access fence is revoked
+before those callbacks are detached and the kernel closes. A late continuation
+cannot read or write that closed kernel. Without this option, the existing
+wait-for-actual-drain behavior remains. The option does not cancel an underlying
+callback, host tool, model request or blocking JavaScript/SQLite operation.
+Only the Loader's built-in `TaskAwareBoundary` has this fenced-storage contract;
+the programmatic plugin with arbitrary caller-owned storage does not.
+An admission detached at the deadline may let the host's own permission
+waterfall continue without a ReflexMesh observation; this is an explicit
+evidence gap, not an observer-owned authorization decision.
+
+`shutdownDrain` then includes `storageRevoked`, `detachedBefore` and
+`detachedAfter`. They are deadline-isolation counts, separate from
+`missingResults`: a detached admission is not an accepted missing-result call,
+and a detached result callback may already have committed its observation.
+`reflexmeshObserverReady.storageRevoked` is true only if this deadline triggered.
+If any callback was detached, `observerDrained` stays false even though
+`kernelClosed` can safely become true after the fence is revoked. A fixed
+`reflexmesh_shadow_shutdown_storage_revoked` warning reports this event once;
+it neither proves a host effect was absent nor permits a retry. Keep the
+readiness reference captured before unload to inspect these fields.
+An event-loop-blocking callback can prevent the timer from running, so the
+configured value is not a hard wall-clock guarantee.
 An integration that monitors unload should capture the readiness object
 **before** starting Loader disposal. Cordis may remove the service during
 unload, so a fresh `ctx.get('reflexmeshObserverReady')` is not a reliable way
