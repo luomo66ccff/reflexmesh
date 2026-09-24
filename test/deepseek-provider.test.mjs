@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DeepSeekEstimateProvider, DEEPSEEK_ESTIMATE_CAPABILITIES } from '../dist/index.js';
+import { DeepSeekEstimateProvider, DEEPSEEK_ESTIMATE_CAPABILITIES,
+  DEEPSEEK_REQUEST_BYTE_LIMIT, deepSeekRequestBody } from '../dist/index.js';
 
 const questions = { ok: { type: 'noul', instructions: 'Does the action match the explicit synthetic intent?' } };
 const signal = () => new AbortController().signal;
@@ -98,4 +99,22 @@ test('HTTP/network/UTF8/response limits never leak raw private content', async (
 test('capability declaration is not caller-mutable', () => {
   assert.throws(() => { DEEPSEEK_ESTIMATE_CAPABILITIES.answers.choice = 'distribution-with-confidence'; });
   assert.throws(() => { DEEPSEEK_ESTIMATE_CAPABILITIES.limits.maxStateBytes = 999999; });
+});
+test('DeepSeek shared serializer matches sent bytes and rejects the first byte over its full-body limit', async () => {
+  const makeQuestions = length => ({ ok: { type: 'noul', instructions: 'x'.repeat(length) } });
+  const base = Buffer.byteLength(deepSeekRequestBody('synthetic-model', {}, makeQuestions(0)), 'utf8');
+  const exact = makeQuestions(DEEPSEEK_REQUEST_BYTE_LIMIT - base);
+  const oversized = makeQuestions(DEEPSEEK_REQUEST_BYTE_LIMIT - base + 1);
+  let calls = 0, captured;
+  const p = provider(async (_url, init) => { calls++; captured = init.body; return Response.json(body()); });
+  await p.evaluate({}, exact, signal());
+  assert.equal(calls, 1);
+  assert.equal(Buffer.byteLength(captured, 'utf8'), DEEPSEEK_REQUEST_BYTE_LIMIT);
+  assert.equal(captured, deepSeekRequestBody('synthetic-model', {}, exact));
+  await assert.rejects(p.evaluate({}, oversized, signal()), /request byte limit/);
+  assert.equal(calls, 1);
+  const escaped = { ok: { type: 'noul', instructions: '界"\\🙂' } };
+  await p.evaluate({}, escaped, signal());
+  assert.equal(captured, deepSeekRequestBody('synthetic-model', {}, escaped));
+  assert.deepEqual(JSON.parse(JSON.parse(captured).messages[1].content).questions, escaped);
 });

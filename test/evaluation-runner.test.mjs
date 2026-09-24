@@ -117,3 +117,36 @@ test('real DeepSeek adapter wire has no label envelope, tools or host context (o
   assert.equal(calls, 1); assert.equal(result.origin, 'provider-run'); assert.equal(result.rows[0].status, 'ok');
   assert.equal(result.deployment.capabilities.probabilitySemantics, 'elicited-estimate');
 });
+test('shipped provider wire limits skip an unsendable case without consuming the request cap', async () => {
+  for (const [providerName, instructionBytes, stateBytes] of [
+    ['deepseek', 28000, 5000], ['jev', 250000, 10000],
+  ]) {
+    let calls = 0;
+    const dataset = structuredClone(comparisonFixture().dataset);
+    dataset.pack.questions.match.instructions = 'q'.repeat(instructionBytes);
+    dataset.cases[0].state = { blob: 's'.repeat(stateBytes) };
+    const env = { REFLEXMESH_ALLOW_REMOTE: 'true', REFLEXMESH_PROVIDER: providerName,
+      REFLEXMESH_PROVIDER_REVISION: 'offline-v1',
+      ...(providerName === 'deepseek' ? { DEEPSEEK_API_KEY: 'synthetic-key', DEEPSEEK_MODEL: 'test-model' }
+        : { TYPESAFE_API_KEY: 'synthetic-key', TYPESAFE_MODEL: 'test-model' }) };
+    const selected = createEvaluationProvider(env, { fetch: async () => {
+      calls++;
+      return new Response(JSON.stringify(providerName === 'deepseek'
+        ? { object: 'chat.completion', model: 'test-model',
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify({ answers: answer().answers }) } }],
+          usage: { prompt_tokens: 12, completion_tokens: 8 } }
+        : answer()));
+    } });
+    const result = await runEvaluation({ ...setup(), ...selected, dataset, maxRequests: 1 });
+    assert.equal(calls, 1, providerName);
+    assert.deepEqual(result.rows.map(row => row.status),
+      ['unsupported', 'ok', 'not_attempted', 'not_attempted'], providerName);
+    assert.equal(result.rows[0].reasonCode, 'input_incompatible', providerName);
+    assert.equal(result.rows[2].reasonCode, 'budget_exhausted', providerName);
+    const allOversized = structuredClone(dataset);
+    for (const item of allOversized.cases) item.state = { blob: 's'.repeat(stateBytes) };
+    const allResult = await runEvaluation({ ...setup(), ...selected, dataset: allOversized, maxRequests: 1 });
+    assert.equal(calls, 1, providerName);
+    assert.ok(allResult.rows.every(row => row.status === 'unsupported' && row.reasonCode === 'input_incompatible'), providerName);
+  }
+});

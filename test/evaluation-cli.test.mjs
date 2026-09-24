@@ -41,6 +41,8 @@ test('evaluation CLI validates exact options and explicit request budgets before
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--labels', 'forbidden'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--model-id', 'route-only'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--provider-revision', 'revision-only'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--max-output-tokens', '64'],
+    ['plan', '--dataset', 'a', '--provider', 'jev', '--max-requests', '1', '--model-id', 'm', '--provider-revision', 'r', '--max-output-tokens', '64'],
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
     [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--expect-route-plan-digest', 'not-a-sha256'],
@@ -68,6 +70,7 @@ test('help, validate, plan and compare never inspect environment credentials or 
   assert.deepEqual(files.map(hash), before);
   const preview = JSON.parse(plan.text);
   assert.equal(preview.requestUpperBound, 2);
+  assert.deepEqual(preview.wirePreflight, { status: 'not_checked', reason: 'model_not_declared' });
   assert.equal(preview.deferredByRequestCapIfNoFailure, 2);
   assert.equal(preview.remoteAccess, false);
   assert.equal(preview.estimatedCostUsd, null);
@@ -107,13 +110,47 @@ test('offline plan mirrors trusted provider compatibility and omits raw case sta
   assert.equal(await evaluationMain(['plan', '--dataset', path, '--provider', 'deepseek',
     '--max-requests', '2'], CLI, { env: new Proxy({}, { get() { throw new Error('Credential access'); } }),
     createProvider() { throw new Error('Provider constructed'); } }), 0);
-  assert.match(CLI.text, /Compatible=3, unsupported=1/);
+  assert.match(CLI.text, /Capability-compatible=3, capability-unsupported=1/);
+  assert.match(CLI.text, /request-body check: not checked/);
   assert.match(CLI.text, /Plan guard: [a-f0-9]{64}/);
   assert.equal(CLI.text.includes('DO_NOT_FORWARD'), false);
   await assert.rejects(evaluationMain(['plan', '--dataset', path, '--provider', 'unknown',
     '--max-requests', '2'], sink()), /Select deepseek or jev/);
   assert.throws(() => planEvaluation({ dataset, provider: { toString() { throw new Error('Unsafe coercion'); } },
     maxRequests: 2 }), /Select deepseek or jev/);
+});
+test('declared routes check exact local request bodies without changing older guard meanings', () => {
+  for (const [provider, instructionBytes, stateBytes] of [
+    ['deepseek', 28000, 5000], ['jev', 250000, 10000],
+  ]) {
+    const dataset = structuredClone(comparisonFixture().dataset);
+    dataset.pack.questions.match.instructions = 'q'.repeat(instructionBytes);
+    dataset.cases[0].state = { blob: 's'.repeat(stateBytes) };
+    const base = { dataset, provider, maxRequests: 1 };
+    const capabilityOnly = planEvaluation(base);
+    assert.equal(capabilityOnly.eligibleCases, 4);
+    assert.equal(capabilityOnly.requestUpperBound, 1);
+    assert.equal(capabilityOnly.wirePreflight.status, 'not_checked');
+    const routed = planEvaluation({ ...base, modelId: 'test-model', revision: 'offline-v1' });
+    assert.equal(routed.eligibleCases, 4);
+    assert.equal(routed.requestUpperBound, 1);
+    assert.equal(routed.wirePreflight.status, 'checked');
+    assert.equal(routed.wirePreflight.sendableCases, 3);
+    assert.equal(routed.wirePreflight.wireRejectedCases, 1);
+    assert.equal(routed.wirePreflight.requestUpperBound, 1);
+    assert.equal(routed.wirePreflight.deferredByRequestCapIfNoFailure, 2);
+    assert.ok(routed.wirePreflight.selectedRequestBodyBytes > 0);
+    assert.equal(routed.guardDigest, capabilityOnly.guardDigest);
+    assert.equal(routed.actualWireBytesVerified, false);
+    assert.equal(JSON.stringify(routed).includes('s'.repeat(100)), false);
+    if (provider === 'deepseek') {
+      assert.equal(routed.wirePreflight.maxOutputTokens, 512);
+      const custom = planEvaluation({ ...base, modelId: 'test-model', revision: 'offline-v1', maxOutputTokens: 64 });
+      assert.equal(custom.wirePreflight.maxOutputTokens, 64);
+      assert.notEqual(custom.wirePreflight.selectedRequestBodyBytes, routed.wirePreflight.selectedRequestBodyBytes);
+      assert.equal(custom.routeGuardDigest, routed.routeGuardDigest);
+    }
+  }
 });
 test('plan guard rejects changed dataset, provider or cap before key access and output reservation', async t => {
   const f = await fixtures(t), plan = planEvaluation({ dataset: f.dataset, provider: 'deepseek', maxRequests: 1 });

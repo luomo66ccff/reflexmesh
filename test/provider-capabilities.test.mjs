@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryLedger, MockProvider, ReflexMesh, toolPreflightPack } from '../dist/index.js';
+import { DeepSeekEstimateProvider, MemoryLedger, MockProvider, ReflexMesh, toolPreflightPack } from '../dist/index.js';
 import { assertProviderInput, snapshotProvider, validateProviderCapabilities } from '../dist/core/provider-capabilities.js';
 import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { DurableMesh, eventKey } from '../adapters/durable-mesh.mjs';
@@ -104,6 +104,21 @@ test('captured provider id, declaration and method cannot be changed after wrapp
   assert.throws(() => provider.evaluate({}, choice(2), signal()), /Unsupported provider question/);
   assert.equal(oldCalls, 1);
   assert.throws(() => snapshotProvider({ id: 'missing', evaluate: async () => result() }));
+});
+
+test('only registered shipped preflight survives provider snapshots, not a lookalike ID or callback', () => {
+  let fetchCalls = 0;
+  const shipped = new DeepSeekEstimateProvider({ apiKey: 'fake', model: 'fixture', fetch: async () => { fetchCalls++; throw new Error('No network'); } });
+  const captured = snapshotProvider(shipped), recaptured = snapshotProvider(captured);
+  const long = { yes: { type: 'noul', instructions: 'x'.repeat(33000) } };
+  assert.equal(captured.preflightInput({}, binary, signal()), true);
+  assert.equal(captured.preflightInput({}, long, signal()), false);
+  assert.equal(recaptured.preflightInput({}, long, signal()), false);
+  assert.equal(Object.isFrozen(captured), true);
+  const lookalike = snapshotProvider({ id: shipped.id, model: shipped.model, capabilities: shipped.capabilities,
+    preflightInput() { throw new Error('Untrusted callback'); }, async evaluate() { throw new Error('No network'); } });
+  assert.equal(lookalike.preflightInput, undefined);
+  assert.equal(fetchCalls, 0);
 });
 
 test('explicit model survives wrappers and a mismatched binding rejects before evaluation', t => {

@@ -12,6 +12,17 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current local candidate: exact request-body preflight
+
+On 2026-09-25, an offline regression exposed a mismatch between capability
+coverage and complete HTTP request-body limits: DeepSeek and Jev could each
+reject a planned eligible case before fetch, while the runner recorded it as
+a failed provider call and stopped the batch. The candidate adds separate
+route-declared local wire-size preview, honest no-route status, and a trusted
+pre-invocation check for shipped adapters. Existing guard digests retain their
+old meaning. See [local validation](VALIDATION-EVALUATION-WIRE-PREFLIGHT-T001.md).
+This is not yet a real-model or broad-host acceptance claim.
+
 ## Latest merged milestone: declared model-route plan guard
 
 On 2026-09-25, the account-free evaluation plan gained optional declared
