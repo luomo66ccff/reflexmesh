@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { evaluationMain, formatEvaluationReport, parseEvaluationOptions } from '../adapters/evaluation-cli.mjs';
@@ -39,6 +39,7 @@ test('evaluation CLI validates exact options and explicit request budgets before
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--allow-remote'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--labels', 'forbidden'],
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
+    [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
@@ -66,6 +67,7 @@ test('help, validate, plan and compare never inspect environment credentials or 
   assert.equal(preview.deferredByRequestCapIfNoFailure, 2);
   assert.equal(preview.remoteAccess, false);
   assert.equal(preview.estimatedCostUsd, null);
+  assert.match(preview.guardDigest, /^[a-f0-9]{64}$/);
   const report = JSON.parse(comparison.text), q = report.questions[0];
   assert.ok(q.availableSubset.challenger.metrics.brier < q.availableSubset.champion.metrics.brier);
   assert.ok(q.paired.delta.brier > 0); assert.equal(q.paired.count, 2);
@@ -91,6 +93,8 @@ test('offline plan mirrors trusted provider compatibility and omits raw case sta
   assert.equal(jev.requestUpperBound, 4);
   assert.equal(jev.modelRouteVerified, false);
   assert.equal(jev.actualWireBytesVerified, false);
+  assert.notEqual(deepseek.guardDigest, jev.guardDigest);
+  assert.notEqual(deepseek.guardDigest, planEvaluation({ dataset, provider: 'deepseek', maxRequests: 3 }).guardDigest);
   const mixed = structuredClone(comparisonFixture().dataset);
   mixed.pack.questions.route = { type: 'choice', instructions: 'Select the route?', criteria: { a: 'A', b: 'B' } };
   assert.equal(planEvaluation({ dataset: mixed, provider: 'deepseek', maxRequests: 4 }).requestUpperBound, 0);
@@ -100,11 +104,45 @@ test('offline plan mirrors trusted provider compatibility and omits raw case sta
     '--max-requests', '2'], CLI, { env: new Proxy({}, { get() { throw new Error('Credential access'); } }),
     createProvider() { throw new Error('Provider constructed'); } }), 0);
   assert.match(CLI.text, /Compatible=3, unsupported=1/);
+  assert.match(CLI.text, /Plan guard: [a-f0-9]{64}/);
   assert.equal(CLI.text.includes('DO_NOT_FORWARD'), false);
   await assert.rejects(evaluationMain(['plan', '--dataset', path, '--provider', 'unknown',
     '--max-requests', '2'], sink()), /Select deepseek or jev/);
   assert.throws(() => planEvaluation({ dataset, provider: { toString() { throw new Error('Unsafe coercion'); } },
     maxRequests: 2 }), /Select deepseek or jev/);
+});
+test('plan guard rejects changed dataset, provider or cap before key access and output reservation', async t => {
+  const f = await fixtures(t), plan = planEvaluation({ dataset: f.dataset, provider: 'deepseek', maxRequests: 1 });
+  const changed = structuredClone(f.dataset);
+  changed.cases[0].state.observedKey = 'changed';
+  const changedPath = join(f.dir, 'changed-dataset.json'); writeFileSync(changedPath, JSON.stringify(changed));
+  const args = (datasetPath, cap, out) => ['run', '--dataset', datasetPath, '--deployment-id', 'guarded-run',
+    '--id', 'guarded-run-1', '--out', out, '--max-requests', String(cap), '--allow-remote',
+    '--expect-plan-digest', plan.guardDigest];
+  let factoryCalls = 0;
+  for (const [name, datasetPath, cap, provider] of [
+    ['dataset', changedPath, 1, 'deepseek'],
+    ['provider', join(f.dir, 'dataset.json'), 1, 'jev'],
+    ['budget', join(f.dir, 'dataset.json'), 2, 'deepseek'],
+  ]) {
+    const out = join(f.dir, `guard-${name}.json`);
+    const env = new Proxy({ REFLEXMESH_PROVIDER: provider }, { get(target, key) {
+      if (key !== 'REFLEXMESH_PROVIDER') throw new Error('Credential or revision accessed');
+      return target[key];
+    } });
+    await assert.rejects(evaluationMain(args(datasetPath, cap, out), sink(), { env,
+      createProvider() { factoryCalls++; throw new Error('Provider constructed'); } }),
+    /Evaluation plan mismatch/);
+    assert.equal(existsSync(out), false);
+  }
+  assert.equal(factoryCalls, 0);
+  const out = join(f.dir, 'guard-matched.json');
+  assert.equal(await evaluationMain(args(join(f.dir, 'dataset.json'), 1, out), sink(), {
+    env: { REFLEXMESH_PROVIDER: 'deepseek' },
+    createProvider() { factoryCalls++; return fixtureDeployment('champion'); },
+  }), 0);
+  assert.equal(factoryCalls, 1);
+  assert.equal(readEvaluationJson(out).rows[0].status, 'ok');
 });
 test('imported non-fixture predictions remain pure local declarations, not authenticated measurements', async t => {
   const f = await fixtures(t);

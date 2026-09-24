@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { canonical, ContractError, DEEPSEEK_ESTIMATE_CAPABILITIES,
   JEV_CAPABILITIES, snapshot } from '../dist/index.js';
 import { assertProviderInput } from '../dist/core/provider-capabilities.js';
@@ -22,10 +23,15 @@ export function planEvaluation({ dataset: input, provider, maxRequests }) {
   const selected = eligible.slice(0, maxRequests);
   const canonicalInputBytes = selected.reduce((sum, item) => sum
     + Buffer.byteLength(canonical({ state: item.state, questions: dataset.pack.questions }), 'utf8'), 0);
+  const datasetDigest = evaluationDatasetDigest(dataset);
+  const capabilitiesDigest = createHash('sha256').update(canonical(capabilities)).digest('hex');
+  const guardDigest = createHash('sha256').update(canonical({ schemaVersion: 1,
+    kind: 'reflexmesh-evaluation-plan-guard', datasetDigest, provider, maxRequests,
+    capabilitiesDigest })).digest('hex');
   return snapshot({ schemaVersion: 1, kind: 'reflexmesh-evaluation-plan',
-    dataset: { id: dataset.id, revision: dataset.revision, digest: evaluationDatasetDigest(dataset),
+    dataset: { id: dataset.id, revision: dataset.revision, digest: datasetDigest,
       dataKind: dataset.dataKind, cases: dataset.cases.length, questions: Object.keys(dataset.pack.questions).length },
-    provider, probabilitySemantics: capabilities.probabilitySemantics,
+    provider, probabilitySemantics: capabilities.probabilitySemantics, capabilitiesDigest, guardDigest,
     maxRequests, eligibleCases: eligible.length, unsupportedCases: dataset.cases.length - eligible.length,
     requestUpperBound: selected.length, deferredByRequestCapIfNoFailure: eligible.length - selected.length,
     selectedCanonicalInputBytes: canonicalInputBytes,

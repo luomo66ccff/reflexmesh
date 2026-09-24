@@ -60,6 +60,18 @@ failure or cancellation can reduce the actual request count. `plan` does not
 read labels, but it cannot detect labels or secrets already embedded in a
 dataset state. Review the dataset and account budget separately before run.
 
+The preview also prints a `Plan guard` (JSON field `guardDigest`). To catch an
+accidental edit or route/cap change between preview and a paid run, copy that
+lowercase SHA-256 value into the run command as
+`--expect-plan-digest SHA256_FROM_PLAN`. This optional check binds the
+canonical dataset digest, selected `deepseek`/`jev` provider, request cap and
+trusted capability declaration. It fails **before** provider/key access or
+output-file reservation if any of those changed. A matching guard is only an
+accident-prevention check: anyone with the dataset can recompute it, and it
+does not bind a model ID, model revision, price, account, label, actual wire
+body or human approval. Keep the explicit `--allow-remote` and environment
+opt-in; review the current dataset and route before each paid run.
+
 ## Three separate input artifacts
 
 All schemas have `schemaVersion: 1`, exact fields and finite plain JSON.
@@ -131,6 +143,10 @@ Required environment:
 ```bash
 npm run evaluation -- run --dataset comparison-lesson/dataset.json --deployment-id candidate-eval-v1 --id candidate-run-1 --out candidate-run-1.json --max-requests 4 --allow-remote --timeout-ms 15000 --max-output-tokens 512
 ```
+
+If you previewed this exact four-request dataset, add
+`--expect-plan-digest SHA256_FROM_THE_FOUR_REQUEST_PLAN` to that command.
+The sample is not a real plan digest and cannot be used as one.
 
 The example's output-token flag is DeepSeek-only. Jev rejects that flag rather
 than pretending to enforce it. Both providers require an explicitly selected

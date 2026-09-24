@@ -56,6 +56,9 @@ paid comparison; it does not replace independent quality labels, money
 budgets, model-route checks or user review of the outbound dataset. Its
 [PR/main integration readback](VALIDATION-EVALUATION-PLAN-INTEGRATION-T001.md)
 keeps remote CI distinct from the local validation.
+An optional [plan-to-run guard](VALIDATION-EVALUATION-PLAN-GUARD-T001.md)
+now rejects accidental dataset/provider/request-cap drift before key access;
+it is not authenticated approval or a monetary budget.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
