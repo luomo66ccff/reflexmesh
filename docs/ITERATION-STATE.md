@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: offline evaluation preflight
+## Latest milestone: offline evaluation preflight
 
 On 2026-09-25, an account-free `evaluation plan` preview was added before the
 opt-in paid comparison runner. It uses each provider's trusted capability
@@ -23,9 +23,13 @@ egress easier to inspect before authorizing a run, but does not estimate
 money, verify model quality or authorize transfer. See the
 [local validation](VALIDATION-EVALUATION-PLAN-T001.md). Local checks passed
 **858 tests: 856 passed, zero failed, two symlink-privilege skips** and four
-offline demos. Publication, exact-head CI and main CI are not claimed in this
-local snapshot. Representative independent-model quality and broader host
-lifecycle acceptance remain open.
+offline demos. [PR #39](https://github.com/luomo66ccff/reflexmesh/pull/39)
+merged the reviewed tree `682f816626cc101617e2f3e65bdb022b51c93546`;
+all five jobs passed on its [exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36048069201)
+and again on the [main merge commit](https://github.com/luomo66ccff/reflexmesh/actions/runs/36048851731).
+See the distinct [integration readback](VALIDATION-EVALUATION-PLAN-INTEGRATION-T001.md).
+Representative independent-model quality and broader host lifecycle
+acceptance remain open.
 
 ## Previous milestone: installed DeepSeek fenced-result probe
 

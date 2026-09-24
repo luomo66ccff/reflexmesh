@@ -53,7 +53,9 @@ quality, calibration, broad host latency or champion/challenger acceptance.
 An account-free [evaluation preflight](VALIDATION-EVALUATION-PLAN-T001.md)
 now previews trusted capability coverage and a request upper bound before
 paid comparison; it does not replace independent quality labels, money
-budgets, model-route checks or user review of the outbound dataset.
+budgets, model-route checks or user review of the outbound dataset. Its
+[PR/main integration readback](VALIDATION-EVALUATION-PLAN-INTEGRATION-T001.md)
+keeps remote CI distinct from the local validation.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
