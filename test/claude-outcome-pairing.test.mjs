@@ -10,6 +10,10 @@ import { fromClaudeHook } from '../dist/index.js';
 import { formatEvidence } from '../adapters/evidence-cli.mjs';
 import { diagnoseDoctor, formatDoctor } from '../adapters/doctor.mjs';
 
+// Process startup and SQLite initialization can exceed five seconds on a loaded
+// Windows CI runner; this bounds a correctness fixture, not hook latency.
+const HOOK_CHILD_TIMEOUT_MS = 20_000;
+
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'reflexmesh-claude-pairing-'));
   t.after(() => {
@@ -25,10 +29,11 @@ function fixture(t) {
     tool_use_id: 'reused-call', tool_name: 'Read', tool_input: { path: 'synthetic-file' }, ...fields });
   const run = (name, fields = {}, entry = 'claude-task-hook', extraEnv = {}) => {
     const child = spawnSync(process.execPath, [`adapters/${entry}.mjs`], {
-      env: { ...env, ...extraEnv }, input: JSON.stringify(payload(name, fields)), encoding: 'utf8', timeout: 5000,
+      env: { ...env, ...extraEnv }, input: JSON.stringify(payload(name, fields)), encoding: 'utf8',
+      timeout: HOOK_CHILD_TIMEOUT_MS,
     });
-    assert.equal(child.status, 0, child.stderr);
     assert.equal(child.error, undefined);
+    assert.equal(child.status, 0, child.stderr);
     assert.deepEqual(JSON.parse(child.stdout), {});
     return child;
   };
