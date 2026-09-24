@@ -50,11 +50,14 @@ test('Cordis-shaped plugin delegates host policy and awaits outcome drain on unl
   });
   const unload = plugin.apply(ctx);
   assert.equal(plugin.mounted, true);
+  assert.deepEqual(plugin.drainStatus(), { closing: false, resultWindowClosed: false,
+    pendingBefore: 0, pendingResults: 0, pendingAfter: 0, missingResults: 0 });
   assert.throws(() => plugin.apply(ctx), /already mounted/);
   const exec = { callId: 'c1', name: 'synthetic_probe', arguments: {}, signal: new AbortController().signal };
   const decision = { kind: 'deny', reason: 'host policy' };
   assert.strictEqual(await handlers.get('tools/pre-execute')(exec, async () => decision), decision);
   assert.equal(handlers.get('tools/result')(exec, { isError: false, content: [] }), undefined);
+  assert.equal(plugin.drainStatus().pendingAfter, 1);
   let unloaded = false;
   const pendingUnload = Promise.resolve(unload()).then(() => { unloaded = true; });
   await Promise.resolve();
@@ -65,6 +68,7 @@ test('Cordis-shaped plugin delegates host policy and awaits outcome drain on unl
   assert.equal(unloaded, true);
   assert.equal(afterCalls, 1);
   assert.equal(plugin.mounted, false);
+  assert.equal(plugin.drainStatus(), null);
   assert.equal(kernelClosed, false);
   assert.equal(handlers.size, 0);
 });

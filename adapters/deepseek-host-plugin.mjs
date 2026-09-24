@@ -17,6 +17,7 @@ export function createDeepSeekHostPlugin({ boundary, identity, resolveIntent, on
       };
     },
     async flush() { await observer?.flush(); },
+    drainStatus() { return observer?.drainStatus() ?? null; },
     get mounted() { return observer !== null; },
   };
 }

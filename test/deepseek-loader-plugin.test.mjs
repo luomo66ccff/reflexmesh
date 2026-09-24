@@ -5,6 +5,13 @@ import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import plugin, { validateDeepSeekLoaderConfig } from '../adapters/deepseek-loader-plugin.mjs';
 import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
+import { TaskAwareBoundary } from '../adapters/task-boundary.mjs';
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
 
 function cleanup(root) {
   const target = realpathSync(root);
@@ -110,6 +117,70 @@ test('loader closes owned kernel after missing accepted result without inventing
     } finally { kernel.close(); }
   } finally {
     try { await dispose?.(); } catch {}
+    cleanup(root);
+  }
+});
+
+test('loader reports live missing count while an admission still prevents safe closure', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'reflexmesh-loader-test-'));
+  const dbPath = join(root, 'ledger.sqlite');
+  const f = mockContext(), warnings = [];
+  f.ctx.logger.warn = code => warnings.push(code);
+  const agent = { id: 'agent-pending', session: { id: 'agent-pending' } };
+  f.agents.set(agent.id, agent);
+  const gate = deferred(), entered = deferred();
+  const originalBefore = TaskAwareBoundary.prototype.before;
+  TaskAwareBoundary.prototype.before = async function(call, intent) {
+    if (call.callId === 'blocked-admission') { entered.resolve(); await gate.promise; }
+    return originalBefore.call(this, call, intent);
+  };
+  let dispose, pendingPre, closing;
+  try {
+    dispose = await plugin.apply(f.ctx, { dbPath, tenantId: 'isolated', scope: 'fixture',
+      intentMode: 'explicit-summary', shutdownResultWaitMs: 0 });
+    f.emit('session/event', agent.session, { type: 'turn/start', data: { turn: 1 } });
+    f.emit('agent/inbox/claimed', { agent, turn: 1, message: { id: 'user-pending', role: 'user',
+      source: { kind: 'user' }, content: [{ type: 'text', text: 'ReflexMesh-Intent: Fixed pending admission fixture' }] } });
+    const signal = new AbortController().signal;
+    await f.emit('agent/pre-step', { agent, turn: 1, step: 1, signal, messages: [] },
+      () => Promise.resolve({ kind: 'enter' }))[0];
+    const exec = callId => ({ agent, signal, callId, name: 'fixture_read', arguments: {} });
+    await f.emit('tools/pre-execute', exec('missing-result'), () => undefined)[0];
+    pendingPre = f.emit('tools/pre-execute', exec('blocked-admission'), () => undefined)[0];
+    await entered.promise;
+    const ready = f.services.get('reflexmeshObserverReady');
+    closing = dispose();
+    const snapshot = ready.shutdownDrain;
+    assert.equal(Object.isFrozen(snapshot), true);
+    assert.deepEqual(snapshot, { closing: true, resultWindowClosed: true,
+      pendingBefore: 1, pendingResults: 0, pendingAfter: 0, missingResults: 1 });
+    assert.equal(ready.shutdownMissingResults, 1);
+    assert.equal(ready.observerDrained, false);
+    assert.equal(ready.kernelClosed, false);
+    assert.deepEqual(warnings, ['reflexmesh_shadow_result_missing_on_shutdown',
+      'reflexmesh_shadow_shutdown_drain_pending']);
+    gate.resolve();
+    await pendingPre;
+    await closing;
+    assert.equal(ready.shutdownMissingResults, 2);
+    assert.deepEqual(ready.shutdownDrain, { closing: true, resultWindowClosed: true,
+      pendingBefore: 0, pendingResults: 0, pendingAfter: 0, missingResults: 2 });
+    assert.deepEqual(snapshot, { closing: true, resultWindowClosed: true,
+      pendingBefore: 1, pendingResults: 0, pendingAfter: 0, missingResults: 1 });
+    assert.equal(ready.observerDrained, true);
+    assert.equal(ready.kernelClosed, true);
+    const kernel = new SqliteKernel(dbPath, { readOnly: true });
+    try {
+      const rows = kernel.listEvidence({ limit: 3 }).items;
+      assert.equal(rows.length, 2);
+      assert.ok(rows.every(row => row.hostOutcome.status === 'missing'
+        && row.hostOutcome.count === 0 && row.labelCount === 0));
+    } finally { kernel.close(); }
+  } finally {
+    gate.resolve();
+    try { await pendingPre; } catch {}
+    try { await (closing ?? dispose?.()); } catch {}
+    TaskAwareBoundary.prototype.before = originalBefore;
     cleanup(root);
   }
 });

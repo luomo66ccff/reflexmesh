@@ -90,6 +90,96 @@ test('a pending before write remains owned after deadline and later becomes miss
   assert.equal(f.handlers.size, 0);
 });
 
+test('a pending admission exposes live drain state and one fixed warning without early closure', async () => {
+  const gate = deferred(), entered = deferred();
+  const f = fixture({ before: async call => {
+    if (call.callId === 'blocked') { entered.resolve(); await gate.promise; }
+  } });
+  const missing = f.exec('missing'), blocked = f.exec('blocked');
+  await f.pre(missing);
+  const pendingPre = f.pre(blocked);
+  await entered.promise;
+  let closed = false;
+  const closing = f.observer.dispose().then(receipt => { closed = true; return receipt; });
+  let snapshot;
+  try {
+    snapshot = f.observer.drainStatus();
+    assert.equal(Object.isFrozen(snapshot), true);
+    assert.deepEqual(snapshot, { closing: true, resultWindowClosed: true,
+      pendingBefore: 1, pendingResults: 0, pendingAfter: 0, missingResults: 1 });
+    assert.deepEqual(f.warnings, ['reflexmesh_shadow_result_missing_on_shutdown',
+      'reflexmesh_shadow_shutdown_drain_pending']);
+    await Promise.resolve();
+    assert.equal(closed, false);
+  } finally { gate.resolve(); }
+  await pendingPre;
+  assert.deepEqual(await closing, { missingResults: 2 });
+  assert.deepEqual(snapshot, { closing: true, resultWindowClosed: true,
+    pendingBefore: 1, pendingResults: 0, pendingAfter: 0, missingResults: 1 });
+  assert.deepEqual(f.observer.drainStatus(), { closing: true, resultWindowClosed: true,
+    pendingBefore: 0, pendingResults: 0, pendingAfter: 0, missingResults: 2 });
+  assert.deepEqual(f.warnings, ['reflexmesh_shadow_result_missing_on_shutdown',
+    'reflexmesh_shadow_shutdown_drain_pending']);
+});
+
+test('a pending result write remains owned and diagnostically visible at deadline', async () => {
+  const gate = deferred(), entered = deferred();
+  const f = fixture({ after: async () => { entered.resolve(); await gate.promise; } });
+  const call = f.exec('inflight-after');
+  await f.pre(call);
+  f.handlers.get('tools/result')(call, { isError: false, content: [] });
+  await entered.promise;
+  let closed = false;
+  const closing = f.observer.dispose().then(receipt => { closed = true; return receipt; });
+  try {
+    assert.deepEqual(f.observer.drainStatus(), { closing: true, resultWindowClosed: true,
+      pendingBefore: 0, pendingResults: 0, pendingAfter: 1, missingResults: 0 });
+    assert.deepEqual(f.warnings, ['reflexmesh_shadow_shutdown_drain_pending']);
+    await Promise.resolve();
+    assert.equal(closed, false);
+  } finally { gate.resolve(); }
+  assert.deepEqual(await closing, { missingResults: 0 });
+  assert.deepEqual(f.observer.drainStatus(), { closing: true, resultWindowClosed: true,
+    pendingBefore: 0, pendingResults: 0, pendingAfter: 0, missingResults: 0 });
+});
+
+test('pending-drain diagnostic reentry is once-only and a rejected admission is not counted missing', async () => {
+  const handlers = new Map(), warnings = [], gate = deferred(), entered = deferred();
+  let observer, nestedDispose;
+  observer = installDeepSeekObserver({ on(name, callback) {
+    handlers.set(name, callback);
+    return () => handlers.delete(name);
+  } }, {
+    boundary: { async before(call) {
+      if (call.callId === 'rejected') { entered.resolve(); await gate.promise; throw new Error('fixed rejection'); }
+    }, after() { assert.fail('No result was accepted'); } },
+    identity: () => ({ sessionId: 'session', agentId: 'agent' }),
+    shutdownResultWaitMs: 0,
+    onError: code => {
+      warnings.push(code);
+      if (code === 'reflexmesh_shadow_shutdown_drain_pending') nestedDispose = observer.dispose();
+    },
+  });
+  const exec = callId => ({ callId, name: 'fixed_read', arguments: {}, signal: new AbortController().signal });
+  const pre = call => handlers.get('tools/pre-execute')(call, () => ({ kind: 'host-owned' }));
+  await pre(exec('missing'));
+  const pendingPre = pre(exec('rejected'));
+  await entered.promise;
+  const closing = observer.dispose();
+  try {
+    assert.ok(nestedDispose);
+    assert.equal(observer.drainStatus().missingResults, 1);
+    assert.equal(observer.drainStatus().pendingBefore, 1);
+  } finally { gate.resolve(); }
+  await pendingPre;
+  const receipt = await closing;
+  assert.strictEqual(await nestedDispose, receipt);
+  assert.deepEqual(receipt, { missingResults: 1 });
+  assert.deepEqual(warnings, ['reflexmesh_shadow_result_missing_on_shutdown',
+    'reflexmesh_shadow_shutdown_drain_pending', 'reflexmesh_shadow_observation_failed']);
+  assert.equal(handlers.size, 0);
+});
+
 test('early result cannot release pending before or attach a later replacement result', async () => {
   const gate = deferred(), entered = deferred(), outcomes = [];
   const f = fixture({ before: async () => { entered.resolve(); await gate.promise; },
@@ -130,7 +220,8 @@ test('mixed valid, missing and in-flight results drain without losing accepted w
   gate.resolve();
   assert.deepEqual(await closing, { missingResults: 1 });
   assert.deepEqual(outcomes, [['gated', 'succeeded'], ['completed', 'unknown']]);
-  assert.deepEqual(f.warnings, ['reflexmesh_shadow_result_missing_on_shutdown']);
+  assert.deepEqual(f.warnings, ['reflexmesh_shadow_result_missing_on_shutdown',
+    'reflexmesh_shadow_shutdown_drain_pending']);
 });
 
 test('zero-budget warning reentry shares one shutdown and counts one missing result', async () => {

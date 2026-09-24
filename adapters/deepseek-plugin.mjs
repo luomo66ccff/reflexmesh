@@ -19,12 +19,30 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
   let resultWindowClosed = false;
   let missingResults = 0;
   let missingWarningSent = false;
+  let drainPendingWarningSent = false;
   const warn = () => { try { onError('reflexmesh_shadow_observation_failed'); } catch {} };
   const warnMissing = () => {
     if (missingResults > 0 && !missingWarningSent) {
       missingWarningSent = true;
       try { onError('reflexmesh_shadow_result_missing_on_shutdown'); } catch {}
     }
+  };
+  const drainStatus = () => {
+    let pendingBefore = 0, pendingResults = 0, pendingAfter = 0;
+    for (const state of active.values()) {
+      if (state.phase === 'pre') pendingBefore++;
+      else if (state.phase === 'waiting-result') pendingResults++;
+      else if (state.phase === 'after') pendingAfter++;
+    }
+    return Object.freeze({ closing, resultWindowClosed, pendingBefore, pendingResults,
+      pendingAfter, missingResults });
+  };
+  const warnDrainPending = () => {
+    if (drainPendingWarningSent) return;
+    const status = drainStatus();
+    if (status.pendingBefore === 0 && status.pendingAfter === 0) return;
+    drainPendingWarningSent = true;
+    try { onError('reflexmesh_shadow_shutdown_drain_pending'); } catch {}
   };
   const release = (exec, state) => {
     if (state.phase === 'released') return;
@@ -122,6 +140,7 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
       release(exec, state);
     }
     warnMissing();
+    warnDrainPending();
   };
   const shutdown = () => {
     if (shutdownPromise) return shutdownPromise;
@@ -172,6 +191,7 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
   }
   return {
     flush,
+    drainStatus,
     async dispose() {
       const stopped = stop();
       const receipt = await shutdown();
