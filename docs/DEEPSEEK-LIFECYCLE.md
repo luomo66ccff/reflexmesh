@@ -70,7 +70,10 @@ window during observer shutdown: after its deadline, an accepted call without
 running admission/result-storage callbacks still drain before the kernel
 closes; one that never settles can still leave shutdown pending. The bounded
 window is covered by synthetic observer/Loader tests, not these installed-host
-scenarios. See [shutdown validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
+scenarios. The separate [installed observer-teardown probe](VALIDATION-DEEPSEEK-TEARDOWN-T001.md)
+now exercises that absence **at unload** with a late host result and natural
+Agent exit. It does not test permanent result absence or indefinitely hung
+admission/storage callbacks. See [shutdown validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
 
 Existing historical observations are not migrated or reclassified. The new
 ABORTED mapping applies only to newly observed results. Use independent host

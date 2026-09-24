@@ -170,6 +170,11 @@ when call IDs repeat. Delegated child summaries stay model-reported rather than
 being upgraded to user-origin evidence by the host's message wrapper. See the
 [verification scope](docs/VALIDATION-DEEPSEEK-SUBAGENTS.md).
 
+The optional [observer-teardown probe](docs/VALIDATION-DEEPSEEK-TEARDOWN-T001.md)
+uses the installed Loader to unload ReflexMesh while a synthetic native tool
+body is still waiting. Its bounded missing-result ledger remains truthful when
+the host later sends a result; it does not imply a total host shutdown deadline.
+
 In-process DeepSeek and function-call observers also require a successful
 before-observation for that invocation before recording its outcome. Conflicting
 call IDs cannot attach new-task results to an old decision; DeepSeek checks that
