@@ -13,27 +13,52 @@ const base = { token: `synthetic-${randomUUID()}`, proof: 'SYNTHETIC_PROOF', fir
 const user = content => ({ role: 'user', content });
 const assistant = content => ({ role: 'assistant', content });
 const result = phase => ({ type: 'tool_result', tool_use_id: `resume_call_${phase}`, content: [{ type: 'text', text: `${base.proof}_${phase}` }] });
-const history = (phase, interrupted = false) => {
+const history = (phase, interrupted = false, hostVersion = '2.1.263') => {
   const messages = [user(base.firstPrompt)];
   if (phase === 'first') return messages;
   if (!interrupted || phase === 'first-result') messages.push(assistant([resumeCall(1)]), user([result(1)]));
-  else messages.push(assistant([{ type: 'text', text: 'No response requested.' }]));
+  else {
+    if (hostVersion === '2.1.280') messages.push(assistant([resumeCall(1)]), user([{
+      type: 'tool_result', tool_use_id: 'resume_call_1', is_error: true,
+      content: [{ type: 'text', text: '[Request interrupted by user for tool use]' }],
+    }]));
+    messages.push(assistant([{ type: 'text', text: 'No response requested.' }]));
+  }
   if (phase === 'first-result') return messages;
   messages.push(user(base.secondPrompt));
   if (phase === 'resume-result') messages.push(assistant([resumeCall(2)]), user([result(2)]));
   return messages;
 };
-const payload = (phase, interrupted = false, stream = false) => ({ model: 'claude-sonnet-4-6', stream,
-  tools: [{ name: RESUME_TOOL }], messages: history(phase, interrupted) });
+const payload = (phase, interrupted = false, stream = false, hostVersion = '2.1.263') => ({ model: 'claude-sonnet-4-6', stream,
+  tools: [{ name: RESUME_TOOL }], messages: history(phase, interrupted, hostVersion) });
 const post = (server, data, path = '/v1/messages', token = base.token) => fetch(server.baseUrl + path, { method: 'POST',
   headers: { 'x-api-key': token, 'content-type': 'application/json' }, body: typeof data === 'string' ? data : JSON.stringify(data), signal: AbortSignal.timeout(2000) });
-async function serverFixture(t, interrupted = false, onEntered = () => {}) {
-  const server = await startClaudeResumeFixture({ ...base, interrupted, onEntered }); t.after(() => server.close()); return server;
+async function serverFixture(t, interrupted = false, onEntered = () => {}, hostVersion = '2.1.263') {
+  const server = await startClaudeResumeFixture({ ...base, interrupted, onEntered, hostVersion }); t.after(() => server.close()); return server;
 }
 
 for (const interrupted of [false, true]) test(`strict resumed history (${interrupted ? 'killed' : 'clean'})`, () => {
   for (const phase of ['first', 'first-result', 'resume', 'resume-result'])
     assert.equal(matchesResumeHistory(history(phase, interrupted), { ...base, phase, interrupted }), true);
+});
+test('2.1.280 interrupted resume requires the exact host-injected error, never a returned tool result', () => {
+  for (const phase of ['first', 'first-result', 'resume', 'resume-result'])
+    assert.equal(matchesResumeHistory(history(phase, true, '2.1.280'), { ...base, phase, interrupted: true, hostVersion: '2.1.280' }), true);
+  assert.equal(matchesResumeHistory(history('resume', true), { ...base, phase: 'resume', interrupted: true, hostVersion: '2.1.280' }), false);
+  assert.equal(matchesResumeHistory(history('resume', true, '2.1.280'), { ...base, phase: 'resume', interrupted: true, hostVersion: '2.1.263' }), false);
+});
+for (const [name, mutate] of [
+  ['missing interrupted result', h => h.splice(2, 1)],
+  ['successful old result', h => { h[2].content[0].is_error = false; }],
+  ['fabricated old proof', h => { h[2].content[0].content[0].text = `${base.proof}_1`; }],
+  ['changed interruption marker', h => { h[2].content[0].content[0].text = 'Interrupted'; }],
+  ['foreign result ID', h => { h[2].content[0].tool_use_id = 'foreign'; }],
+  ['missing placeholder', h => h.splice(3, 1)],
+  ['placeholder before interrupted result', h => { [h[2], h[3]] = [h[3], h[2]]; }],
+  ['duplicate old call', h => h[1].content.push(resumeCall(1))],
+]) test(`2.1.280 killed history rejects ${name}`, () => {
+  const input = history('resume', true, '2.1.280'); mutate(input);
+  assert.equal(matchesResumeHistory(input, { ...base, phase: 'resume', interrupted: true, hostVersion: '2.1.280' }), false);
 });
 for (const [name, mutate] of [
   ['missing old prompt', h => h.shift()],
@@ -78,17 +103,17 @@ test('strict local server completes exactly two turns with distinct tool receipt
   assert.equal(server.snapshot().stage, 'done'); assert.equal(server.snapshot().resumedHistory, true);
   assert.equal(server.snapshot().entries.length, 2); assert.equal(server.snapshot().failure, 'none');
 });
-test('interrupted memory-only tool stops at an observed barrier without a returned result', async t => {
+for (const hostVersion of ['2.1.263', '2.1.280']) test(`${hostVersion} interrupted memory-only tool stops at an observed barrier without a returned result`, async t => {
   let release; const entered = new Promise(resolve => { release = resolve; });
-  const server = await serverFixture(t, true, release);
+  const server = await serverFixture(t, true, release, hostVersion);
   await post(server, payload('first', true));
   const controller = new AbortController();
   const pending = fetch(server.baseUrl + '/fixture/entered', { method: 'POST', headers: { 'x-api-key': base.token }, body: JSON.stringify({ phase: 1, pid: 1 }), signal: controller.signal }).catch(() => null);
   await entered; assert.deepEqual(server.snapshot().entries, [{ phase: 1, pid: 1, returned: false }]);
   controller.abort(); await pending; server.resume();
-  assert.equal((await post(server, payload('resume', true))).status, 200);
+  assert.equal((await post(server, payload('resume', true, false, hostVersion))).status, 200);
   await post(server, { phase: 2, pid: 2 }, '/fixture/entered');
-  assert.equal((await post(server, payload('resume-result', true))).status, 200);
+  assert.equal((await post(server, payload('resume-result', true, false, hostVersion))).status, 200);
   assert.equal(server.snapshot().stage, 'done');
 });
 test('streaming fixture emits an exact call and rejects retry after invalid history', async t => {

@@ -11,9 +11,10 @@ import { isDirectRun } from '../adapters/direct-run.mjs';
 import { localEnvironment, ancestorContextAbsent, managedConfigurationAbsent } from './claude-local-probe.mjs';
 import { resolveExecutable, runBounded, processFailureReason, evaluateClaudeJsonl } from './real-host-compat.mjs';
 import { startClaudeFixture } from './claude-loopback-server.mjs';
+import { SUPPORTED_CLAUDE_VERSIONS, supportedClaudeVersion } from './claude-probe-version.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PREFIX = 'reflexmesh-claude-setup-', VERSION = '2.1.263';
+const PREFIX = 'reflexmesh-claude-setup-';
 const SUMMARY = 'Read only the isolated setup fixture; do not modify files.';
 const MARKER = 'REFLEXMESH_CLAUDE_SETUP_OK', TENANT = 'synthetic-setup-probe';
 const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'];
@@ -184,8 +185,9 @@ export async function runClaudeSetupProbe({ claudeCommand = 'claude', timeoutMs 
   if (!executable) return { ...report, reason: 'host_command_not_found' };
   const version = await runBounded(executable, ['--version'], { cwd: ROOT, env: {}, timeoutMs: 10000,
     stdoutLimitBytes: 1024, stderrLimitBytes: 1024 });
-  if (!version.ok || version.stdout.trim() !== `${VERSION} (Claude Code)`) return { ...report, reason: 'unsupported_host_version' };
-  report.hostVersion = VERSION;
+  const hostVersion = version.ok ? supportedClaudeVersion(version.stdout) : null;
+  if (!hostVersion) return { ...report, reason: 'unsupported_host_version' };
+  report.hostVersion = hostVersion;
   for (const scenario of ['capture-off', 'explicit-summary']) {
     const result = await runClaudeSetupScenario(executable, scenario, timeoutMs);
     report.scenarios.push(result);
@@ -197,7 +199,7 @@ export async function runClaudeSetupProbe({ claudeCommand = 'claude', timeoutMs 
 export async function main(argv = process.argv.slice(2), output = process.stdout) {
   if (argv.length === 1 && ['--help', '-h'].includes(argv[0])) {
     output.write('Usage: npm run compat:claude-setup -- [--claude-command NATIVE_EXECUTABLE]\n'
-      + 'Installed Windows Claude Code 2.1.263; direct doctor-generated hooks, synthetic localhost Messages.\n'
+      + `Installed Windows Claude Code ${SUPPORTED_CLAUDE_VERSIONS.join(' / ')}; direct doctor-generated hooks, synthetic localhost Messages.\n`
       + 'No real model/account/default profile. Runs default capture-off and explicit-summary in fresh sessions.\n'
       + 'This opt-in probe starts Claude; doctor:claude itself never starts a host. Not an OS sandbox.\n');
     return 0;

@@ -13,6 +13,7 @@ import { isDirectRun } from '../adapters/direct-run.mjs';
 import { localEnvironment, ancestorContextAbsent, managedConfigurationAbsent } from './claude-local-probe.mjs';
 import { resolveExecutable, runBounded } from './real-host-compat.mjs';
 import { RESUME_TOOL, resumeCall, startClaudeResumeFixture } from './claude-resume-server.mjs';
+import { SUPPORTED_CLAUDE_VERSIONS, supportedClaudeVersion } from './claude-probe-version.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..'), PREFIX = 'reflexmesh-claude-resume-';
 const SUMMARY_A = 'Read the first isolated synthetic memory fixture only.';
@@ -98,7 +99,7 @@ function native(stream, phase) {
   return { uses: uses.filter(block => block.id === `resume_call_${phase}`), results: results.filter(block => block.tool_use_id === `resume_call_${phase}`) };
 }
 
-export async function runClaudeResumeScenario(executable, interrupted, timeoutMs = 60000, { doctor = diagnoseClaudeDoctor } = {}) {
+export async function runClaudeResumeScenario(executable, interrupted, timeoutMs = 60000, { doctor = diagnoseClaudeDoctor, hostVersion = '2.1.263' } = {}) {
   const report = { scenario: interrupted ? 'entered-then-killed' : 'clean-exit', status: 'failed', reason: 'probe_execution_failed', assertions: [] };
   let directory, service, temporaryRoot, barrier = false;
   try {
@@ -120,7 +121,7 @@ export async function runClaudeResumeScenario(executable, interrupted, timeoutMs
     const firstPrompt = `ReflexMesh-Intent: ${SUMMARY_A}\nRead the phase 1 fixture once.`;
     const secondPrompt = `${interrupted ? '' : `ReflexMesh-Intent: ${SUMMARY_B}\n`}Read only the new phase 2 fixture once; do not re-execute old calls.`;
     const controller = new AbortController();
-    service = await startClaudeResumeFixture({ token, proof, firstPrompt, secondPrompt, interrupted, onEntered: async () => {
+    service = await startClaudeResumeFixture({ token, proof, firstPrompt, secondPrompt, interrupted, hostVersion, onEntered: async () => {
       // Wait for observed persistence, not an arbitrary delay, while the fixed tool cannot finish.
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline) {
@@ -221,7 +222,10 @@ export async function runClaudeResumeScenario(executable, interrupted, timeoutMs
 
 export async function main(argv = process.argv.slice(2), output = process.stdout) {
   if (argv.length === 1 && ['--help', '-h'].includes(argv[0])) {
-    output.write('Usage: npm run compat:claude-resume -- [--claude-command NATIVE_EXECUTABLE]\nInstalled Windows Claude Code 2.1.263, two isolated cold-resume scenarios.\nSynthetic localhost Messages, memory-only MCP, explicit private transcript, no account/default profile.\nTerminates only the owned test process tree at an observed tool-entry barrier. Not an OS sandbox.\n'); return 0;
+    output.write('Usage: npm run compat:claude-resume -- [--claude-command NATIVE_EXECUTABLE]\n'
+      + `Installed Windows Claude Code ${SUPPORTED_CLAUDE_VERSIONS.join(' / ')}, two isolated cold-resume scenarios.\n`
+      + 'Synthetic localhost Messages, memory-only MCP, explicit private transcript, no account/default profile.\n'
+      + 'Terminates only the owned test process tree at an observed tool-entry barrier. Not an OS sandbox.\n'); return 0;
   }
   const report = { schemaVersion: 1, evidenceLevel: 'installed_claude_cold_resume', hostVersion: 'unverified', modelInference: false,
     modelTransport: 'loopback_fixture', defaultProfileUsed: false, status: 'failed', reason: 'invalid_options', scenarios: [] };
@@ -230,10 +234,11 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
     if (!executable) report.reason = 'host_command_not_found';
     else {
       const version = await runBounded(executable, ['--version'], { ...limits, timeoutMs: 10000, cwd: ROOT, env: {} });
-      if (!version.ok || version.stdout.trim() !== '2.1.263 (Claude Code)') report.reason = 'unsupported_host_version';
+      const hostVersion = version.ok ? supportedClaudeVersion(version.stdout) : null;
+      if (!hostVersion) report.reason = 'unsupported_host_version';
       else {
-        report.hostVersion = '2.1.263';
-        for (const interrupted of [false, true]) { const scenario = await runClaudeResumeScenario(executable, interrupted); report.scenarios.push(scenario); if (scenario.status !== 'passed') break; }
+        report.hostVersion = hostVersion;
+        for (const interrupted of [false, true]) { const scenario = await runClaudeResumeScenario(executable, interrupted, 60000, { hostVersion }); report.scenarios.push(scenario); if (scenario.status !== 'passed') break; }
         report.status = report.scenarios.length === 2 && report.scenarios.every(item => item.status === 'passed') ? 'passed' : 'failed';
         report.reason = report.status === 'passed' ? 'cold_resume_scenarios_verified' : report.scenarios.at(-1)?.reason ?? 'probe_execution_failed';
       }

@@ -9,6 +9,7 @@ import { eventKey } from '../adapters/durable-mesh.mjs';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 import { resolveExecutable, runBounded, evaluateClaudeJsonl, processFailureReason } from './real-host-compat.mjs';
 import { startClaudeFixture } from './claude-loopback-server.mjs';
+import { SUPPORTED_CLAUDE_VERSIONS, supportedClaudeVersion } from './claude-probe-version.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PREFIX = 'reflexmesh-claude-local-';
@@ -16,7 +17,6 @@ const PREFIX = 'reflexmesh-claude-local-';
 const MODEL = 'claude-sonnet-4-6';
 const MARKER = 'REFLEXMESH_CLAUDE_LOCAL_OK';
 const SUMMARY = 'Read only the isolated synthetic fixture; do not change files.';
-const VERSION = '2.1.263';
 const OS_ENV = ['PATH', 'SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT', 'TEMP', 'TMP'];
 const row = (name, passed) => ({ name, passed: passed === true });
 const lines = text => text.split(/\r?\n/).filter(Boolean).map(line => {
@@ -233,8 +233,9 @@ export async function runClaudeLocalProbe({ claudeCommand = 'claude', timeoutMs 
   if (!executable) return { ...report, reason: 'host_command_not_found' };
   const version = await runBounded(executable, ['--version'], { cwd: ROOT, env: {}, timeoutMs: 10000,
     stdoutLimitBytes: 1024, stderrLimitBytes: 1024 });
-  if (!version.ok || version.stdout.trim() !== `${VERSION} (Claude Code)`) return { ...report, reason: 'unsupported_host_version' };
-  report.hostVersion = VERSION;
+  const hostVersion = version.ok ? supportedClaudeVersion(version.stdout) : null;
+  if (!hostVersion) return { ...report, reason: 'unsupported_host_version' };
+  report.hostVersion = hostVersion;
   for (const scenario of ['single-read', 'duplicate-pre']) {
     const result = await runLocalScenario(executable, scenario, timeoutMs, runHost);
     report.scenarios.push(result);
@@ -246,7 +247,7 @@ export async function runClaudeLocalProbe({ claudeCommand = 'claude', timeoutMs 
 export async function main(argv = process.argv.slice(2), output = process.stdout) {
   if (argv.length === 1 && ['--help', '-h'].includes(argv[0])) {
     output.write('Usage: npm run compat:claude-local -- [--claude-command NATIVE_EXECUTABLE]\n'
-      + 'Account-free installed Claude Code 2.1.263 / Windows check using local synthetic Messages, not model inference.\n'
+      + `Account-free installed Claude Code ${SUPPORTED_CLAUDE_VERSIONS.join(' / ')} / Windows check using local synthetic Messages, not model inference.\n`
       + 'Runs one fixed Read plus a duplicate-observer delivery scenario in separate temporary sessions.\n'
       + 'Requires clean writable Windows system Temp and no managed Claude policy/context; never edits user settings.\n'
       + 'This is not an OS filesystem/network sandbox. See docs/CLAUDE-LOCAL-LOOP.md.\n');

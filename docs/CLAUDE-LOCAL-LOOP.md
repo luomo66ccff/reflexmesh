@@ -14,7 +14,7 @@ logged-in host/model, and from the default offline suite.
 ## Run
 
 The installed-host check currently accepts **Windows and Claude Code 2.1.263
-only**, with a Node runtime satisfying both the 22.16+ API floor and the
+or 2.1.280 only**, with a Node runtime satisfying both the 22.16+ API floor and the
 [actual SQLite WAL write gate](SQLITE-RUNTIME.md). Node 22.16.0 itself does not
 pass that gate. Other host versions/platforms fail closed; the command does
 not install, downgrade or change Claude. A version match is not a signature check:
@@ -101,7 +101,7 @@ This probe therefore omits `--bare` and uses the isolation checks above. The
 [bare-mode documentation](https://code.claude.com/docs/en/headless#start-faster-with-bare-mode)
 is not a promise that this pinned build executes explicit hooks in bare mode.
 
-The same executable made one unauthenticated `HEAD /api/hello` before two
+Both tested revisions made one unauthenticated `HEAD /api/hello` before two
 Messages requests. The fixture permits that exact body-free handshake once.
 This is an observed, version-specific behavior, not a documented public API
 contract. Unexpected routes, extra requests and mismatched results fail closed.

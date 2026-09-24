@@ -88,13 +88,15 @@ Connecting Claude on Windows? `npm run doctor:claude -- --help` starts the
 [read-only setup guide](docs/CLAUDE-FIRST-RUN.md): explicit paths, seven generated
 production hooks and capture off by default, with no settings or account changes.
 `npm run compat:claude-setup` separately verifies the generated fragment through
-installed Claude Code 2.1.263 with account-free synthetic local transport.
+exactly pinned installed Claude Code 2.1.263 or 2.1.280 with account-free
+synthetic local transport.
 
-Already have Claude Code 2.1.263 on Windows? `npm run compat:claude-local`
+Already have Claude Code 2.1.263 or 2.1.280 on Windows? `npm run compat:claude-local`
 checks a real native Read and hook/ledger lifecycle with **local synthetic
 Messages, no account and no model inference**. It also checks that an injected
 duplicate observer delivery blocks ambiguous evidence without stopping the
-native Read. See [setup, pinned support and isolation limits](docs/CLAUDE-LOCAL-LOOP.md).
+native Read. See [setup, pinned support and isolation limits](docs/CLAUDE-LOCAL-LOOP.md)
+and the [2.1.280 validation boundary](docs/VALIDATION-CLAUDE-HOST-2-1-280-T001.md).
 
 For the full development checks and other offline examples:
 
