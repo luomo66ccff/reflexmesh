@@ -99,11 +99,38 @@ and does **not** bind model/revision. Both options may be supplied.
 
 The model ID and revision are operator declarations, not independently
 verified remote identity. Aliases can change weights; the digest is not a
-signature, authorization, price or monetary limit. It does not bind the
-account, output-token cap, timeout, serializer version, actual request bytes
-or labels. A route-declared local body check is not a guard for that body:
-the run rechecks its actual provider configuration before every request.
+signature, authorization, price or monetary limit. The older route guard
+does not bind the account, output-token cap, timeout, serializer version,
+request-body bytes or labels. A preview alone is not a guard for that body;
+the run also rechecks its actual provider configuration before every request.
 Review data egress and account controls separately.
+
+For an additional check of the **locally serialized request bodies**, copy
+`Wire guard` (JSON field `wireGuardDigest`) from a route-declared plan into
+`run --expect-wire-plan-digest SHA256_FROM_WIRE_PLAN`. It binds the route
+guard, the effective DeepSeek output-token limit (default 512, or the same
+explicit `--max-output-tokens N` in both commands), a provider serializer ID,
+and SHA-256/UTF-8 byte count of every capability-compatible case body in
+dataset order—including wire-rejected and request-cap-deferred cases. Jev
+has no output-token limit. This catches a changed JSON field order even when
+the older canonical dataset and route digests remain equal. No raw case
+state, question text, body or case ID is printed by the plan.
+
+```bash
+npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 4 --model-id MODEL_ID_FROM_ACCOUNT --provider-revision EVALUATED_REVISION --max-output-tokens 64
+# After reviewing the dataset and plan, add these flags to the otherwise explicit run:
+# --max-output-tokens 64 --expect-wire-plan-digest SHA256_FROM_WIRE_PLAN
+```
+
+The wire guard is optional and independent of the two older guards. Its
+mismatch fails before key access, provider construction or output-file
+reservation; it can be used alone or alongside them. It is an
+accident-prevention fingerprint for the shipped adapters, not authenticated
+approval, a budget for monetary cost, proof of remote endpoint/model identity,
+or a guarantee about arbitrary injected provider factories. The run still
+checks actual input and body limits before each request, and provider/network
+failures still stop without automatic retry. Hashes are fingerprints, not
+anonymization; review the dataset before sending it.
 
 ## Three separate input artifacts
 
