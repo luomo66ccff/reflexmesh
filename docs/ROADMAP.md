@@ -113,6 +113,9 @@ injected cleanup failures now fail instead of being silently ignored.
 [PR #23](https://github.com/luomo66ccff/reflexmesh/pull/23) is merged; its
 [t005 integration report](VALIDATION-FIRST-RUN-T005.md) records exact-head and
 post-merge CI without promoting local first-run evidence to live-host proof.
+The subsequent Windows Node 22 hook-fixture CI failure and bounded test-only
+repair are recorded in [t006](VALIDATION-FIRST-RUN-T006.md); this is not a
+runtime hook latency result.
 
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
 first-run gaps within the existing adapters, followed by representative

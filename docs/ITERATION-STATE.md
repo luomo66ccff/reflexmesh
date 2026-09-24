@@ -12,7 +12,21 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: first-run lesson merged into main
+## Latest milestone: bounded Windows hook-fixture repair
+
+After the documentation-only [PR #24](https://github.com/luomo66ccff/reflexmesh/pull/24)
+merged, [main CI 36008198413](https://github.com/luomo66ccff/reflexmesh/actions/runs/36008198413)
+failed three Claude hook-pairing tests on Windows Node 22 at their fixture's
+five-second child deadline; its other four jobs passed. The one-file test-only
+[PR #25](https://github.com/luomo66ccff/reflexmesh/pull/25) extends that
+correctness fixture's deadline to 20 seconds and reports child errors before
+exit-status assertions. All five jobs passed on its
+[exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36009614394)
+and again on [main merge commit `f0548fd`](https://github.com/luomo66ccff/reflexmesh/actions/runs/36010120753).
+This does not certify actual hook latency or explain the runner delay with
+certainty. See [validation t006](VALIDATION-FIRST-RUN-T006.md).
+
+## Previous milestone: first-run lesson merged into main
 
 On 2026-09-24, [PR #23](https://github.com/luomo66ccff/reflexmesh/pull/23)
 merged the retained-evidence first-run lesson and its cleanup-truthfulness
