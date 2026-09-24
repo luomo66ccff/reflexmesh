@@ -9,7 +9,7 @@ import { isDirectRun } from './direct-run.mjs';
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
   npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV [--max-output-tokens N]] [--json]
-  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
+  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--expect-wire-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
 Validate/plan/compare are local only. A plan without a declared route checks capabilities only; a route also checks local request-body size, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
@@ -24,7 +24,7 @@ export function parseEvaluationOptions(argv) {
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
     plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'max-output-tokens', 'json'],
-    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'timeout-ms', 'max-output-tokens'],
+    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'expect-wire-plan-digest', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
   if (!allowed) fail('Expected validate, plan, run or compare; use --help');
   const options = { command };
@@ -48,6 +48,8 @@ export function parseEvaluationOptions(argv) {
     fail('Invalid evaluation plan digest');
   if (options['expect-route-plan-digest'] !== undefined && !/^[a-f0-9]{64}$/.test(options['expect-route-plan-digest']))
     fail('Invalid evaluation route plan digest');
+  if (options['expect-wire-plan-digest'] !== undefined && !/^[a-f0-9]{64}$/.test(options['expect-wire-plan-digest']))
+    fail('Invalid evaluation wire plan digest');
   if (command === 'plan' && (Object.hasOwn(options, 'model-id') !== Object.hasOwn(options, 'provider-revision')))
     fail('Model ID and provider revision must be supplied together');
   if (command === 'plan' && options['max-output-tokens'] !== undefined
@@ -107,8 +109,8 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
           ? `Local request-body check: sendable=${plan.wirePreflight.sendableCases}, wire-rejected=${plan.wirePreflight.wireRejectedCases}; at most ${plan.wirePreflight.requestUpperBound} requests under cap; selected body bytes=${plan.wirePreflight.selectedRequestBodyBytes}${plan.wirePreflight.maxOutputTokens === undefined ? '' : ` at max-output-tokens=${plan.wirePreflight.maxOutputTokens}`}.\n`
           : 'Local request-body check: not checked without a declared model route.\n')
         + `Dataset digest: ${plan.dataset.digest}\nPlan guard: ${plan.guardDigest}\n`
-        + (plan.declaredRoute ? `Declared route: ${quote(plan.declaredRoute.modelId)} @ ${quote(plan.declaredRoute.revision)}.\nRoute guard: ${plan.routeGuardDigest}\n` : '')
-        + 'No key, label, host profile or network was accessed. A declared route checks only local serialization; route guards do not bind output tokens or serializer version, and neither model weights nor endpoint, quality or cost are verified.\n');
+        + (plan.declaredRoute ? `Declared route: ${quote(plan.declaredRoute.modelId)} @ ${quote(plan.declaredRoute.revision)}.\nRoute guard: ${plan.routeGuardDigest}\nWire guard: ${plan.wireGuardDigest}\n` : '')
+        + 'No key, label, host profile or network was accessed. The wire guard binds locally serialized bodies and output tokens, not endpoint availability, model weights, quality, cost or authorization. Older guards keep their narrower meanings.\n');
     return 0;
   }
   if (options.command === 'compare') {
@@ -121,19 +123,24 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
   // The three local branches above do not construct providers or read credentials.
   // An optional reviewed plan guard fails before provider/key access or output reservation.
   const routeGuard = options['expect-route-plan-digest'] !== undefined;
+  const wireGuard = options['expect-wire-plan-digest'] !== undefined;
+  const declaredRouteGuard = routeGuard || wireGuard;
   let providerEnv = env, expectedRoute = null;
-  if (options['expect-plan-digest'] !== undefined || routeGuard) {
+  if (options['expect-plan-digest'] !== undefined || declaredRouteGuard) {
     const provider = env.REFLEXMESH_PROVIDER;
     const modelKey = provider === 'deepseek' ? 'DEEPSEEK_MODEL' : provider === 'jev' ? 'TYPESAFE_MODEL' : null;
-    if (routeGuard && modelKey === null) throw new ContractError('Select deepseek or jev for evaluation route plan');
-    const modelId = routeGuard ? env[modelKey] : undefined;
-    const revision = routeGuard ? env.REFLEXMESH_PROVIDER_REVISION : undefined;
-    const current = planEvaluation({ dataset, provider, maxRequests: options['max-requests'], modelId, revision });
+    if (declaredRouteGuard && modelKey === null) throw new ContractError('Select deepseek or jev for evaluation route plan');
+    const modelId = declaredRouteGuard ? env[modelKey] : undefined;
+    const revision = declaredRouteGuard ? env.REFLEXMESH_PROVIDER_REVISION : undefined;
+    const current = planEvaluation({ dataset, provider, maxRequests: options['max-requests'], modelId, revision,
+      maxOutputTokens: wireGuard ? options['max-output-tokens'] : undefined });
     if (options['expect-plan-digest'] !== undefined && current.guardDigest !== options['expect-plan-digest'])
       throw new ContractError('Evaluation plan mismatch; no provider or output opened');
     if (routeGuard && current.routeGuardDigest !== options['expect-route-plan-digest'])
       throw new ContractError('Evaluation route plan mismatch; no provider or output opened');
-    if (routeGuard) {
+    if (wireGuard && current.wireGuardDigest !== options['expect-wire-plan-digest'])
+      throw new ContractError('Evaluation wire plan mismatch; no provider or output opened');
+    if (declaredRouteGuard) {
       // Keep the checked route stable across the dynamic import and provider construction.
       expectedRoute = { providerId: EVALUATION_PROVIDER_IDS[provider], modelId, revision };
       providerEnv = Object.create(env);
@@ -146,7 +153,7 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
   }
   const factory = createProvider ?? (await import('./evaluation-provider.mjs')).createEvaluationProvider;
   const selected = await factory(providerEnv, { maxOutputTokens: options['max-output-tokens'] });
-  if (routeGuard && (selected?.binding?.providerId !== expectedRoute.providerId
+  if (declaredRouteGuard && (selected?.binding?.providerId !== expectedRoute.providerId
     || selected?.binding?.modelId !== expectedRoute.modelId
     || selected?.binding?.revision !== expectedRoute.revision
     || selected?.provider?.id !== selected.binding.providerId || selected?.provider?.model !== selected.binding.modelId))

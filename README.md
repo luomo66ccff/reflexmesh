@@ -138,6 +138,12 @@ For a declared model route, `plan` can also take `--model-id ID
 value to `run --expect-route-plan-digest SHA256` catches changed model ID
 or revision before credential access. It does not verify backend weights,
 account spending or authorization.
+The same route-declared plan also prints a separate wire guard. Pass
+`--expect-wire-plan-digest SHA256` to reject changed locally serialized
+request bodies or DeepSeek output-token limits before credential access.
+Use the same `--max-output-tokens N` in plan and run when overriding the
+512-token default. This binds the reviewed local request shape, not the
+remote endpoint, billed cost or permission to send data.
 Validate and compare stay offline; paid runs need explicit opt-in and budgets.
 See the [paired comparison guide](docs/PROVIDER-COMPARISON.md). No automatic
 winner, calibration transfer, model promotion or tool execution is implied.

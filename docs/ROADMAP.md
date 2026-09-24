@@ -73,6 +73,10 @@ cases without spending a request slot; endpoint, model quality and cost are
 still outside this check.
 Its [PR/main integration readback](VALIDATION-EVALUATION-WIRE-PREFLIGHT-INTEGRATION-T001.md)
 keeps remote CI separate from the local serialization evidence.
+The follow-up [wire-plan guard](VALIDATION-EVALUATION-WIRE-GUARD-T001.md)
+lets an operator detect changed local request bodies and DeepSeek output-token
+settings before an opted-in paid run. Existing plan/route guards keep their
+narrower meanings; this fingerprint is not remote identity, cost or approval.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

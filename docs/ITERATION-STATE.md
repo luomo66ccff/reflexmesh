@@ -12,6 +12,17 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current local candidate: reviewed wire-plan guard
+
+On 2026-09-25, a route-declared plan could check exact local request-body
+sizes but its route guard did not bind DeepSeek output tokens or body bytes.
+The candidate adds a distinct opt-in wire guard over every capability-eligible
+serialized body, including rejected and deferred cases. It fails before key
+access, provider construction or output reservation when an opted-in run
+differs. Older guards retain their meanings. See the
+[local validation](VALIDATION-EVALUATION-WIRE-GUARD-T001.md); real-model
+quality, billing and broader host acceptance remain separate.
+
 ## Latest merged milestone: exact request-body preflight
 
 On 2026-09-25, an offline regression exposed a mismatch between capability

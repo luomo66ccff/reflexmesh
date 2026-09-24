@@ -10,7 +10,8 @@ import { comparisonFixture, fixtureDeployment } from '../examples/evaluation-fix
 import { runEvaluation } from '../adapters/evaluation-runner.mjs';
 import { planEvaluation } from '../adapters/evaluation-plan.mjs';
 import { createEvaluationProvider } from '../adapters/evaluation-provider.mjs';
-import { canonical, DEEPSEEK_ESTIMATE_CAPABILITIES, JEV_CAPABILITIES } from '../dist/index.js';
+import { canonical, DEEPSEEK_ESTIMATE_CAPABILITIES, deepSeekRequestBody,
+  JEV_CAPABILITIES, jevRequestBody } from '../dist/index.js';
 import { main as demo } from '../examples/provider-comparison.mjs';
 
 const sink = () => ({ text: '', write(text) { this.text += text; } });
@@ -46,6 +47,7 @@ test('evaluation CLI validates exact options and explicit request budgets before
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
     [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--expect-route-plan-digest', 'not-a-sha256'],
+    [...runArgs('a'), '--expect-wire-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
@@ -151,6 +153,60 @@ test('declared routes check exact local request bodies without changing older gu
       assert.equal(custom.routeGuardDigest, routed.routeGuardDigest);
     }
   }
+});
+test('wire guard binds complete serialized bodies and output cap without redefining older guards', () => {
+  const dataset = structuredClone(comparisonFixture().dataset);
+  const route = { dataset, provider: 'deepseek', maxRequests: 1,
+    modelId: 'test-model', revision: 'offline-v1' };
+  const planned = planEvaluation(route);
+  assert.equal(planEvaluation({ dataset, provider: 'deepseek', maxRequests: 1 }).wireGuardDigest, undefined);
+  assert.match(planned.wireGuardDigest, /^[a-f0-9]{64}$/);
+  const sha = value => createHash('sha256').update(value, 'utf8').digest('hex');
+  const bodies = dataset.cases.map((item, index) => {
+    const body = deepSeekRequestBody(route.modelId, item.state, dataset.pack.questions, 512);
+    return { caseId: item.id, byteLength: Buffer.byteLength(body, 'utf8'),
+      bodyDigest: sha(body), sendable: true, selected: index === 0 };
+  });
+  assert.equal(planned.wireGuardDigest, sha(canonical({ schemaVersion: 1,
+    kind: 'reflexmesh-evaluation-wire-plan-guard', routeGuardDigest: planned.routeGuardDigest,
+    serializerId: 'deepseek-chat-completions-json-v1', effectiveMaxOutputTokens: 512,
+    orderedEligibleBodiesDigest: sha(canonical(bodies)) })));
+  assert.equal(planned.wireGuardDigest, planEvaluation({ ...route, maxOutputTokens: 512 }).wireGuardDigest);
+  const smaller = planEvaluation({ ...route, maxOutputTokens: 64 });
+  assert.notEqual(smaller.wireGuardDigest, planned.wireGuardDigest);
+  assert.equal(smaller.routeGuardDigest, planned.routeGuardDigest);
+  assert.equal(smaller.guardDigest, planned.guardDigest);
+  const reordered = structuredClone(dataset);
+  for (const item of reordered.cases) item.state = Object.fromEntries(Object.entries(item.state).reverse());
+  const reorderedPlan = planEvaluation({ ...route, dataset: reordered });
+  assert.equal(reorderedPlan.dataset.digest, planned.dataset.digest);
+  assert.equal(reorderedPlan.routeGuardDigest, planned.routeGuardDigest);
+  assert.notEqual(reorderedPlan.wireGuardDigest, planned.wireGuardDigest);
+  const deferredOnly = structuredClone(dataset);
+  deferredOnly.cases[3].state = Object.fromEntries(Object.entries(deferredOnly.cases[3].state).reverse());
+  assert.notEqual(planEvaluation({ ...route, dataset: deferredOnly }).wireGuardDigest, planned.wireGuardDigest);
+  const oversized = structuredClone(dataset);
+  oversized.pack.questions.match.instructions = 'q'.repeat(28000);
+  oversized.cases[0].state = { blob: 's'.repeat(5000), tag: 'fixture' };
+  const oversizedPlan = planEvaluation({ ...route, dataset: oversized });
+  assert.equal(oversizedPlan.wirePreflight.wireRejectedCases, 1);
+  const reorderedRejected = structuredClone(oversized);
+  reorderedRejected.cases[0].state = { tag: 'fixture', blob: 's'.repeat(5000) };
+  const rejectedPlan = planEvaluation({ ...route, dataset: reorderedRejected });
+  assert.equal(rejectedPlan.routeGuardDigest, oversizedPlan.routeGuardDigest);
+  assert.notEqual(rejectedPlan.wireGuardDigest, oversizedPlan.wireGuardDigest);
+  const jev = planEvaluation({ ...route, provider: 'jev' });
+  assert.match(jev.wireGuardDigest, /^[a-f0-9]{64}$/);
+  assert.notEqual(jev.wireGuardDigest, planned.wireGuardDigest);
+  const jevBodies = dataset.cases.map((item, index) => {
+    const body = jevRequestBody(route.modelId, item.state, dataset.pack.questions);
+    return { caseId: item.id, byteLength: Buffer.byteLength(body, 'utf8'),
+      bodyDigest: sha(body), sendable: true, selected: index === 0 };
+  });
+  assert.equal(jev.wireGuardDigest, sha(canonical({ schemaVersion: 1,
+    kind: 'reflexmesh-evaluation-wire-plan-guard', routeGuardDigest: jev.routeGuardDigest,
+    serializerId: 'jev-systemone-json-v1', effectiveMaxOutputTokens: null,
+    orderedEligibleBodiesDigest: sha(canonical(jevBodies)) })));
 });
 test('plan guard rejects changed dataset, provider or cap before key access and output reservation', async t => {
   const f = await fixtures(t), plan = planEvaluation({ dataset: f.dataset, provider: 'deepseek', maxRequests: 1 });
@@ -310,6 +366,102 @@ test('route guard rejects drift before key access and freezes matching route thr
     createProvider() { return fixtureDeployment('champion'); },
   }), /Evaluation route binding mismatch/);
   assert.equal(existsSync(wrongOut), false);
+});
+test('wire guard rejects body and token drift before credentials, provider construction or output reservation', async t => {
+  const f = await fixtures(t), path = join(f.dir, 'dataset.json');
+  const route = { dataset: f.dataset, provider: 'deepseek', maxRequests: 1,
+    modelId: 'test-model', revision: 'offline-v1', maxOutputTokens: 64 };
+  const plan = planEvaluation(route);
+  const args = (datasetPath, out, extra = []) => ['run', '--dataset', datasetPath,
+    '--deployment-id', 'wire-run', '--id', 'wire-run-1', '--out', out,
+    '--max-requests', '1', '--allow-remote', '--expect-wire-plan-digest', plan.wireGuardDigest, ...extra];
+  const envValues = { REFLEXMESH_PROVIDER: 'deepseek', DEEPSEEK_MODEL: route.modelId,
+    REFLEXMESH_PROVIDER_REVISION: route.revision };
+  let factoryCalls = 0;
+  const guardedEnv = new Proxy(envValues, { get(target, key) {
+    if (!Object.hasOwn(target, key)) throw new Error('Credential accessed');
+    return target[key];
+  } });
+  const noFactory = () => { factoryCalls++; throw new Error('Provider constructed'); };
+  const capOut = join(f.dir, 'wire-cap-drift.json');
+  await assert.rejects(evaluationMain(args(path, capOut), sink(), { env: guardedEnv, createProvider: noFactory }),
+    /Evaluation wire plan mismatch/);
+  assert.equal(existsSync(capOut), false);
+  const reordered = structuredClone(f.dataset);
+  for (const item of reordered.cases) item.state = Object.fromEntries(Object.entries(item.state).reverse());
+  const reorderedPath = join(f.dir, 'wire-reordered.json');
+  writeFileSync(reorderedPath, JSON.stringify(reordered));
+  const orderOut = join(f.dir, 'wire-order-drift.json');
+  await assert.rejects(evaluationMain(args(reorderedPath, orderOut, ['--max-output-tokens', '64']), sink(),
+    { env: guardedEnv, createProvider: noFactory }), /Evaluation wire plan mismatch/);
+  assert.equal(existsSync(orderOut), false);
+  for (const [name, changed] of [
+    ['provider', { REFLEXMESH_PROVIDER: 'jev', TYPESAFE_MODEL: 'test-model' }],
+    ['model', { DEEPSEEK_MODEL: 'other-model' }],
+    ['revision', { REFLEXMESH_PROVIDER_REVISION: 'other-revision' }],
+  ]) {
+    const changedOut = join(f.dir, `wire-${name}-drift.json`);
+    await assert.rejects(evaluationMain(args(path, changedOut,
+      name === 'provider' ? [] : ['--max-output-tokens', '64']), sink(), {
+      env: new Proxy({ ...envValues, ...changed }, { get(target, key) {
+        if (!Object.hasOwn(target, key)) throw new Error('Credential accessed');
+        return target[key];
+      } }), createProvider: noFactory,
+    }), /Evaluation wire plan mismatch/);
+    assert.equal(existsSync(changedOut), false);
+  }
+  assert.equal(factoryCalls, 0);
+  let modelReads = 0, transportCalls = 0, sentBody;
+  const changingEnv = new Proxy({ REFLEXMESH_PROVIDER: 'deepseek', REFLEXMESH_PROVIDER_REVISION: route.revision,
+    REFLEXMESH_ALLOW_REMOTE: 'true', DEEPSEEK_API_KEY: 'offline-fixture-key' }, { get(target, key) {
+    if (key === 'DEEPSEEK_MODEL') { modelReads++; return modelReads === 1 ? route.modelId : 'changed-after-check'; }
+    return target[key];
+  } });
+  const out = join(f.dir, 'wire-matched.json');
+  const status = await evaluationMain(args(path, out, ['--max-output-tokens', '64']), sink(), {
+    env: changingEnv, createProvider: (selectedEnv, options) => createEvaluationProvider(selectedEnv, {
+      ...options, fetch: async (_url, request) => {
+        transportCalls++; sentBody = request.body;
+        assert.equal(JSON.parse(request.body).model, route.modelId);
+        assert.equal(JSON.parse(request.body).max_tokens, 64);
+        return Response.json({ object: 'chat.completion', model: route.modelId,
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
+            content: JSON.stringify({ answers: { match: { type: 'noul', noul: 0.8 } } }) } }],
+          usage: { prompt_tokens: 12, completion_tokens: 8 } });
+      },
+    }),
+  });
+  assert.equal(status, 0);
+  assert.equal(modelReads, 1);
+  assert.equal(transportCalls, 1);
+  assert.equal(sentBody, deepSeekRequestBody(route.modelId, f.dataset.cases[0].state,
+    f.dataset.pack.questions, 64));
+  assert.equal(readEvaluationJson(out).rows[0].status, 'ok');
+});
+test('Jev wire guard works alone or beside older guards without a token option', async t => {
+  const f = await fixtures(t), path = join(f.dir, 'dataset.json'), out = join(f.dir, 'jev-wire.json');
+  const plan = planEvaluation({ dataset: f.dataset, provider: 'jev', maxRequests: 1,
+    modelId: 'jev-fixture', revision: 'offline-v1' });
+  let calls = 0;
+  const args = ['run', '--dataset', path, '--deployment-id', 'jev-wire', '--id', 'jev-wire-1',
+    '--out', out, '--max-requests', '1', '--allow-remote', '--expect-plan-digest', plan.guardDigest,
+    '--expect-route-plan-digest', plan.routeGuardDigest, '--expect-wire-plan-digest', plan.wireGuardDigest];
+  assert.equal(await evaluationMain(args, sink(), {
+    env: { REFLEXMESH_PROVIDER: 'jev', TYPESAFE_MODEL: 'jev-fixture',
+      REFLEXMESH_PROVIDER_REVISION: 'offline-v1', REFLEXMESH_ALLOW_REMOTE: 'true', TYPESAFE_API_KEY: 'offline-fixture-key' },
+    createProvider: (env, options) => createEvaluationProvider(env, { ...options, fetch: async () => {
+      calls++; return Response.json({ model: 'jev-fixture', answers: { match: { type: 'noul', noul: 0.8 } } });
+    } }),
+  }), 0);
+  assert.equal(calls, 1);
+  assert.equal(readEvaluationJson(out).rows[0].status, 'ok');
+  const rejectedOut = join(f.dir, 'jev-wire-token.json');
+  await assert.rejects(evaluationMain([...args.map(value => value === out ? rejectedOut : value),
+    '--max-output-tokens', '64'], sink(), {
+    env: { REFLEXMESH_PROVIDER: 'jev', TYPESAFE_MODEL: 'jev-fixture', REFLEXMESH_PROVIDER_REVISION: 'offline-v1' },
+    createProvider() { throw new Error('Provider constructed'); },
+  }), /DeepSeek output token limit requires a declared route/);
+  assert.equal(existsSync(rejectedOut), false);
 });
 test('imported non-fixture predictions remain pure local declarations, not authenticated measurements', async t => {
   const f = await fixtures(t);

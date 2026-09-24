@@ -6,6 +6,9 @@ import { assertProviderInput } from '../dist/core/provider-capabilities.js';
 import { evaluationDatasetDigest, validateEvaluationDataset } from './evaluation-contract.mjs';
 
 const CAPABILITIES = Object.freeze({ deepseek: DEEPSEEK_ESTIMATE_CAPABILITIES, jev: JEV_CAPABILITIES });
+const WIRE_SERIALIZERS = Object.freeze({
+  deepseek: 'deepseek-chat-completions-json-v1', jev: 'jev-systemone-json-v1',
+});
 export const EVALUATION_PROVIDER_IDS = Object.freeze({
   deepseek: 'deepseek/binary-json-estimate-v1', jev: 'typesafe/jev',
 });
@@ -35,19 +38,29 @@ export function planEvaluation({ dataset: input, provider, maxRequests, modelId,
   }
   const selected = eligible.slice(0, maxRequests);
   let wirePreflight = { status: 'not_checked', reason: 'model_not_declared' };
+  let wireGuardInput = null;
   if (routeDeclared) {
     const outputTokens = provider === 'deepseek' ? maxOutputTokens ?? 512 : null;
     const sendable = [];
     const wireBytes = new Map();
+    const wireBodies = [];
     for (const item of eligible) {
       const body = provider === 'deepseek'
         ? deepSeekRequestBody(modelId, item.state, dataset.pack.questions, outputTokens)
         : jevRequestBody(modelId, item.state, dataset.pack.questions);
       const bytes = Buffer.byteLength(body, 'utf8');
-      if (bytes > (provider === 'deepseek' ? DEEPSEEK_REQUEST_BYTE_LIMIT : JEV_REQUEST_BYTE_LIMIT)) continue;
+      const withinLimit = bytes <= (provider === 'deepseek' ? DEEPSEEK_REQUEST_BYTE_LIMIT : JEV_REQUEST_BYTE_LIMIT);
+      wireBodies.push({ caseId: item.id, byteLength: bytes,
+        bodyDigest: createHash('sha256').update(body, 'utf8').digest('hex'), sendable: withinLimit });
+      if (!withinLimit) continue;
       sendable.push(item); wireBytes.set(item.id, bytes);
     }
     const wireSelected = sendable.slice(0, maxRequests);
+    const selectedIds = new Set(wireSelected.map(item => item.id));
+    wireGuardInput = { serializerId: WIRE_SERIALIZERS[provider], effectiveMaxOutputTokens: outputTokens,
+      orderedEligibleBodiesDigest: createHash('sha256').update(canonical(wireBodies.map(item => ({
+        ...item, selected: selectedIds.has(item.caseId),
+      })))).digest('hex') };
     wirePreflight = { status: 'checked', ...(provider === 'deepseek' ? { maxOutputTokens: outputTokens } : {}),
       sendableCases: sendable.length, wireRejectedCases: eligible.length - sendable.length,
       requestUpperBound: wireSelected.length,
@@ -65,11 +78,15 @@ export function planEvaluation({ dataset: input, provider, maxRequests, modelId,
   const routeGuardDigest = routeDeclared ? createHash('sha256').update(canonical({
     schemaVersion: 1, kind: 'reflexmesh-evaluation-route-plan-guard',
     guardDigest, route })).digest('hex') : null;
+  const wireGuardDigest = routeDeclared ? createHash('sha256').update(canonical({
+    schemaVersion: 1, kind: 'reflexmesh-evaluation-wire-plan-guard',
+    routeGuardDigest, ...wireGuardInput,
+  })).digest('hex') : null;
   return snapshot({ schemaVersion: 1, kind: 'reflexmesh-evaluation-plan',
     dataset: { id: dataset.id, revision: dataset.revision, digest: datasetDigest,
       dataKind: dataset.dataKind, cases: dataset.cases.length, questions: Object.keys(dataset.pack.questions).length },
     provider, probabilitySemantics: capabilities.probabilitySemantics, capabilitiesDigest, guardDigest,
-    ...(routeDeclared ? { declaredRoute: route, routeGuardDigest } : {}),
+    ...(routeDeclared ? { declaredRoute: route, routeGuardDigest, wireGuardDigest } : {}),
     maxRequests, eligibleCases: eligible.length, unsupportedCases: dataset.cases.length - eligible.length,
     requestUpperBound: selected.length, deferredByRequestCapIfNoFailure: eligible.length - selected.length,
     selectedCanonicalInputBytes: canonicalInputBytes, wirePreflight,
