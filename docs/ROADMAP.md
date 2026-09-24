@@ -71,6 +71,8 @@ separates capability compatibility from exact locally serialized request-body
 compatibility when a route is declared. The runner skips known unsendable
 cases without spending a request slot; endpoint, model quality and cost are
 still outside this check.
+Its [PR/main integration readback](VALIDATION-EVALUATION-WIRE-PREFLIGHT-INTEGRATION-T001.md)
+keeps remote CI separate from the local serialization evidence.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
