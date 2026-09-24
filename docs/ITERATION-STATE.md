@@ -12,7 +12,31 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: installed DeepSeek observer teardown at missing result
+## Latest milestone: live DeepSeek shutdown drain diagnostics
+
+On 2026-09-25, [PR #33](https://github.com/luomo66ccff/reflexmesh/pull/33)
+fixed an operational misreport: while one accepted result was already missing
+and another admission/storage callback still held the drain, Loader readiness
+previously displayed zero missing results until disposal finished. It now
+reads the live count and exposes a frozen, payload-free `shutdownDrain`
+snapshot. The programmatic plugin offers the same read-only status while
+mounted. At the result-window boundary, remaining admission or captured-result
+work emits one fixed diagnostic but remains owned until it settles; the Loader
+does not close its kernel early. See [local validation](VALIDATION-DEEPSEEK-DRAIN-T001.md).
+
+Local checks passed **846 tests: 844 passed, zero failed, two local
+symlink-privilege skips**, plus the demo and installed DeepSeek Harness
+0.1.2-rc.1 isolated probes: teardown **9/9**, native **13/13**, Agent **12/12**,
+lifecycle **17/17**, subagent **12/12**. All five jobs passed on
+[PR exact-head CI 36032221796](https://github.com/luomo66ccff/reflexmesh/actions/runs/36032221796)
+and [main CI 36032645585](https://github.com/luomo66ccff/reflexmesh/actions/runs/36032645585).
+Merge commit `88bb40d33b5bd6846c070cc01616607de1d384e3` has the reviewed
+tree `b8f81a012854954cce4c1f73f38c6004c1329e54`. This is an honest
+diagnostic, not a total shutdown deadline: a callback that never settles can
+still prevent safe closure, and a blocked event loop can prevent the timer
+from firing. No real-model or default-profile acceptance is implied.
+
+## Previous milestone: installed DeepSeek observer teardown at missing result
 
 On 2026-09-25, [PR #31](https://github.com/luomo66ccff/reflexmesh/pull/31)
 added an opt-in isolated probe against installed DeepSeek Harness 0.1.2-rc.1.
@@ -725,7 +749,7 @@ the following implementation and validation details remain historical evidence.
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation and observer unload while a native result is still absent, followed by a late result; one separate authorized real-model round trip is also recorded. Permanent result absence, hung admission/storage callbacks and host-tool timeout policy remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation and observer unload while a native result is still absent, followed by a late result; one separate authorized real-model round trip is also recorded. Live, payload-free drain diagnostics fix the waiting-period missing-count misreport but do not safely terminate an arbitrary callback. Permanent result absence, hung admission/storage callbacks and host-tool timeout policy remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
