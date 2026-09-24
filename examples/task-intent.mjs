@@ -94,11 +94,17 @@ function summaryOutput({ runtime, report, outputDir, retained }) {
     'ReflexMesh first-run lesson complete.',
     `Runtime: Node ${runtime.nodeVersion ?? 'unknown'}; SQLite ${runtime.sqliteVersion ?? 'unknown'}; WAL write gate passed.`,
     `Synthetic evidence: ${report.decisionCount} decisions, ${report.totalFixturePredictions} fixture prediction, ${report.labelsCreated} labels.`,
+    `No selected task -> ${report.missingIntent.effect}; fixture provider calls: ${report.missingIntent.providerCalls}.`,
+    `Selected task summary -> ${report.selectedIntent.effect} in shadow mode; repeated call reused the decision: ${report.duplicate.replayed}.`,
+    `Fixture host report: ${report.hostOutcomeTransition.before} -> ${report.hostOutcomeTransition.after} (${report.hostOutcomeTransition.observations} observation); labels created: ${report.labelsCreated}.`,
+    `After task clear -> ${report.afterStop.effect}; coverage: ${report.afterStop.coverage} (old summary not reused).`,
+    'A shadow allow is not host permission; a missing host report is not proof that a tool did not run.',
     'No model, external provider, user profile or host tool was accessed.',
   ];
   if (retained) lines.push(`Synthetic ledger retained at ${JSON.stringify(join(outputDir, 'ledger.sqlite'))}.`,
-    'Read-only commands and interpretation notes are in START-HERE.md.');
-  else lines.push('Temporary ledger and task-summary cache were removed.');
+    'Next: open START-HERE.md in that directory for copyable read-only inspection commands.');
+  else lines.push('Temporary ledger and task-summary cache were removed.',
+    'Next: npm run demo:evidence for the detailed walkthrough, or rerun with -- --out-dir NEW_DIRECTORY to inspect a retained fixture.');
   return lines.join('\n') + '\n';
 }
 
@@ -145,6 +151,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
     const beforeOutcome = kernel.evidenceSnapshot(assessed.decisionId);
     const replay = await boundary.before(readCall, selected);
     boundary.after(readCall, 'succeeded', { synthetic: true, message: 'Fixture only; no actual tool ran' }, 'test-oracle');
+    const afterOutcome = kernel.evidenceSnapshot(assessed.decisionId);
     cache.clear(scope);
     const cleared = await boundary.before({ ...call, callId: 'after-stop' }, cache.current(scope));
     const receipt = boundary.inspect(readCall);
@@ -152,6 +159,8 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
       missingIntent: { effect: missing.verdict.effect, providerCalls: beforeCapture },
       selectedIntent: { effect: assessed.verdict.effect, receipt: assessed.taskEvidence },
       duplicate: { replayed: replay.replayed },
+      hostOutcomeTransition: { before: beforeOutcome.hostOutcome.status,
+        after: afterOutcome.hostOutcome.status, observations: afterOutcome.hostOutcome.count },
       afterStop: { effect: cleared.verdict.effect, coverage: cleared.taskEvidence.coverage },
       totalFixturePredictions: predictions,
       selectedSummaryInJournal: JSON.stringify(receipt).includes(selected.summary),

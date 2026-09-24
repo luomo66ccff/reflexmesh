@@ -127,6 +127,9 @@ post-merge CI without promoting local first-run evidence to live-host proof.
 The subsequent Windows Node 22 hook-fixture CI failure and bounded test-only
 repair are recorded in [t006](VALIDATION-FIRST-RUN-T006.md); this is not a
 runtime hook latency result.
+The [t007 narrated first-run lesson](VALIDATION-FIRST-RUN-T007.md) now
+explains the task/decision/host-outcome/label separation in its default
+summary and gives a next step, without adding a host or model dependency.
 
 **2026-09-24 Claude host compatibility:** [PR #27](https://github.com/luomo66ccff/reflexmesh/pull/27)
 merged strict support for installed Claude Code 2.1.280, with isolated native
