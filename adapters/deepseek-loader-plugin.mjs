@@ -21,7 +21,7 @@ const plugin = {
     mkdirSync(dirname(options.dbPath), { recursive: true, mode: 0o700 });
     const kernel = new SqliteKernel(options.dbPath);
     let taskSource, observer;
-    let observerDrained = false, kernelClosed = false, shutdownMissingResults = 0;
+    let observerDrained = false, kernelClosed = false;
     try {
       taskSource = createDeepSeekTaskSource(ctx, { intentMode: options.intentMode });
       const provider = { id: 'abstain', capabilities: ABSTAIN_CAPABILITIES,
@@ -37,7 +37,10 @@ const plugin = {
       ctx.provide('reflexmeshObserverReady', {
         get observerDrained() { return observerDrained; },
         get kernelClosed() { return kernelClosed; },
-        get shutdownMissingResults() { return shutdownMissingResults; },
+        // These read through the observer while disposal is pending; a hung
+        // admission/result write must not make the visible count stale.
+        get shutdownMissingResults() { return observer.drainStatus().missingResults; },
+        get shutdownDrain() { return observer.drainStatus(); },
       });
     } catch (error) {
       taskSource?.dispose();
@@ -48,8 +51,7 @@ const plugin = {
     let disposal;
     return () => disposal ??= (async () => {
       taskSource.dispose();
-      const receipt = await observer.dispose();
-      shutdownMissingResults = receipt.missingResults;
+      await observer.dispose();
       observerDrained = true;
       kernel.close();
       kernelClosed = true;

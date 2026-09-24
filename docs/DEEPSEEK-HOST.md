@@ -28,6 +28,9 @@ const fiber = await ctx.plugin(observer);
 // After awaiting a host tool execution, drain its queued observations:
 await observer.flush();
 
+// Optional, read-only live diagnostic while mounted (null after unmount):
+const drain = observer.drainStatus();
+
 // Stop dispatching new host tools and settle/cancel active tools in HOST code.
 await fiber.dispose();
 // Only now may the storage owner close its kernel.
@@ -59,6 +62,18 @@ share one ordered effect in the original plugin context. This is an observer
 shutdown budget, not a host tool deadline or cancellation mechanism. The host
 must still quiesce its tools; a permanently hung admission or storage callback
 can still prevent safe closure. Never close the caller-owned kernel early.
+`drainStatus()` returns a frozen scalar snapshot with `closing`,
+`resultWindowClosed`, `pendingBefore`, `pendingResults`, `pendingAfter` and
+`missingResults`; it contains no call, Agent or result data. The `pendingAfter`
+count includes journal work queued but not yet running. A saved snapshot does
+not change as later work settles. If the result-reception window closes with
+admission or captured-result storage still pending, the observer emits one
+`reflexmesh_shadow_shutdown_drain_pending` diagnostic and continues waiting.
+This means pending **at the window boundary**, not necessarily hung forever;
+with a zero-length window even normal short drain work may qualify. The
+diagnostic is not permission to close storage, cancel a tool or retry it.
+The [drain validation](VALIDATION-DEEPSEEK-DRAIN-T001.md) separates this
+read-only diagnostic from an actual total shutdown guarantee.
 
 At most 256 accepted observations are tracked at once. Overflow emits a fixed
 diagnostic and skips that observation while still delegating to host policy.

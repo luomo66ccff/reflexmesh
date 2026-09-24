@@ -103,9 +103,23 @@ ledger and appear in read-only attention. The observer never cancels or retries
 the host tool, fabricates a result, or treats absence as proof of no effects.
 It still waits for any in-flight admission or captured-result write before
 closing its ledger. `reflexmeshObserverReady.shutdownMissingResults` reports
-the number abandoned at shutdown; `observerDrained` means observer storage
-work is drained, not that every host call produced an outcome. A custom
-before/after callback that never settles can still prevent safe closure.
+the live number abandoned at shutdown, including while storage work still
+prevents completion. The read-only `shutdownDrain` getter returns a frozen
+scalar snapshot: `closing`, `resultWindowClosed`, `pendingBefore`,
+`pendingResults`, `pendingAfter` and `missingResults`. Counts reveal no call,
+Agent or result payloads. If the result window closes with admission or
+captured-result storage pending, one fixed
+`reflexmesh_shadow_shutdown_drain_pending` warning is emitted; it means
+pending at that instant, not necessarily permanently hung. `observerDrained`
+means observer storage work is actually drained, not that every host call
+produced an outcome. `kernelClosed` becomes true only after that drain. A
+custom before/after callback that never settles can still prevent safe
+closure; do not interpret the warning as permission to force-close the ledger.
+An integration that monitors unload should capture the readiness object
+**before** starting Loader disposal. Cordis may remove the service during
+unload, so a fresh `ctx.get('reflexmeshObserverReady')` is not a reliable way
+to discover a pending drain; getters on the previously captured object remain
+live. Do not treat this object as a host-tool cancellation handle.
 
 ## Reproduce the isolated CLI/Agent probe
 
