@@ -143,6 +143,12 @@ it neither proves a host effect was absent nor permits a retry. Keep the
 readiness reference captured before unload to inspect these fields.
 An event-loop-blocking callback can prevent the timer from running, so the
 configured value is not a hard wall-clock guarantee.
+For an account-free check against a trusted installed Harness 0.1.2-rc.1,
+run `node scripts/real-host-compat.mjs --host deepseek --deepseek-mode
+observer-fence --deepseek-package-root PATH_TO_DSH` after `npm run build`.
+The [installed-host report](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md) describes
+the injected pending result-storage callback, the native Agent result and
+the evidence limits. This probe uses only a disposable synthetic profile.
 An integration that monitors unload should capture the readiness object
 **before** starting Loader disposal. Cordis may remove the service during
 unload, so a fresh `ctx.get('reflexmeshObserverReady')` is not a reliable way

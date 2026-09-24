@@ -18,6 +18,7 @@ import { AGENT_EVIDENCE, evaluateAgentProbeOutput } from './deepseek-agent-contr
 import { LIFECYCLE_EVIDENCE, evaluateLifecycleProbeOutput } from './deepseek-lifecycle-contract.mjs';
 import { SUBAGENT_EVIDENCE, evaluateSubagentProbeOutput } from './deepseek-subagent-contract.mjs';
 import { TEARDOWN_EVIDENCE, evaluateTeardownProbeOutput } from './deepseek-teardown-contract.mjs';
+import { FENCE_EVIDENCE, evaluateFenceProbeOutput } from './deepseek-fence-contract.mjs';
 
 const HOSTS = new Set(['codex', 'claude', 'deepseek', 'all']);
 const CODEX_MARKER = 'REFLEXMESH_CODEX_COMPAT_OK';
@@ -97,7 +98,7 @@ export function parseArgs(argv, defaults = {}) {
     else parsed[scalar] = current.value;
   }
   if (!HOSTS.has(parsed.host)) throw new Error('invalid_host');
-  if (!['native', 'agent-cli', 'lifecycle-matrix', 'subagent-isolation', 'observer-teardown'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
+  if (!['native', 'agent-cli', 'lifecycle-matrix', 'subagent-isolation', 'observer-teardown', 'observer-fence'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
   if (parsed.deepseekMode !== 'native' && !parsed.deepseekPackageRoot) throw new Error('deepseek_package_root_required');
   parsed.timeoutMs = boundedInteger(String(parsed.timeoutMs), 'timeout_ms', 1_000, 600_000);
   parsed.versionTimeoutMs = boundedInteger(String(parsed.versionTimeoutMs), 'version_timeout_ms', 500, 60_000);
@@ -659,18 +660,20 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   const lifecycleMode = options.deepseekMode === 'lifecycle-matrix';
   const subagentMode = options.deepseekMode === 'subagent-isolation';
   const teardownMode = options.deepseekMode === 'observer-teardown';
-  const agentLike = agentMode || lifecycleMode || subagentMode || teardownMode;
-  const requestedLevel = teardownMode ? 'cli_agent_observer_teardown' : subagentMode ? 'cli_agent_subagent_isolation'
+  const fenceMode = options.deepseekMode === 'observer-fence';
+  const agentLike = agentMode || lifecycleMode || subagentMode || teardownMode || fenceMode;
+  const requestedLevel = fenceMode ? 'cli_agent_observer_fence' : teardownMode ? 'cli_agent_observer_teardown' : subagentMode ? 'cli_agent_subagent_isolation'
     : lifecycleMode ? 'cli_agent_lifecycle_matrix' : agentMode ? 'cli_agent_loop' : 'native_tool_pipeline';
-  const extra = { ...(teardownMode ? TEARDOWN_EVIDENCE : subagentMode ? SUBAGENT_EVIDENCE : lifecycleMode ? LIFECYCLE_EVIDENCE : agentMode ? AGENT_EVIDENCE
+  const extra = { ...(fenceMode ? FENCE_EVIDENCE : teardownMode ? TEARDOWN_EVIDENCE : subagentMode ? SUBAGENT_EVIDENCE : lifecycleMode ? LIFECYCLE_EVIDENCE : agentMode ? AGENT_EVIDENCE
     : { agentE2E: false, classification: 'synthetic_classification' }),
     evidenceLevel: 'none', requestedEvidenceLevel: requestedLevel,
     ...(agentLike ? { agentLoopExercised: false } : {}) };
   const spec = processSpec(options.nodeCommand, options.nodeCommandArgs, 'node', process.env);
   if (!spec) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'node_command_not_found', [], started, extra);
-  const script = teardownMode ? 'deepseek-teardown-probe.mjs' : subagentMode ? 'deepseek-subagent-probe.mjs' : lifecycleMode ? 'deepseek-lifecycle-probe.mjs'
+  const script = fenceMode || teardownMode ? 'deepseek-teardown-probe.mjs' : subagentMode ? 'deepseek-subagent-probe.mjs' : lifecycleMode ? 'deepseek-lifecycle-probe.mjs'
     : agentMode ? 'deepseek-agent-probe.mjs' : 'deepseek-runtime-probe.mjs';
-  const child = await runBounded(spec.executable, [...spec.prefixArgs, join(options.repoRoot, 'scripts', script), options.deepseekPackageRoot], {
+  const child = await runBounded(spec.executable, [...spec.prefixArgs, join(options.repoRoot, 'scripts', script), options.deepseekPackageRoot,
+    ...(fenceMode ? ['fenced-after'] : [])], {
     cwd: options.repoRoot,
     env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR },
     timeoutMs: options.timeoutMs,
@@ -681,7 +684,7 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   if (!child.ok && !(child.kind === 'nonzero_exit' && typeof child.stdout === 'string')) {
     return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', processFailureReason(child), [], started, extra);
   }
-  const assessed = teardownMode ? evaluateTeardownProbeOutput(child.stdout) : subagentMode ? evaluateSubagentProbeOutput(child.stdout) : lifecycleMode ? evaluateLifecycleProbeOutput(child.stdout)
+  const assessed = fenceMode ? evaluateFenceProbeOutput(child.stdout) : teardownMode ? evaluateTeardownProbeOutput(child.stdout) : subagentMode ? evaluateSubagentProbeOutput(child.stdout) : lifecycleMode ? evaluateLifecycleProbeOutput(child.stdout)
     : agentMode ? evaluateAgentProbeOutput(child.stdout) : evaluateDeepSeekProbeOutput(child.stdout);
   if (!assessed) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_output_invalid', [], started, extra);
   if (child.ok !== (assessed.status === 'passed')) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_exit_mismatch', [], started, extra);
