@@ -177,7 +177,8 @@ Next: installed-host permanent-result-loss and broader hung-callback
 scenarios, then representative independent-model quality. An isolated
 [installed-host fence probe](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md) now
 exercises one deliberately delayed `after` callback through the official
-Loader and native Agent, but does not prove arbitrary or permanent hangs.
+Loader and native Agent; [PR #37 integration](VALIDATION-DEEPSEEK-FENCE-HOST-INTEGRATION-T001.md)
+is verified, but arbitrary or permanent hangs remain unproven.
 This feature does not certify whole-host cancellation or arbitrary callbacks.
 
 ## v0.3: memory governance and calibrated comparison

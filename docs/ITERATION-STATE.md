@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: installed DeepSeek fenced-result probe
+## Latest milestone: installed DeepSeek fenced-result probe
 
 On 2026-09-25, an opt-in, isolated installed DeepSeek Harness 0.1.2-rc.1
 probe exercised the Loader's existing fenced-drain option with one genuine
@@ -24,10 +24,14 @@ truthfully retained a missing observer outcome and zero labels. See the
 [local installed-host receipt](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md).
 The new mode passed **10/10** assertions; local checks passed **857 tests:
 855 passed, zero failed, two symlink-privilege skips**, the demo, and the
-existing installed teardown regression **9/9**. Publication, review and CI
-are not claimed in this local snapshot. This injected asynchronous delay is
-not proof of arbitrary or permanently hung callback safety, a blocked event
-loop, default-profile behavior, or total host shutdown.
+existing installed teardown regression **9/9**. [PR #37](https://github.com/luomo66ccff/reflexmesh/pull/37)
+merged the reviewed tree `6b4bbbf63d14580701c2b9d093674c78eeb77ed7`;
+all five jobs passed on its [exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36043066525)
+and again on the [main merge commit](https://github.com/luomo66ccff/reflexmesh/actions/runs/36043751219).
+See the distinct [integration readback](VALIDATION-DEEPSEEK-FENCE-HOST-INTEGRATION-T001.md).
+This injected asynchronous delay is not proof of arbitrary or permanently
+hung callback safety, a blocked event loop, default-profile behavior, or
+total host shutdown.
 
 ## Previous milestone: fenced DeepSeek Loader drain
 
