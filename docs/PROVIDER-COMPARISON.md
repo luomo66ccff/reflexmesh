@@ -42,7 +42,8 @@ Use `--json` for the complete machine-readable report, `--bins N` to select
 Validate and compare do not load provider configuration or credentials.
 
 Before authorizing a paid run, preview the same trusted capability gate used
-by the runner, without a key, model, label file or network request:
+by the runner, without a key, provider construction, label file or network
+request:
 
 ```bash
 npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 2
@@ -71,6 +72,31 @@ accident-prevention check: anyone with the dataset can recompute it, and it
 does not bind a model ID, model revision, price, account, label, actual wire
 body or human approval. Keep the explicit `--allow-remote` and environment
 opt-in; review the current dataset and route before each paid run.
+
+To catch a changed **declared model route**, supply its account-supported
+model ID and your evaluated revision to an offline plan:
+
+```bash
+npm run evaluation -- plan --dataset comparison-lesson/dataset.json --provider deepseek --max-requests 4 --model-id MODEL_ID_FROM_ACCOUNT --provider-revision EVALUATED_REVISION
+```
+
+This prints a separate `Route guard` (JSON field `routeGuardDigest`).
+Copy it to the same run command as
+`--expect-route-plan-digest SHA256_FROM_ROUTE_PLAN`. The route guard also
+binds the earlier dataset/provider/capability/request-cap plan and the
+trusted provider ID. At run time it compares the current
+`REFLEXMESH_PROVIDER`, matching model variable and
+`REFLEXMESH_PROVIDER_REVISION` **before** reading the key, constructing
+the provider or reserving output. The checked route is held stable through
+provider construction, and the constructed binding is compared before the
+output file is opened. The older `--expect-plan-digest` remains available
+and does **not** bind model/revision. Both options may be supplied.
+
+The model ID and revision are operator declarations, not independently
+verified remote identity. Aliases can change weights; the digest is not a
+signature, authorization, price or monetary limit. It does not bind the
+account, output-token cap, timeout, actual request bytes or labels. Review
+data egress and account controls separately.
 
 ## Three separate input artifacts
 
@@ -147,6 +173,9 @@ npm run evaluation -- run --dataset comparison-lesson/dataset.json --deployment-
 If you previewed this exact four-request dataset, add
 `--expect-plan-digest SHA256_FROM_THE_FOUR_REQUEST_PLAN` to that command.
 The sample is not a real plan digest and cannot be used as one.
+If you also supplied `--model-id` and `--provider-revision` to the plan,
+prefer `--expect-route-plan-digest SHA256_FROM_ROUTE_PLAN` for the stronger
+declared-route mismatch check. Its sample placeholder is not a real digest.
 
 The example's output-token flag is DeepSeek-only. Jev rejects that flag rather
 than pretending to enforce it. Both providers require an explicitly selected

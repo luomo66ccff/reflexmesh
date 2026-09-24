@@ -3,13 +3,13 @@ import { ContractError } from '../dist/index.js';
 import { compareEvaluations } from './evaluation-report.mjs';
 import { evaluationDatasetDigest, validateEvaluationDataset, validateEvaluationLabels } from './evaluation-contract.mjs';
 import { readEvaluationJson, reserveEvaluationOutput } from './evaluation-files.mjs';
-import { planEvaluation } from './evaluation-plan.mjs';
+import { EVALUATION_PROVIDER_IDS, planEvaluation } from './evaluation-plan.mjs';
 import { isDirectRun } from './direct-run.mjs';
 
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
-  npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--json]
-  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
+  npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV] [--json]
+  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
 Validate/plan/compare are local only. Plan checks declared capabilities, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
@@ -23,8 +23,8 @@ export function parseEvaluationOptions(argv) {
   if (!argv.length || argv.length === 1 && ['--help', '-h'].includes(argv[0])) return { help: true };
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
-    plan: ['dataset', 'provider', 'max-requests', 'json'],
-    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'timeout-ms', 'max-output-tokens'],
+    plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'json'],
+    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
   if (!allowed) fail('Expected validate, plan, run or compare; use --help');
   const options = { command };
@@ -46,6 +46,10 @@ export function parseEvaluationOptions(argv) {
   }
   if (options['expect-plan-digest'] !== undefined && !/^[a-f0-9]{64}$/.test(options['expect-plan-digest']))
     fail('Invalid evaluation plan digest');
+  if (options['expect-route-plan-digest'] !== undefined && !/^[a-f0-9]{64}$/.test(options['expect-route-plan-digest']))
+    fail('Invalid evaluation route plan digest');
+  if (command === 'plan' && (Object.hasOwn(options, 'model-id') !== Object.hasOwn(options, 'provider-revision')))
+    fail('Model ID and provider revision must be supplied together');
   return options;
 }
 const quote = value => JSON.stringify(value);
@@ -90,12 +94,15 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
     return 0;
   }
   if (options.command === 'plan') {
-    const plan = planEvaluation({ dataset, provider: options.provider, maxRequests: options['max-requests'] });
+    const plan = planEvaluation({ dataset, provider: options.provider, maxRequests: options['max-requests'],
+      modelId: options['model-id'], revision: options['provider-revision'] });
     output.write(options.json ? JSON.stringify(plan) + '\n'
       : `Offline evaluation plan: ${plan.dataset.cases} cases, ${plan.dataset.questions} questions; provider=${plan.provider}.\n`
         + `Compatible=${plan.eligibleCases}, unsupported=${plan.unsupportedCases}; at most ${plan.requestUpperBound} requests under cap ${plan.maxRequests}.\n`
         + `Deferred by cap if requests succeed=${plan.deferredByRequestCapIfNoFailure}; selected canonical state+question bytes=${plan.selectedCanonicalInputBytes}.\n`
-        + `Dataset digest: ${plan.dataset.digest}\nPlan guard: ${plan.guardDigest}\nNo key, label, host profile or network was accessed. This is not a wire-size, model-quality or cost guarantee.\n`);
+        + `Dataset digest: ${plan.dataset.digest}\nPlan guard: ${plan.guardDigest}\n`
+        + (plan.declaredRoute ? `Declared route: ${quote(plan.declaredRoute.modelId)} @ ${quote(plan.declaredRoute.revision)}.\nRoute guard: ${plan.routeGuardDigest}\n` : '')
+        + 'No key, label, host profile or network was accessed. A declared route is not verified model weights, wire size, quality or cost.\n');
     return 0;
   }
   if (options.command === 'compare') {
@@ -107,14 +114,37 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
   }
   // The three local branches above do not construct providers or read credentials.
   // An optional reviewed plan guard fails before provider/key access or output reservation.
-  if (options['expect-plan-digest'] !== undefined) {
-    const current = planEvaluation({ dataset, provider: env.REFLEXMESH_PROVIDER,
-      maxRequests: options['max-requests'] });
-    if (current.guardDigest !== options['expect-plan-digest'])
+  const routeGuard = options['expect-route-plan-digest'] !== undefined;
+  let providerEnv = env, expectedRoute = null;
+  if (options['expect-plan-digest'] !== undefined || routeGuard) {
+    const provider = env.REFLEXMESH_PROVIDER;
+    const modelKey = provider === 'deepseek' ? 'DEEPSEEK_MODEL' : provider === 'jev' ? 'TYPESAFE_MODEL' : null;
+    if (routeGuard && modelKey === null) throw new ContractError('Select deepseek or jev for evaluation route plan');
+    const modelId = routeGuard ? env[modelKey] : undefined;
+    const revision = routeGuard ? env.REFLEXMESH_PROVIDER_REVISION : undefined;
+    const current = planEvaluation({ dataset, provider, maxRequests: options['max-requests'], modelId, revision });
+    if (options['expect-plan-digest'] !== undefined && current.guardDigest !== options['expect-plan-digest'])
       throw new ContractError('Evaluation plan mismatch; no provider or output opened');
+    if (routeGuard && current.routeGuardDigest !== options['expect-route-plan-digest'])
+      throw new ContractError('Evaluation route plan mismatch; no provider or output opened');
+    if (routeGuard) {
+      // Keep the checked route stable across the dynamic import and provider construction.
+      expectedRoute = { providerId: EVALUATION_PROVIDER_IDS[provider], modelId, revision };
+      providerEnv = Object.create(env);
+      Object.defineProperties(providerEnv, {
+        REFLEXMESH_PROVIDER: { value: provider, enumerable: true },
+        REFLEXMESH_PROVIDER_REVISION: { value: revision, enumerable: true },
+        [modelKey]: { value: modelId, enumerable: true },
+      });
+    }
   }
   const factory = createProvider ?? (await import('./evaluation-provider.mjs')).createEvaluationProvider;
-  const selected = await factory(env, { maxOutputTokens: options['max-output-tokens'] });
+  const selected = await factory(providerEnv, { maxOutputTokens: options['max-output-tokens'] });
+  if (routeGuard && (selected?.binding?.providerId !== expectedRoute.providerId
+    || selected?.binding?.modelId !== expectedRoute.modelId
+    || selected?.binding?.revision !== expectedRoute.revision
+    || selected?.provider?.id !== selected.binding.providerId || selected?.provider?.model !== selected.binding.modelId))
+    throw new ContractError('Evaluation route binding mismatch; no output opened');
   const file = reserveEvaluationOutput(options.out);
   try {
     const { runEvaluation } = await import('./evaluation-runner.mjs');

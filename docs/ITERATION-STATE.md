@@ -12,7 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest merged milestone: narrated first-run evidence
+## Latest local milestone: declared model-route plan guard
+
+On 2026-09-25, the account-free evaluation plan gained optional declared
+model ID and provider revision fields with a separate route guard digest.
+An opted-in run now rejects a changed dataset, provider, request cap,
+trusted capability/provider ID, model ID or revision before key access,
+provider construction or output reservation. It holds the checked route
+stable through construction and checks the constructed binding. Existing
+unbound guards and runs remain compatible. This prevents accidental local
+route drift, not alias retargeting, account spending or data-egress
+authorization. See the [local validation](VALIDATION-EVALUATION-ROUTE-PLAN-T001.md).
+Local checks passed **862 tests: 860 passed, zero failed, two local
+symlink-privilege skips** and four offline demos. No paid request ran;
+DeepSeek key, model and revision were absent from this process. Remote
+review/CI, independent quality and broader host acceptance remain open.
+
+## Previous merged milestone: narrated first-run evidence
 
 On 2026-09-25, the default account-free `npm run first-run` summary was
 changed from counts alone to the fixture's actual task/decision/outcome

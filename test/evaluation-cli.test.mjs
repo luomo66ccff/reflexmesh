@@ -9,7 +9,8 @@ import { EVALUATION_FILE_LIMIT, readEvaluationJson, reserveEvaluationOutput } fr
 import { comparisonFixture, fixtureDeployment } from '../examples/evaluation-fixture.mjs';
 import { runEvaluation } from '../adapters/evaluation-runner.mjs';
 import { planEvaluation } from '../adapters/evaluation-plan.mjs';
-import { canonical } from '../dist/index.js';
+import { createEvaluationProvider } from '../adapters/evaluation-provider.mjs';
+import { canonical, DEEPSEEK_ESTIMATE_CAPABILITIES, JEV_CAPABILITIES } from '../dist/index.js';
 import { main as demo } from '../examples/provider-comparison.mjs';
 
 const sink = () => ({ text: '', write(text) { this.text += text; } });
@@ -38,8 +39,11 @@ test('evaluation CLI validates exact options and explicit request budgets before
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '0'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--allow-remote'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--labels', 'forbidden'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--model-id', 'route-only'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--provider-revision', 'revision-only'],
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
     [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
+    [...runArgs('a'), '--expect-route-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
@@ -143,6 +147,132 @@ test('plan guard rejects changed dataset, provider or cap before key access and 
   }), 0);
   assert.equal(factoryCalls, 1);
   assert.equal(readEvaluationJson(out).rows[0].status, 'ok');
+});
+test('declared route guard binds model and revision without reading environment or credentials', async t => {
+  const f = await fixtures(t);
+  const basis = planEvaluation({ dataset: f.dataset, provider: 'deepseek', maxRequests: 1 });
+  const route = { dataset: f.dataset, provider: 'deepseek', maxRequests: 1,
+    modelId: 'deepseek-v4-flash', revision: 'evaluated-route-v1' };
+  const planned = planEvaluation(route);
+  assert.equal(planned.guardDigest, basis.guardDigest);
+  assert.equal(basis.routeGuardDigest, undefined);
+  assert.deepEqual(planned.declaredRoute, { providerId: 'deepseek/binary-json-estimate-v1',
+    modelId: route.modelId, revision: route.revision });
+  assert.match(planned.routeGuardDigest, /^[a-f0-9]{64}$/);
+  assert.notEqual(planned.routeGuardDigest, planEvaluation({ ...route, modelId: 'deepseek-v4-fast' }).routeGuardDigest);
+  assert.notEqual(planned.routeGuardDigest, planEvaluation({ ...route, revision: 'evaluated-route-v2' }).routeGuardDigest);
+  const jev = planEvaluation({ dataset: f.dataset, provider: 'jev', maxRequests: 1,
+    modelId: 'jev-fixture', revision: route.revision });
+  assert.equal(jev.declaredRoute.providerId, 'typesafe/jev');
+  assert.notEqual(jev.routeGuardDigest, planned.routeGuardDigest);
+  assert.throws(() => planEvaluation({ ...route, modelId: 'bad model' }), /valid evaluation model/);
+  assert.throws(() => planEvaluation({ ...route, revision: 'bad\nrevision' }), /valid evaluation model/);
+  const output = sink();
+  assert.equal(await evaluationMain(['plan', '--dataset', join(f.dir, 'dataset.json'), '--provider', 'deepseek',
+    '--max-requests', '1', '--model-id', route.modelId, '--provider-revision', route.revision], output, {
+    env: new Proxy({}, { get() { throw new Error('Environment accessed'); } }),
+    createProvider() { throw new Error('Provider constructed'); },
+  }), 0);
+  assert.match(output.text, /Declared route: "deepseek-v4-flash" @ "evaluated-route-v1"/);
+  assert.match(output.text, /Route guard: [a-f0-9]{64}/);
+});
+test('route guard rejects drift before key access and freezes matching route through construction', async t => {
+  const f = await fixtures(t), path = join(f.dir, 'dataset.json');
+  const route = { dataset: f.dataset, provider: 'deepseek', maxRequests: 1,
+    modelId: 'deepseek-v4-flash', revision: 'evaluated-route-v1' };
+  const plan = planEvaluation(route), changed = structuredClone(f.dataset);
+  changed.cases[0].state.observedKey = 'changed';
+  const changedPath = join(f.dir, 'route-changed-dataset.json');
+  writeFileSync(changedPath, JSON.stringify(changed));
+  const args = (datasetPath, cap, out) => ['run', '--dataset', datasetPath, '--deployment-id', 'route-guarded-run',
+    '--id', 'route-guarded-run-1', '--out', out, '--max-requests', String(cap), '--allow-remote',
+    '--expect-route-plan-digest', plan.routeGuardDigest];
+  let factoryCalls = 0;
+  for (const [name, datasetPath, cap, provider, modelId, revision] of [
+    ['dataset', changedPath, 1, 'deepseek', route.modelId, route.revision],
+    ['provider', path, 1, 'jev', 'jev-model', route.revision],
+    ['cap', path, 2, 'deepseek', route.modelId, route.revision],
+    ['model', path, 1, 'deepseek', 'deepseek-v4-fast', route.revision],
+    ['revision', path, 1, 'deepseek', route.modelId, 'evaluated-route-v2'],
+  ]) {
+    const out = join(f.dir, `route-${name}.json`);
+    const env = new Proxy({ REFLEXMESH_PROVIDER: provider, DEEPSEEK_MODEL: modelId,
+      TYPESAFE_MODEL: modelId, REFLEXMESH_PROVIDER_REVISION: revision }, { get(target, key) {
+      if (!['REFLEXMESH_PROVIDER', 'DEEPSEEK_MODEL', 'TYPESAFE_MODEL', 'REFLEXMESH_PROVIDER_REVISION'].includes(key))
+        throw new Error('Credential accessed');
+      return target[key];
+    } });
+    await assert.rejects(evaluationMain(args(datasetPath, cap, out), sink(), { env,
+      createProvider() { factoryCalls++; throw new Error('Provider constructed'); } }),
+    /Evaluation route plan mismatch/);
+    assert.equal(existsSync(out), false);
+  }
+  assert.equal(factoryCalls, 0);
+  const out = join(f.dir, 'route-matched.json');
+  let modelReads = 0;
+  const env = new Proxy({ REFLEXMESH_PROVIDER: 'deepseek', REFLEXMESH_PROVIDER_REVISION: route.revision }, {
+    get(target, key) {
+      if (key === 'DEEPSEEK_MODEL') { modelReads++; return modelReads === 1 ? route.modelId : 'changed-after-check'; }
+      if (!['REFLEXMESH_PROVIDER', 'REFLEXMESH_PROVIDER_REVISION'].includes(key))
+        throw new Error('Credential accessed');
+      return target[key];
+    },
+  });
+  const createProvider = selectedEnv => {
+    factoryCalls++;
+    assert.equal(selectedEnv.REFLEXMESH_PROVIDER, 'deepseek');
+    assert.equal(selectedEnv.DEEPSEEK_MODEL, route.modelId);
+    assert.equal(selectedEnv.REFLEXMESH_PROVIDER_REVISION, route.revision);
+    const provider = { id: 'deepseek/binary-json-estimate-v1', model: route.modelId,
+      capabilities: DEEPSEEK_ESTIMATE_CAPABILITIES,
+      async evaluate() { return { model: route.modelId, answers: { match: { type: 'noul', noul: 0.8 } } }; } };
+    return { provider, binding: { providerId: provider.id, modelId: route.modelId, revision: route.revision,
+      calibrationRef: null, authorizationRevision: 'eval-no-execution-v1', toolsetRevision: 'eval-no-tools-v1' } };
+  };
+  assert.equal(await evaluationMain(args(path, 1, out), sink(), { env, createProvider }), 0);
+  assert.equal(factoryCalls, 1);
+  assert.equal(modelReads, 1);
+  assert.equal(readEvaluationJson(out).rows[0].status, 'ok');
+  const adapterOut = join(f.dir, 'route-adapter.json');
+  let transportCalls = 0;
+  assert.equal(await evaluationMain(args(path, 1, adapterOut), sink(), {
+    env: { REFLEXMESH_ALLOW_REMOTE: 'true', REFLEXMESH_PROVIDER: 'deepseek',
+      REFLEXMESH_PROVIDER_REVISION: route.revision, DEEPSEEK_MODEL: route.modelId,
+      DEEPSEEK_API_KEY: 'offline-fixture-key' },
+    createProvider: selectedEnv => createEvaluationProvider(selectedEnv, { fetch: async (_url, options) => {
+      transportCalls++;
+      assert.equal(JSON.parse(options.body).model, route.modelId);
+      return Response.json({ object: 'chat.completion', model: route.modelId,
+        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
+          content: JSON.stringify({ answers: { match: { type: 'noul', noul: 0.8 } } }) } }],
+        usage: { prompt_tokens: 12, completion_tokens: 8 } });
+    } }),
+  }), 0);
+  assert.equal(transportCalls, 1);
+  assert.equal(readEvaluationJson(adapterOut).rows[0].status, 'ok');
+  const jevPlan = planEvaluation({ dataset: f.dataset, provider: 'jev', maxRequests: 1,
+    modelId: 'jev-fixture', revision: route.revision });
+  const jevOut = join(f.dir, 'route-jev.json');
+  assert.equal(await evaluationMain(['run', '--dataset', path, '--deployment-id', 'jev-route',
+    '--id', 'jev-route-1', '--out', jevOut, '--max-requests', '1', '--allow-remote',
+    '--expect-route-plan-digest', jevPlan.routeGuardDigest], sink(), {
+    env: { REFLEXMESH_PROVIDER: 'jev', TYPESAFE_MODEL: 'jev-fixture',
+      REFLEXMESH_PROVIDER_REVISION: route.revision },
+    createProvider() {
+      const provider = { id: 'typesafe/jev', model: 'jev-fixture', capabilities: JEV_CAPABILITIES,
+        async evaluate() { return { model: 'jev-fixture', answers: { match: { type: 'noul', noul: 0.8 } } }; } };
+      return { provider, binding: { providerId: provider.id, modelId: provider.model, revision: route.revision,
+        calibrationRef: null, authorizationRevision: 'eval-no-execution-v1', toolsetRevision: 'eval-no-tools-v1' } };
+    },
+  }), 0);
+  assert.equal(readEvaluationJson(jevOut).rows[0].status, 'ok');
+  const wrongOut = join(f.dir, 'route-wrong-binding.json');
+  await assert.rejects(evaluationMain(args(path, 1, wrongOut), sink(), {
+    env: { REFLEXMESH_PROVIDER: 'deepseek', DEEPSEEK_MODEL: route.modelId,
+      REFLEXMESH_PROVIDER_REVISION: route.revision },
+    createProvider() { return fixtureDeployment('champion'); },
+  }), /Evaluation route binding mismatch/);
+  assert.equal(existsSync(wrongOut), false);
 });
 test('imported non-fixture predictions remain pure local declarations, not authenticated measurements', async t => {
   const f = await fixtures(t);
