@@ -100,7 +100,7 @@ does not configure a decision model or create independent truth labels.
 
 ## 3. Verify the generated hooks separately
 
-For the tested Windows Claude Code **2.1.263** installation:
+For the tested Windows Claude Code **2.1.263 or 2.1.280** installations:
 
 ```powershell
 npm run compat:claude-setup -- --help

@@ -1,6 +1,6 @@
 # Cold resume and evidence needing review
 
-This opt-in check uses installed **Windows Claude Code 2.1.263** with synthetic
+This opt-in check uses installed **Windows Claude Code 2.1.263 or 2.1.280** with synthetic
 localhost Messages and one fixed, in-memory MCP tool. There is no account,
 paid model inference, Jev prediction or default-profile access. ReflexMesh is
 still a shadow observer, not a host execution controller.
@@ -40,11 +40,13 @@ process identities, session continuity and exact ledger/action/task/result
 digests. Neither a repeated UUID nor exit code zero alone can pass.
 
 Installed 2.1.263 removes the unfinished tool-use block from its resumed Messages
-view and inserts a fixed assistant placeholder. The pinned fixture checks that
-shape, but **the placeholder is not a tool result**. The original call was
-verified in the persisted transcript before termination; its ReflexMesh ledger
-stays unchanged with no result. A future host shape change must fail this fixture
-until separately reviewed, not be accepted by a permissive text search.
+view and inserts a fixed assistant placeholder. Installed 2.1.280 retains that
+block and adds an exact host-injected `is_error: true` interruption result before
+the same placeholder. The version-specific fixture checks these distinct shapes;
+neither the placeholder nor the injected interruption is evidence that the tool
+returned. The original call was verified in the persisted transcript before
+termination; its ReflexMesh ledger stays unchanged with no observed result.
+Other shapes fail until separately reviewed, not via a permissive text search.
 
 The official [CLI reference](https://code.claude.com/docs/en/cli-reference)
 documents explicit session IDs, persisted-session resume and absolute transcript

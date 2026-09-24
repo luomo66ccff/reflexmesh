@@ -1,8 +1,10 @@
 import { createServer } from 'node:http';
 import { listenLoopback } from './loopback-listen.mjs';
+import { SUPPORTED_CLAUDE_VERSIONS } from './claude-probe-version.mjs';
 
 export const RESUME_TOOL = 'mcp__reflexmesh_fixture__read';
 export const resumeCall = phase => ({ type: 'tool_use', id: `resume_call_${phase}`, name: RESUME_TOOL, input: { phase } });
+const INTERRUPTED_RESULT = '[Request interrupted by user for tool use]';
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const blocks = messages => messages.flatMap(item => Array.isArray(item?.content) ? item.content : []);
 const contentText = value => typeof value === 'string' ? value : Array.isArray(value)
@@ -26,8 +28,9 @@ function respond(res, content, stopReason, stage, stream) {
   event('message_stop', { type: 'message_stop' }); res.end();
 }
 
-export function matchesResumeHistory(messages, { phase, interrupted, proof, firstPrompt, secondPrompt }) {
+export function matchesResumeHistory(messages, { phase, interrupted, proof, firstPrompt, secondPrompt, hostVersion = '2.1.263' }) {
   if (!Array.isArray(messages) || messages.some(item => !object(item) || !['user', 'assistant'].includes(item.role))) return false;
+  if (!SUPPORTED_CLAUDE_VERSIONS.includes(hostVersion)) return false;
   const all = blocks(messages), uses = all.filter(item => item?.type === 'tool_use');
   const results = all.filter(item => item?.type === 'tool_result');
   if (!['first', 'first-result', 'resume', 'resume-result'].includes(phase)) return false;
@@ -37,12 +40,14 @@ export function matchesResumeHistory(messages, { phase, interrupted, proof, firs
   if (firstIndex < 0 || resumed && secondIndex <= firstIndex) return false;
   if (!resumed && secondIndex >= 0) return false;
   const expectedUses = phase === 'first' ? [] : phase === 'first-result' || phase === 'resume' ? [1] : [1, 2];
-  // Pinned 2.1.263 removes an unfinished tool-use block from the Messages view on resume.
-  // Require its exact replacement and the earlier prompt; never treat this as a tool outcome.
+  // 2.1.263 omits the unfinished call; 2.1.280 retains it with a host-injected
+  // error result. Neither shape proves that the interrupted tool returned.
+  let placeholderIndex = -1;
   if (resumed && interrupted) {
-    expectedUses.splice(expectedUses.indexOf(1), 1);
-    if (!messages.some((item, index) => item.role === 'assistant' && contentText(item.content) === 'No response requested.'
-      && index > firstIndex && index < secondIndex)) return false;
+    if (hostVersion === '2.1.263') expectedUses.splice(expectedUses.indexOf(1), 1);
+    placeholderIndex = messages.findIndex((item, index) => item.role === 'assistant' && contentText(item.content) === 'No response requested.'
+      && index > firstIndex && index < secondIndex);
+    if (placeholderIndex < 0) return false;
   }
   if (uses.length !== expectedUses.length || !expectedUses.every(n => uses.some(use => JSON.stringify(use) === JSON.stringify(resumeCall(n))))) return false;
   if (results.length !== expectedUses.length) return false;
@@ -52,14 +57,17 @@ export function matchesResumeHistory(messages, { phase, interrupted, proof, firs
     const resultIndex = messages.findIndex(item => item.role === 'user' && Array.isArray(item.content) && item.content.includes(matching[0]));
     if (useIndex < 0 || useIndex <= (n === 1 ? firstIndex : secondIndex) || matching.length !== 1 || resultIndex <= useIndex
       || n === 1 && resumed && resultIndex >= secondIndex) return false;
+    if (n === 1 && resumed && interrupted && hostVersion === '2.1.280')
+      return resultIndex < placeholderIndex && matching[0].is_error === true
+        && contentText(matching[0].content) === INTERRUPTED_RESULT;
     return [undefined, false].includes(matching[0].is_error) && contentText(matching[0].content)?.includes(`${proof}_${n}`);
   });
 }
 
 /** Two process turns, bounded localhost-only synthetic Messages and memory-only MCP receipts. */
-export async function startClaudeResumeFixture({ token, proof, firstPrompt, secondPrompt, interrupted, onEntered }) {
+export async function startClaudeResumeFixture({ token, proof, firstPrompt, secondPrompt, interrupted, onEntered, hostVersion = '2.1.263' }) {
   if (![token, proof, firstPrompt, secondPrompt].every(value => typeof value === 'string' && value.length > 0 && value.length <= 2048)
-    || typeof interrupted !== 'boolean' || typeof onEntered !== 'function') throw new TypeError('Invalid fixture options');
+    || typeof interrupted !== 'boolean' || typeof onEntered !== 'function' || !SUPPORTED_CLAUDE_VERSIONS.includes(hostVersion)) throw new TypeError('Invalid fixture options');
   let stage = 'first', total = 0, helloRequests = 0, messageRequests = 0, resumedHistory = false, failure = 'none';
   const entries = [], sockets = new Set();
   const fail = (res, reason) => { failure = failure === 'none' ? reason : failure;
@@ -89,7 +97,7 @@ export async function startClaudeResumeFixture({ token, proof, firstPrompt, seco
     messageRequests++;
     if (!object(payload) || payload.model !== 'claude-sonnet-4-6' || (payload.stream !== undefined && typeof payload.stream !== 'boolean')
       || !Array.isArray(payload.tools) || payload.tools.length !== 1 || payload.tools[0]?.name !== RESUME_TOOL) return fail(res, 'invalid_model_request');
-    if (!matchesResumeHistory(payload.messages, { phase: stage, interrupted, proof, firstPrompt, secondPrompt })) return fail(res, 'history_mismatch');
+    if (!matchesResumeHistory(payload.messages, { phase: stage, interrupted, proof, firstPrompt, secondPrompt, hostVersion })) return fail(res, 'history_mismatch');
     if (stage === 'first' || stage === 'resume') {
       const phase = stage === 'first' ? 1 : 2;
       if (phase === 2) resumedHistory = true;

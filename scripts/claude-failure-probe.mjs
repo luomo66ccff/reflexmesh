@@ -11,6 +11,7 @@ import { diagnoseClaudeDoctor } from '../adapters/claude-doctor.mjs';
 import { localEnvironment, ancestorContextAbsent, managedConfigurationAbsent } from './claude-local-probe.mjs';
 import { resolveExecutable, runBounded, processFailureReason } from './real-host-compat.mjs';
 import { startClaudeFailureFixture, FAILURE_TOOL, FAILURE_CALLS } from './claude-failure-server.mjs';
+import { SUPPORTED_CLAUDE_VERSIONS, supportedClaudeVersion } from './claude-probe-version.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PREFIX = 'reflexmesh-claude-failure-';
@@ -145,8 +146,9 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
     const executable = resolveHost(claudeCommand, { host: 'claude' });
     if (!executable) { report.reason = 'host_command_not_found'; return report; }
     const version = await runVersion(executable, ['--version'], { cwd: ROOT, env: {}, timeoutMs: 10000, stdoutLimitBytes: 1024, stderrLimitBytes: 1024 });
-    if (!version.ok || version.stdout.trim() !== '2.1.263 (Claude Code)') { report.reason = 'unsupported_host_version'; return report; }
-    report.hostVersion = '2.1.263';
+    const hostVersion = version.ok ? supportedClaudeVersion(version.stdout) : null;
+    if (!hostVersion) { report.reason = 'unsupported_host_version'; return report; }
+    report.hostVersion = hostVersion;
     phase = 'isolation_setup';
     temporaryRoot = realpathSync(systemTemp);
     if (!ancestorCheck(temporaryRoot)) { report.reason = 'ambient_context_unverified'; return report; }
@@ -222,7 +224,7 @@ export async function runClaudeFailureProbe({ claudeCommand = 'claude', timeoutM
 export async function main(argv = process.argv.slice(2), output = process.stdout) {
   if (argv.length === 1 && ['--help', '-h'].includes(argv[0])) {
     output.write('Usage: npm run compat:claude-failure -- [--claude-command NATIVE_EXECUTABLE]\n'
-      + 'Installed Windows Claude Code 2.1.263; direct production hooks and two concurrent synthetic MCP outcomes.\n'
+      + `Installed Windows Claude Code ${SUPPORTED_CLAUDE_VERSIONS.join(' / ')}; direct production hooks and two concurrent synthetic MCP outcomes.\n`
       + 'Starts the installed host, uses strict localhost Messages; no real model/account/default profile.\n'
       + 'Does not prove actual cancellation or is_interrupt delivery. Not an OS sandbox.\n'); return 0;
   }

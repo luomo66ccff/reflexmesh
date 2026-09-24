@@ -43,7 +43,7 @@ schema-2 migration preserves its observation without retroactive certification.
 
 ## Check real mixed outcomes without an account
 
-With installed Windows Claude Code **2.1.263** and a Node runtime meeting the
+With installed Windows Claude Code **2.1.263 or 2.1.280** and a Node runtime meeting the
 [SQLite WAL write requirement](SQLITE-RUNTIME.md), not just the 22.16+ API floor:
 
 ```powershell
