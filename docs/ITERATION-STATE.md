@@ -12,7 +12,27 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: bounded Windows hook-fixture repair
+## Latest milestone: Claude Code 2.1.280 isolated host compatibility
+
+On 2026-09-24, [PR #27](https://github.com/luomo66ccff/reflexmesh/pull/27)
+added exact-version support for installed Claude Code 2.1.280 alongside the
+previously validated 2.1.263. Four account-free installed-CLI probes passed on
+2.1.280: local Read/hook loop, generated first-run setup, mixed failure evidence,
+and two-process cold resume (clean exit and killed old tool). The resumed
+interrupted-tool transcript differs from 2.1.263; strict fixture and regression
+checks reject its synthetic error result as a genuine tool return. See the
+[dated local validation](VALIDATION-CLAUDE-HOST-2-1-280-T001.md) for exact
+counts and limits. The older binary was not rerun for this change.
+
+All five jobs passed on [PR exact-head CI 36015864180](https://github.com/luomo66ccff/reflexmesh/actions/runs/36015864180)
+and on [main merge CI 36016402182](https://github.com/luomo66ccff/reflexmesh/actions/runs/36016402182).
+The main merge commit `6c4144ecd28150f79aee8159717f4cf8756ff52d` has the
+reviewed tree `6f9fe36f1f6e0efd0c4163edea1f682a7047d4a5`. This expands
+only the pinned isolated Claude host evidence, not default-profile or broad
+cross-host support. Bounded DeepSeek shutdown/cancellation remains the next
+lifecycle priority.
+
+## Previous milestone: bounded Windows hook-fixture repair
 
 After the documentation-only [PR #24](https://github.com/luomo66ccff/reflexmesh/pull/24)
 merged, [main CI 36008198413](https://github.com/luomo66ccff/reflexmesh/actions/runs/36008198413)
