@@ -12,6 +12,18 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Latest milestone: first-run lesson merged into main
+
+On 2026-09-24, [PR #23](https://github.com/luomo66ccff/reflexmesh/pull/23)
+merged the retained-evidence first-run lesson and its cleanup-truthfulness
+review fix into main. Its reviewed head `622a0d9ce20daca06c8475e8831372e2800b65b4`
+passed all five jobs in [exact-head CI 36005685879](https://github.com/luomo66ccff/reflexmesh/actions/runs/36005685879).
+Merge commit `81d6286ffa3f9fab2cd58c06d6cfe4903112d835` has the reviewed
+tree `676fb46103608cdf3a2bcb749a1a03c3a6e73211`; all five jobs in
+[main CI 36006377573](https://github.com/luomo66ccff/reflexmesh/actions/runs/36006377573)
+passed against that exact merge commit. No real host/provider acceptance is
+implied. See [integration validation t005](VALIDATION-FIRST-RUN-T005.md).
+
 ## First-run cleanup review t004
 
 During review of open PR #23 on 2026-09-24, the first-run script was found to
@@ -24,7 +36,8 @@ the default and retained-lesson paths. Local Node 24 checks passed: `npm ci
 Windows symlink skips), `npm run demo` and `npm run first-run`. Node 22 passed
 the focused first-run suite (five passed, one npm-environment-only skip).
 See [validation t004](VALIDATION-FIRST-RUN-T004.md). This is not yet a merged
-or exact-head remote-CI claim; the broader product and host gates remain open.
+or exact-head remote-CI claim **within that local-only snapshot**; the later
+publication is recorded above. The broader product and host gates remain open.
 
 ## Current milestone: reviewed stack integrated into main
 

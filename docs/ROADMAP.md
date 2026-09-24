@@ -110,12 +110,15 @@ proof of real provider quality. See the bounded
 Review follow-up [t004](VALIDATION-FIRST-RUN-T004.md) prevents a successful
 first-run receipt from claiming temporary cleanup before it is verified;
 injected cleanup failures now fail instead of being silently ignored.
+[PR #23](https://github.com/luomo66ccff/reflexmesh/pull/23) is merged; its
+[t005 integration report](VALIDATION-FIRST-RUN-T005.md) records exact-head and
+post-merge CI without promoting local first-run evidence to live-host proof.
 
-**Next integration priority:** independently review and integrate the stacked
-increments into a release candidate, with exact-head CI and first-run validation.
-Unmerged feature branches are not the default checkout experience. This roadmap
-does not itself authorize merge/retarget, release, profile changes or new paid
-model work. Remaining host lifecycle, quality and operational gates stay open.
+**Next acceptance priority:** bounded host shutdown/cancellation and isolated
+first-run gaps within the existing adapters, followed by representative
+independent-model quality and larger operational tests. The merged first-run
+lesson does not close those gates or authorize a release, profile change or
+new paid model work.
 
 ## v0.3: memory governance and calibrated comparison
 
