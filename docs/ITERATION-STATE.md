@@ -12,6 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current local candidate: fenced DeepSeek Loader drain
+
+On 2026-09-25, an opt-in `shutdownDrainWaitMs` candidate adds a Loader-owned
+synchronous SQLite access fence. After the result-reception window, its second
+deadline can isolate a still-pending admission or result callback before the
+Loader closes its raw kernel. It reports detached callbacks separately from
+actually drained callbacks and from missing host results. The default remains
+wait-for-drain; arbitrary caller-owned boundaries cannot opt into this fence.
+See [local validation](VALIDATION-DEEPSEEK-FENCE-T001.md). The local check
+passed **853 tests: 851 passed, zero failed, two local symlink-privilege skips**,
+the demo, and five installed DeepSeek Harness 0.1.2-rc.1 isolated synthetic
+regressions. This is not yet a reviewed PR or remote-CI claim. The new deadline
+was exercised in local Loader/Cordis-shaped tests, not with an injected
+never-settling callback inside the installed host. It cannot interrupt a
+blocked event loop, arbitrary storage callback or host tool; no complete
+shutdown or bug-free release is claimed.
+
 ## Latest milestone: live DeepSeek shutdown drain diagnostics
 
 On 2026-09-25, [PR #33](https://github.com/luomo66ccff/reflexmesh/pull/33)

@@ -259,3 +259,18 @@ test('shutdown budget validation fails before any host listener is registered', 
     assert.equal(listeners, 0);
   }
 });
+
+test('an arbitrary revoke callback cannot certify a generic boundary for detached shutdown', () => {
+  const handlers = new Map();
+  const ctx = { on(name, callback) {
+    handlers.set(name, callback);
+    return () => handlers.delete(name);
+  } };
+  assert.throws(() => installDeepSeekObserver(ctx, {
+    boundary: { before() { return new Promise(() => {}); }, after() {} },
+    identity: () => ({ sessionId: 's', agentId: 'a' }),
+    shutdownResultWaitMs: 0, shutdownDrainWaitMs: 0,
+    storageFence: { revoke() {} },
+  }), /Invalid DeepSeek shutdown drain fence/);
+  assert.equal(handlers.size, 0);
+});

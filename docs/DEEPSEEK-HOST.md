@@ -62,6 +62,10 @@ share one ordered effect in the original plugin context. This is an observer
 shutdown budget, not a host tool deadline or cancellation mechanism. The host
 must still quiesce its tools; a permanently hung admission or storage callback
 can still prevent safe closure. Never close the caller-owned kernel early.
+The Loader-only optional fenced drain deadline in [the Agent guide](DEEPSEEK-AGENT.md)
+does not apply here: a caller-supplied boundary may retain storage or other
+side effects outside ReflexMesh's control. Do not race this plugin's disposal
+against an arbitrary timer and then close its database.
 `drainStatus()` returns a frozen scalar snapshot with `closing`,
 `resultWindowClosed`, `pendingBefore`, `pendingResults`, `pendingAfter` and
 `missingResults`; it contains no call, Agent or result data. The `pendingAfter`

@@ -4,6 +4,9 @@ import { digest } from './sqlite-kernel.mjs';
 import { resolveHostIntent } from './task-evidence.mjs';
 import { normalizeProviderBinding } from './provider-binding.mjs';
 
+// Internal identity check for a Loader-owned synchronous storage fence.
+export const BOUNDARY_USES_KERNEL = Symbol('reflexmesh.boundaryUsesKernel');
+
 /** Observes host actions; never calls, grants, blocks, rewrites or replays a host tool. */
 export class ShadowBoundary {
   #kernel; #mesh; #tenant; #scope; #pack; #deploymentDigest;
@@ -15,6 +18,7 @@ export class ShadowBoundary {
     this.#mesh = new DurableMesh({ kernel, provider, binding: normalizedBinding,
       mode: 'shadow', decisionTimeoutMs: 3000 }).registerPack(pack);
   }
+  [BOUNDARY_USES_KERNEL](candidate) { return this.#kernel === candidate; }
   event(call, userIntent = null) {
     validateCall(call);
     if (userIntent !== null && (typeof userIntent !== 'string' || userIntent.length > 16000)) throw new ContractError('Invalid intent evidence');
