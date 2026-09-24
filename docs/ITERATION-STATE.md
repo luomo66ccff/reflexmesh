@@ -12,18 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Current local candidate: reviewed wire-plan guard
+## Latest merged milestone: reviewed wire-plan guard
 
 On 2026-09-25, a route-declared plan could check exact local request-body
 sizes but its route guard did not bind DeepSeek output tokens or body bytes.
-The candidate adds a distinct opt-in wire guard over every capability-eligible
+The merged change adds a distinct opt-in wire guard over every capability-eligible
 serialized body, including rejected and deferred cases. It fails before key
 access, provider construction or output reservation when an opted-in run
 differs. Older guards retain their meanings. See the
-[local validation](VALIDATION-EVALUATION-WIRE-GUARD-T001.md); real-model
-quality, billing and broader host acceptance remain separate.
+[local validation](VALIDATION-EVALUATION-WIRE-GUARD-T001.md): 868/870 local
+tests passed with two Windows symlink-privilege skips, and the first-run and
+four synthetic demos passed. [PR #49](https://github.com/luomo66ccff/reflexmesh/pull/49)
+merged the reviewed tree `d45b78506fdc5787a49eed93ed464e2475375f23`;
+all five jobs passed on its exact head and the main merge commit. See the
+separate [integration readback](VALIDATION-EVALUATION-WIRE-GUARD-INTEGRATION-T001.md).
+Real-model quality, billing and broader host acceptance remain separate.
 
-## Latest merged milestone: exact request-body preflight
+## Previous merged milestone: exact request-body preflight
 
 On 2026-09-25, an offline regression exposed a mismatch between capability
 coverage and complete HTTP request-body limits: DeepSeek and Jev could each
