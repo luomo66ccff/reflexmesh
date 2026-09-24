@@ -95,9 +95,17 @@ claimed message may subsequently be rejected or transformed by the host; the
 receipt describes the claimed summary, not the complete final model prompt.
 
 During shutdown, stop new host dispatch and settle/cancel active host work first.
-The plugin drains accepted outcomes before closing the ledger it owns. A tool
-that never reports a terminal result can leave disposal pending; the observer
-must not retry it or fabricate successful cleanup.
+The plugin gives already accepted calls a five-second result-reception window
+by default. An optional `shutdownResultWaitMs` in this Loader configuration
+sets that window to a safe integer from 0 to 60000 milliseconds; 0 closes it
+immediately. After the window, calls without a result remain **missing** in the
+ledger and appear in read-only attention. The observer never cancels or retries
+the host tool, fabricates a result, or treats absence as proof of no effects.
+It still waits for any in-flight admission or captured-result write before
+closing its ledger. `reflexmeshObserverReady.shutdownMissingResults` reports
+the number abandoned at shutdown; `observerDrained` means observer storage
+work is drained, not that every host call produced an outcome. A custom
+before/after callback that never settles can still prevent safe closure.
 
 ## Reproduce the isolated CLI/Agent probe
 

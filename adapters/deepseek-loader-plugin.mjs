@@ -21,7 +21,7 @@ const plugin = {
     mkdirSync(dirname(options.dbPath), { recursive: true, mode: 0o700 });
     const kernel = new SqliteKernel(options.dbPath);
     let taskSource, observer;
-    let observerDrained = false, kernelClosed = false;
+    let observerDrained = false, kernelClosed = false, shutdownMissingResults = 0;
     try {
       taskSource = createDeepSeekTaskSource(ctx, { intentMode: options.intentMode });
       const provider = { id: 'abstain', capabilities: ABSTAIN_CAPABILITIES,
@@ -32,10 +32,12 @@ const plugin = {
           calibrationRef: null, authorizationRevision: 'host-owned-shadow', toolsetRevision: 'host-owned-shadow' },
       });
       observer = installDeepSeekObserver(ctx, { boundary, identity: taskSource.identity,
-        resolveIntent: taskSource.resolveIntent, onError: () => ctx.logger?.warn?.('reflexmesh_shadow_observation_failed') });
+        resolveIntent: taskSource.resolveIntent, shutdownResultWaitMs: options.shutdownResultWaitMs,
+        onError: code => ctx.logger?.warn?.(code) });
       ctx.provide('reflexmeshObserverReady', {
         get observerDrained() { return observerDrained; },
         get kernelClosed() { return kernelClosed; },
+        get shutdownMissingResults() { return shutdownMissingResults; },
       });
     } catch (error) {
       taskSource?.dispose();
@@ -46,7 +48,8 @@ const plugin = {
     let disposal;
     return () => disposal ??= (async () => {
       taskSource.dispose();
-      await observer.dispose();
+      const receipt = await observer.dispose();
+      shutdownMissingResults = receipt.missingResults;
       observerDrained = true;
       kernel.close();
       kernelClosed = true;

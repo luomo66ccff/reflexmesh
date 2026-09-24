@@ -42,6 +42,11 @@ test('loader configuration fails before creating a database and never adopts pro
     assert.throws(() => validateDeepSeekLoaderConfig({ ...base, dbPath: 'relative.sqlite' }));
     assert.throws(() => validateDeepSeekLoaderConfig({ ...base, intentMode: 'ambient' }));
     assert.throws(() => validateDeepSeekLoaderConfig({ ...base, provider: 'jev' }));
+    for (const shutdownResultWaitMs of [-1, 60_001, 1.5, NaN, Infinity, '20']) {
+      assert.throws(() => validateDeepSeekLoaderConfig({ ...base, shutdownResultWaitMs }));
+    }
+    assert.equal(validateDeepSeekLoaderConfig({ ...base, shutdownResultWaitMs: 0 }).shutdownResultWaitMs, 0);
+    await assert.rejects(plugin.apply(f.ctx, { ...base, shutdownResultWaitMs: -1 }));
     await assert.rejects(plugin.apply(f.ctx, { ...base, provider: 'jev' }));
     assert.equal(existsSync(join(root, 'private')), false);
 
@@ -64,6 +69,49 @@ test('loader configuration fails before creating a database and never adopts pro
     try { assert.deepEqual(kernel.listEvidence().items, []); }
     finally { kernel.close(); }
   } finally { cleanup(root); }
+});
+
+test('loader closes owned kernel after missing accepted result without inventing a host outcome', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'reflexmesh-loader-test-'));
+  const dbPath = join(root, 'ledger.sqlite');
+  const f = mockContext(), warnings = [];
+  f.ctx.logger.warn = code => warnings.push(code);
+  const agent = { id: 'agent-missing', session: { id: 'agent-missing' } };
+  f.agents.set(agent.id, agent);
+  let dispose;
+  try {
+    dispose = await plugin.apply(f.ctx, { dbPath, tenantId: 'isolated', scope: 'fixture',
+      intentMode: 'explicit-summary', shutdownResultWaitMs: 0 });
+    f.emit('session/event', agent.session, { type: 'turn/start', data: { turn: 1 } });
+    f.emit('agent/inbox/claimed', { agent, turn: 1, message: { id: 'user-missing', role: 'user',
+      source: { kind: 'user' }, content: [{ type: 'text', text: 'ReflexMesh-Intent: Fixed missing-result fixture' }] } });
+    const signal = new AbortController().signal;
+    await f.emit('agent/pre-step', { agent, turn: 1, step: 1, signal, messages: [] },
+      () => Promise.resolve({ kind: 'enter' }))[0];
+    const exec = { agent, signal, callId: 'missing-result', name: 'fixture_read', arguments: {} };
+    await f.emit('tools/pre-execute', exec, () => Promise.resolve(undefined))[0];
+    const ready = f.services.get('reflexmeshObserverReady');
+    assert.equal(ready.kernelClosed, false);
+    await dispose();
+    assert.equal(ready.observerDrained, true);
+    assert.equal(ready.kernelClosed, true);
+    assert.equal(ready.shutdownMissingResults, 1);
+    assert.deepEqual(warnings, ['reflexmesh_shadow_result_missing_on_shutdown']);
+    const kernel = new SqliteKernel(dbPath, { readOnly: true });
+    try {
+      const rows = kernel.listEvidence({ limit: 2 }).items;
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].hostOutcome.status, 'missing');
+      assert.equal(rows[0].hostOutcome.count, 0);
+      assert.equal(rows[0].labelCount, 0);
+      const attention = kernel.listAttention({ limit: 2 }).items;
+      assert.equal(attention.length, 1);
+      assert.deepEqual(attention[0].attention.reasons.map(reason => reason.code), ['shadow_outcome_missing']);
+    } finally { kernel.close(); }
+  } finally {
+    try { await dispose?.(); } catch {}
+    cleanup(root);
+  }
 });
 
 test('owned kernel closes only after accepted host result drains', async () => {

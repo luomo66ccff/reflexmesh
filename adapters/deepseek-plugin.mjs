@@ -8,15 +8,27 @@ const callDigest = call => createHash('sha256').update(canonical(call)).digest('
  * Target tools source blob: 6be7be61e257cd9e38c8a3122298316bf3df9892.
  * Caller owns identity resolution. This is SHADOW ONLY, not a monotonic security guard.
  */
-export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent, onError = () => {} }) {
+export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent, onError = () => {}, shutdownResultWaitMs = 5000 }) {
   if (typeof ctx?.on !== 'function' || typeof identity !== 'function' || (resolveIntent !== undefined && typeof resolveIntent !== 'function')) throw new TypeError('Context and identity resolver required');
+  if (!Number.isSafeInteger(shutdownResultWaitMs) || shutdownResultWaitMs < 0 || shutdownResultWaitMs > 60_000) throw new TypeError('Invalid DeepSeek shutdown result wait');
   // The host uses this same execution object at pre-execute and result. Keep
   // only accepted calls, bounded until their authoritative result is drained.
   const active = new Map();
   const maxActive = 256;
   let closing = false;
+  let resultWindowClosed = false;
+  let missingResults = 0;
+  let missingWarningSent = false;
   const warn = () => { try { onError('reflexmesh_shadow_observation_failed'); } catch {} };
+  const warnMissing = () => {
+    if (missingResults > 0 && !missingWarningSent) {
+      missingWarningSent = true;
+      try { onError('reflexmesh_shadow_result_missing_on_shutdown'); } catch {}
+    }
+  };
   const release = (exec, state) => {
+    if (state.phase === 'released') return;
+    state.phase = 'released';
     if (active.get(exec) === state) active.delete(exec);
     state.settle();
   };
@@ -25,7 +37,8 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     if (active.size >= maxActive || active.has(exec)) { warn(); return next(); }
     let settle;
     const done = new Promise(resolve => { settle = resolve; });
-    const state = { done, settle, resultSeen: false, callDigest: null, agent: null, session: null };
+    const state = { done, settle, phase: 'pre', resultSeen: false, earlyResultRejected: false,
+      callDigest: null, agent: null, session: null };
     active.set(exec, state);
     try {
       if (!exec.signal.aborted) {
@@ -43,16 +56,29 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
       }
     } catch { warn(); }
     finally {
-      // No accepted observation remains to drain, including pre-dispatch aborts.
-      if (state.callDigest === null) release(exec, state);
+      // A result that arrives before admission cannot release an in-flight
+      // before() write or later attach a second result to that same call.
+      if (state.callDigest === null || state.earlyResultRejected) release(exec, state);
+      else if (resultWindowClosed) {
+        missingResults++;
+        release(exec, state);
+        warnMissing();
+      } else state.phase = 'waiting-result';
     }
     // Never return {kind:'allow'}: preserve the rest of the host permission waterfall.
     return next();
   };
   const observeResult = (exec, result) => {
     const state = active.get(exec);
-    if (!state || state.resultSeen) return undefined;
+    if (resultWindowClosed || !state || state.resultSeen) return undefined;
     state.resultSeen = true;
+    if (state.phase === 'pre') {
+      state.earlyResultRejected = true;
+      warn();
+      return undefined;
+    }
+    if (state.phase !== 'waiting-result') return undefined;
+    state.phase = 'after'; // Includes the queued journal microtask.
     const settle = () => release(exec, state);
     let call, evidence, status;
     try {
@@ -80,16 +106,50 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     void task;
     return undefined;
   };
-  let offPre, offResult, shutdownPromise;
+  let offPre, offResult, shutdownPromise, resultListenerStopped = false;
   const flush = () => Promise.all([...active.values()].map(state => state.done));
+  const stopResults = () => {
+    if (resultListenerStopped) return;
+    resultWindowClosed = true; // A saved listener callback must also fail closed.
+    resultListenerStopped = true;
+    offResult();
+  };
+  const expireResults = () => {
+    stopResults();
+    for (const [exec, state] of active) {
+      if (state.phase !== 'waiting-result') continue;
+      missingResults++;
+      release(exec, state);
+    }
+    warnMissing();
+  };
   const shutdown = () => {
     if (shutdownPromise) return shutdownPromise;
     closing = true;
-    offPre();
-    shutdownPromise = (async () => {
-      await flush();
-      offResult();
-    })();
+    // Publish the one shutdown promise before offPre/onError can synchronously
+    // re-enter disposal, especially with a zero-length result window.
+    let resolveShutdown, rejectShutdown;
+    shutdownPromise = new Promise((resolve, reject) => {
+      resolveShutdown = resolve;
+      rejectShutdown = reject;
+    });
+    void (async () => {
+      offPre();
+      let timer;
+      try {
+        if (shutdownResultWaitMs === 0) expireResults();
+        else await Promise.race([flush(), new Promise(resolve => {
+          timer = setTimeout(() => { expireResults(); resolve(); }, shutdownResultWaitMs);
+        })]);
+        // A missing result may be abandoned; in-flight before/after storage
+        // must still finish before the Loader is allowed to close its kernel.
+        await flush();
+        return Object.freeze({ missingResults });
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+        stopResults();
+      }
+    })().then(resolveShutdown, rejectShutdown);
     return shutdownPromise;
   };
   let stop;
@@ -114,8 +174,9 @@ export function installDeepSeekObserver(ctx, { boundary, identity, resolveIntent
     flush,
     async dispose() {
       const stopped = stop();
-      await shutdown();
+      const receipt = await shutdown();
       await stopped;
+      return receipt;
     },
   };
 }
