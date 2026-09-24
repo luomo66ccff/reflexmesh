@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: narrated first-run evidence
+## Latest merged milestone: narrated first-run evidence
 
 On 2026-09-25, the default account-free `npm run first-run` summary was
 changed from counts alone to the fixture's actual task/decision/outcome
@@ -24,8 +24,12 @@ fixture without changing cleanup, permissions or remote access. See the
 [local t007 validation](VALIDATION-FIRST-RUN-T007.md). Local checks passed
 **860 tests: 858 passed, zero failed, two local symlink-privilege skips**,
 `npm run first-run`, `npm run demo` and `npm run demo:evidence`.
-Publication and CI are not claimed in this local snapshot. Real-user
-onboarding, model quality and broader host acceptance remain open.
+[PR #43](https://github.com/luomo66ccff/reflexmesh/pull/43) merged the
+reviewed tree `e830ee3c5d4a27591a0d4bc5675505927f174780`; all five jobs
+passed on its [exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36055480212)
+and again on the [main merge commit](https://github.com/luomo66ccff/reflexmesh/actions/runs/36055854135).
+See the distinct [integration readback](VALIDATION-FIRST-RUN-T008.md).
+Real-user onboarding, model quality and broader host acceptance remain open.
 
 ## Previous merged milestone: plan-to-run mismatch guard
 
