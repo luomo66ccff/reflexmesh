@@ -21,6 +21,7 @@ const observer = createDeepSeekHostPlugin({
   identity: resolveTrustedSessionAndAgent,
   resolveIntent: selectMinimizedTaskEnvelope,
   onError: code => reportFixedDiagnostic(code),
+  shutdownResultWaitMs: 5000, // optional; result-reception window, not tool timeout
 });
 const fiber = await ctx.plugin(observer);
 
@@ -46,14 +47,18 @@ Before shutdown, the host must stop new tool dispatch and
 settle or cancel its own active work. An observer cannot prove that a missing
 result means a tool did not run, or safely retry that tool.
 
-Disposal stops accepting new pre-observations and drains accepted calls through
-their final result and queued storage write before removing the result hook.
-Cordis hooks and the drain share one ordered effect in the original plugin
-context. If an accepted host call never produces its terminal result, disposal
-can remain pending; a concurrency bound is not a deadline or a cancellation
-mechanism. Whole-host shutdown still requires the host to quiesce its tools
-before tearing down services. Never close the caller-owned kernel early to
-force an apparently successful unload.
+Disposal stops accepting new pre-observations, then accepts authoritative
+results for up to five seconds by default. `shutdownResultWaitMs` is a safe
+integer from 0 to 60000 milliseconds; the first shutdown starts one window,
+and repeated disposal cannot extend it. At expiry, calls still waiting for a
+result are released as **missing**, not reported unknown, failed or succeeded.
+No outcome row, label or retry is created; a saved late result callback cannot
+append an observation. Admission and result-storage callbacks already in
+flight must still settle before disposal completes. Cordis hooks and the drain
+share one ordered effect in the original plugin context. This is an observer
+shutdown budget, not a host tool deadline or cancellation mechanism. The host
+must still quiesce its tools; a permanently hung admission or storage callback
+can still prevent safe closure. Never close the caller-owned kernel early.
 
 At most 256 accepted observations are tracked at once. Overflow emits a fixed
 diagnostic and skips that observation while still delegating to host policy.

@@ -167,6 +167,28 @@ test('synthetic composite effect drains gated pre and outcome during concurrent 
   assert.equal(handlers.size, 0);
 });
 
+test('synthetic concurrent Cordis/manual unload shares a missing-result deadline', async () => {
+  const { ctx, handlers, autoUnload } = syntheticEffectContext();
+  const warnings = [];
+  let afterCalls = 0;
+  const plugin = createDeepSeekHostPlugin({
+    boundary: { before() {}, after() { afterCalls++; } },
+    identity: () => ({ sessionId: 'synthetic-session', agentId: 'synthetic-agent' }),
+    onError: code => warnings.push(code), shutdownResultWaitMs: 0,
+  });
+  const unload = plugin.apply(ctx);
+  const exec = { callId: 'missing-result', name: 'synthetic_probe', arguments: {},
+    signal: new AbortController().signal };
+  await handlers.get('tools/pre-execute')(exec, () => ({ kind: 'host-owned' }));
+  const oldResult = handlers.get('tools/result');
+  await Promise.all([autoUnload(unload), unload()]);
+  oldResult(exec, { isError: false, content: [] });
+  assert.deepEqual(warnings, ['reflexmesh_shadow_result_missing_on_shutdown']);
+  assert.equal(afterCalls, 0);
+  assert.equal(plugin.mounted, false);
+  assert.equal(handlers.size, 0);
+});
+
 test('synthetic 257 accepted candidates cap at 256 observations without suppressing host next', async () => {
   const { ctx, handlers, autoUnload } = syntheticEffectContext();
   let beforeCalls = 0, afterCalls = 0, hostNextCalls = 0, diagnostics = 0;

@@ -60,11 +60,17 @@ CPU or temporary-memory limit on traversing arbitrary host objects.
 ## Limits
 
 No default-profile compatibility, real subagent, process restart, forced kill,
-missing-result recovery or timeout-policy validation is implied. The installed
-host delegates tool timeout policy to a separate plugin; it is not loaded by
-these minimal scenarios. The host must quiesce its own work before unloading
-the observer. A body that never settles can leave shutdown pending; neither
-an outer process deadline nor a queue bound proves it had no effects.
+missing-result recovery or host-tool timeout-policy validation is implied. The
+installed host delegates tool timeout policy to a separate plugin; it is not
+loaded by these minimal scenarios. The host must quiesce its own work before
+unloading the observer. ReflexMesh now has a separate bounded result-reception
+window during observer shutdown: after its deadline, an accepted call without
+`tools/result` stays **missing** and gets a fixed diagnostic. This is not an
+`ABORTED` report, proof of absent effects or permission to retry. Already
+running admission/result-storage callbacks still drain before the kernel
+closes; one that never settles can still leave shutdown pending. The bounded
+window is covered by synthetic observer/Loader tests, not these installed-host
+scenarios. See [shutdown validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
 
 Existing historical observations are not migrated or reclassified. The new
 ABORTED mapping applies only to newly observed results. Use independent host
