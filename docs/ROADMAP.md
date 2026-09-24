@@ -138,9 +138,19 @@ The installed host's missing-result teardown and indefinitely hung callback
 paths remain outside those passing host scenarios; the reception window is not
 a host-tool timeout or total shutdown deadline.
 
+**2026-09-25 installed DeepSeek teardown boundary:** [PR #31](https://github.com/luomo66ccff/reflexmesh/pull/31)
+merged an opt-in isolated installed-host probe. It unloads the observer while
+one native tool body is pending, verifies bounded drain and a truthful missing
+ledger outcome, then allows a late host result and natural Agent exit. See
+[local validation](VALIDATION-DEEPSEEK-TEARDOWN-T001.md),
+[exact-head CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36027435510)
+and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36027994173).
+It does not cover permanent result absence, hung callbacks, real-model
+transport or the default user profile.
+
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
-first-run gaps within the existing adapters, especially installed-host
-missing-result teardown and safe handling of hung callbacks, followed by representative
+first-run gaps within the existing adapters, especially permanent missing-result
+and hung-callback behavior, followed by representative
 independent-model quality and larger operational tests. The merged first-run
 lesson does not close those gates or authorize a release, profile change or
 new paid model work.

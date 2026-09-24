@@ -12,7 +12,31 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: bounded DeepSeek observer result reception
+## Latest milestone: installed DeepSeek observer teardown at missing result
+
+On 2026-09-25, [PR #31](https://github.com/luomo66ccff/reflexmesh/pull/31)
+added an opt-in isolated probe against installed DeepSeek Harness 0.1.2-rc.1.
+The native tool body waits while the official Loader unloads only the
+ReflexMesh observer. The Loader drains it and closes its owned kernel with one
+accepted call still lacking `tools/result`; the ledger remains **missing**,
+has one read-only `shadow_outcome_missing` reason and zero labels. After
+unload, the body returns, the host sends its late result to the Agent, and
+Headless exits naturally. The one tool body is not retried. The fixed
+[local validation](VALIDATION-DEEPSEEK-TEARDOWN-T001.md) passed **9/9**
+assertions, plus 842 offline tests (840 passed, two local symlink-privilege
+skips) and the demo. Existing installed native, Agent, lifecycle and subagent
+probes were rerun and passed **13/13**, **12/12**, **17/17** and **12/12**.
+
+All five jobs passed on [PR exact-head CI 36027435510](https://github.com/luomo66ccff/reflexmesh/actions/runs/36027435510)
+and [main CI 36027994173](https://github.com/luomo66ccff/reflexmesh/actions/runs/36027994173).
+Merge commit `69212d6cf2a74a0f8501a0d86dd1bee14a5bffde` has the reviewed
+tree `46fc43edd81b1e314675826551d3baeea8315028`. This proves a result
+absent **at unload**, followed by a late host result. It does not prove
+permanent result absence, a total host shutdown deadline, safety of forever-
+hung admission/storage callbacks, default-profile support or real-model
+behavior.
+
+## Previous milestone: bounded DeepSeek observer result reception
 
 On 2026-09-24, [PR #29](https://github.com/luomo66ccff/reflexmesh/pull/29)
 closed a documented shutdown gap: an accepted DeepSeek call with no
@@ -701,7 +725,7 @@ the following implementation and validation details remain historical evidence.
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup and official sequential spawn isolation coverage plus one separate authorized real-model round trip. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children, unattended/cross-host restart and timeout policy remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation and observer unload while a native result is still absent, followed by a late result; one separate authorized real-model round trip is also recorded. Permanent result absence, hung admission/storage callbacks and host-tool timeout policy remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
@@ -712,8 +736,9 @@ The independently labeled, separately bound comparison/report workflow is now
 implemented with an explicit provenance and descriptive-only boundary. The
 reviewed stack now reaches the default branch, with a fresh-clone offline
 first-run check. Next prioritize bounded host shutdown/cancellation and isolated
-first-run gaps within the existing adapters, keeping actual-host evidence
-separate from synthetic checks. Audit archival/lookup is implemented, while
+first-run gaps within the existing adapters, especially permanent missing-result
+and hung-callback boundaries, keeping isolated synthetic transport distinct
+from real-model and default-profile acceptance. Audit archival/lookup is implemented, while
 other evidence-body retention and broader operational acceptance remain open,
 alongside remaining lifecycle evidence;
 newly discovered lifecycle blockers take priority. Real comparative quality
