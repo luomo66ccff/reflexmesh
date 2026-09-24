@@ -125,6 +125,9 @@ same labeled, both-successful cases, with missing/failure coverage beside it.
 Before a paid run, `npm run evaluation -- plan --dataset FILE --provider deepseek --max-requests N`
 shows offline capability coverage and a request upper bound;
 it does not read credentials, send data or estimate cost.
+The optional `run --expect-plan-digest SHA256` rejects changed dataset,
+provider or request cap before credential access; a matching digest is not
+permission to send data.
 Validate and compare stay offline; paid runs need explicit opt-in and budgets.
 See the [paired comparison guide](docs/PROVIDER-COMPARISON.md). No automatic
 winner, calibration transfer, model promotion or tool execution is implied.

@@ -9,7 +9,7 @@ import { isDirectRun } from './direct-run.mjs';
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
   npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--json]
-  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--timeout-ms 15000] [--max-output-tokens N]
+  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
 Validate/plan/compare are local only. Plan checks declared capabilities, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
@@ -24,7 +24,7 @@ export function parseEvaluationOptions(argv) {
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
     plan: ['dataset', 'provider', 'max-requests', 'json'],
-    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'timeout-ms', 'max-output-tokens'],
+    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
   if (!allowed) fail('Expected validate, plan, run or compare; use --help');
   const options = { command };
@@ -44,6 +44,8 @@ export function parseEvaluationOptions(argv) {
       options[key] = Number(options[key]);
     }
   }
+  if (options['expect-plan-digest'] !== undefined && !/^[a-f0-9]{64}$/.test(options['expect-plan-digest']))
+    fail('Invalid evaluation plan digest');
   return options;
 }
 const quote = value => JSON.stringify(value);
@@ -93,7 +95,7 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
       : `Offline evaluation plan: ${plan.dataset.cases} cases, ${plan.dataset.questions} questions; provider=${plan.provider}.\n`
         + `Compatible=${plan.eligibleCases}, unsupported=${plan.unsupportedCases}; at most ${plan.requestUpperBound} requests under cap ${plan.maxRequests}.\n`
         + `Deferred by cap if requests succeed=${plan.deferredByRequestCapIfNoFailure}; selected canonical state+question bytes=${plan.selectedCanonicalInputBytes}.\n`
-        + `Dataset digest: ${plan.dataset.digest}\nNo key, label, host profile or network was accessed. This is not a wire-size, model-quality or cost guarantee.\n`);
+        + `Dataset digest: ${plan.dataset.digest}\nPlan guard: ${plan.guardDigest}\nNo key, label, host profile or network was accessed. This is not a wire-size, model-quality or cost guarantee.\n`);
     return 0;
   }
   if (options.command === 'compare') {
@@ -103,7 +105,14 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
     output.write(options.json ? JSON.stringify(report, null, 2) + '\n' : formatEvaluationReport(report));
     return 0;
   }
-  // No provider factory or credential access on the two branches above.
+  // The three local branches above do not construct providers or read credentials.
+  // An optional reviewed plan guard fails before provider/key access or output reservation.
+  if (options['expect-plan-digest'] !== undefined) {
+    const current = planEvaluation({ dataset, provider: env.REFLEXMESH_PROVIDER,
+      maxRequests: options['max-requests'] });
+    if (current.guardDigest !== options['expect-plan-digest'])
+      throw new ContractError('Evaluation plan mismatch; no provider or output opened');
+  }
   const factory = createProvider ?? (await import('./evaluation-provider.mjs')).createEvaluationProvider;
   const selected = await factory(env, { maxOutputTokens: options['max-output-tokens'] });
   const file = reserveEvaluationOutput(options.out);

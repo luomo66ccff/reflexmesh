@@ -12,7 +12,21 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: offline evaluation preflight
+## Latest local milestone: plan-to-run mismatch guard
+
+On 2026-09-25, the offline evaluation preview gained an optional
+`guardDigest`, and paid `run --expect-plan-digest` now refuses changed
+dataset, provider choice, request cap or trusted capability declaration
+before provider/key access or output-file reservation. This closes an
+accidental stale-preview handoff, not a permission or money gate. See the
+[local guard validation](VALIDATION-EVALUATION-PLAN-GUARD-T001.md).
+Local checks passed **859 tests: 857 passed, zero failed, two local
+symlink-privilege skips** and four offline demos. Publication and CI are
+not claimed in this local snapshot. Model route,
+independent quality, account spending and broader host lifecycle gates
+remain open.
+
+## Previous milestone: offline evaluation preflight
 
 On 2026-09-25, an account-free `evaluation plan` preview was added before the
 opt-in paid comparison runner. It uses each provider's trusted capability
