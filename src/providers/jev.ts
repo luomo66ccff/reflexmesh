@@ -11,14 +11,15 @@ export interface JevOptions {
   maxResponseBytes?: number;
 }
 /** Server-only HTTP adapter. Contract verified against official typesafe-sdk-js source. */
+export const JEV_CAPABILITIES = validateProviderCapabilities({
+  schemaVersion: 1, resultContract: 'probabilistic-v1', probabilitySemantics: 'provider-native',
+  answers: { noul: 'probability', choice: 'distribution-with-confidence',
+    score: 'distribution-with-confidence-and-expected-value' },
+  limits: { maxStateBytes: 256_000, maxQuestions: 128, maxChoicesPerQuestion: 255 },
+});
 export class JevProvider implements DecisionProvider {
   readonly id = 'typesafe/jev';
-  readonly capabilities = validateProviderCapabilities({
-    schemaVersion: 1, resultContract: 'probabilistic-v1', probabilitySemantics: 'provider-native',
-    answers: { noul: 'probability', choice: 'distribution-with-confidence',
-      score: 'distribution-with-confidence-and-expected-value' },
-    limits: { maxStateBytes: 256_000, maxQuestions: 128, maxChoicesPerQuestion: 255 },
-  });
+  readonly capabilities = JEV_CAPABILITIES;
   readonly model: string;
   readonly #apiKey: string;
   readonly #fetch: typeof globalThis.fetch;

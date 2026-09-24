@@ -8,6 +8,8 @@ import { evaluationMain, formatEvaluationReport, parseEvaluationOptions } from '
 import { EVALUATION_FILE_LIMIT, readEvaluationJson, reserveEvaluationOutput } from '../adapters/evaluation-files.mjs';
 import { comparisonFixture, fixtureDeployment } from '../examples/evaluation-fixture.mjs';
 import { runEvaluation } from '../adapters/evaluation-runner.mjs';
+import { planEvaluation } from '../adapters/evaluation-plan.mjs';
+import { canonical } from '../dist/index.js';
 import { main as demo } from '../examples/provider-comparison.mjs';
 
 const sink = () => ({ text: '', write(text) { this.text += text; } });
@@ -30,13 +32,17 @@ const runArgs = (dir, out = 'run.json') => ['run', '--dataset', join(dir, 'datas
   '--id', 'bounded-run-1', '--out', join(dir, out), '--max-requests', '1', '--allow-remote'];
 test('evaluation CLI validates exact options and explicit request budgets before any work', () => {
   assert.equal(parseEvaluationOptions([]).help, true); assert.equal(parseEvaluationOptions(['--help']).help, true);
-  for (const args of [['wrong'], ['validate'], ['validate', '--dataset', 'a', '--dataset', 'b'],
+  for (const args of [['wrong'], ['validate'], ['plan'], ['validate', '--dataset', 'a', '--dataset', 'b'],
     ['validate', '--dataset', 'a', '--unknown'], ['validate', '--dataset'], ['compare', '--dataset', 'a'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '0'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--allow-remote'],
+    ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--labels', 'forbidden'],
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
-test('help, validate and compare never inspect environment credentials or create a provider', async t => {
+test('help, validate, plan and compare never inspect environment credentials or create a provider', async t => {
   const f = await fixtures(t), trap = { env: new Proxy({}, { get() { throw new Error('Credential access'); } }),
     createProvider() { throw new Error('Factory must not run'); } };
   const output = sink();
@@ -47,15 +53,58 @@ test('help, validate and compare never inspect environment credentials or create
   const files = ['dataset', 'labels', 'champion', 'challenger'].map(name => join(f.dir, `${name}.json`)), before = files.map(hash);
   const comparison = sink();
   const previousFetch = globalThis.fetch; globalThis.fetch = () => { throw new Error('Network forbidden'); };
-  try { assert.equal(await evaluationMain([...f.args, '--json'], comparison, trap), 0); }
+  const plan = sink();
+  try {
+    assert.equal(await evaluationMain(['plan', '--dataset', join(f.dir, 'dataset.json'), '--provider', 'deepseek',
+      '--max-requests', '2', '--json'], plan, trap), 0);
+    assert.equal(await evaluationMain([...f.args, '--json'], comparison, trap), 0);
+  }
   finally { globalThis.fetch = previousFetch; }
   assert.deepEqual(files.map(hash), before);
+  const preview = JSON.parse(plan.text);
+  assert.equal(preview.requestUpperBound, 2);
+  assert.equal(preview.deferredByRequestCapIfNoFailure, 2);
+  assert.equal(preview.remoteAccess, false);
+  assert.equal(preview.estimatedCostUsd, null);
   const report = JSON.parse(comparison.text), q = report.questions[0];
   assert.ok(q.availableSubset.challenger.metrics.brier < q.availableSubset.champion.metrics.brier);
   assert.ok(q.paired.delta.brier > 0); assert.equal(q.paired.count, 2);
   assert.equal(report.executionAllowed, false); assert.equal(report.promotionAllowed, false);
   assert.match(formatEvaluationReport(report), /different population; no direct delta/);
   assert.match(formatEvaluationReport(report), /SYNTHETIC/);
+});
+test('offline plan mirrors trusted provider compatibility and omits raw case state', async t => {
+  const dir = directory(t), dataset = structuredClone(comparisonFixture().dataset);
+  dataset.cases[0].state = { privateValue: 'DO_NOT_FORWARD_' + 'x'.repeat(16000) };
+  const path = join(dir, 'dataset.json'); writeFileSync(path, JSON.stringify(dataset));
+  const deepseek = planEvaluation({ dataset, provider: 'deepseek', maxRequests: 2 });
+  assert.equal(deepseek.eligibleCases, 3);
+  assert.equal(deepseek.unsupportedCases, 1);
+  assert.equal(deepseek.requestUpperBound, 2);
+  assert.equal(deepseek.deferredByRequestCapIfNoFailure, 1);
+  assert.equal(deepseek.selectedCanonicalInputBytes, dataset.cases.slice(1, 3).reduce((sum, item) =>
+    sum + Buffer.byteLength(canonical({ state: item.state, questions: dataset.pack.questions }), 'utf8'), 0));
+  assert.equal(JSON.stringify(deepseek).includes('DO_NOT_FORWARD'), false);
+  const jev = planEvaluation({ dataset, provider: 'jev', maxRequests: 4 });
+  assert.equal(jev.eligibleCases, 4);
+  assert.equal(jev.unsupportedCases, 0);
+  assert.equal(jev.requestUpperBound, 4);
+  assert.equal(jev.modelRouteVerified, false);
+  assert.equal(jev.actualWireBytesVerified, false);
+  const mixed = structuredClone(comparisonFixture().dataset);
+  mixed.pack.questions.route = { type: 'choice', instructions: 'Select the route?', criteria: { a: 'A', b: 'B' } };
+  assert.equal(planEvaluation({ dataset: mixed, provider: 'deepseek', maxRequests: 4 }).requestUpperBound, 0);
+  assert.equal(planEvaluation({ dataset: mixed, provider: 'jev', maxRequests: 4 }).requestUpperBound, 4);
+  const CLI = sink();
+  assert.equal(await evaluationMain(['plan', '--dataset', path, '--provider', 'deepseek',
+    '--max-requests', '2'], CLI, { env: new Proxy({}, { get() { throw new Error('Credential access'); } }),
+    createProvider() { throw new Error('Provider constructed'); } }), 0);
+  assert.match(CLI.text, /Compatible=3, unsupported=1/);
+  assert.equal(CLI.text.includes('DO_NOT_FORWARD'), false);
+  await assert.rejects(evaluationMain(['plan', '--dataset', path, '--provider', 'unknown',
+    '--max-requests', '2'], sink()), /Select deepseek or jev/);
+  assert.throws(() => planEvaluation({ dataset, provider: { toString() { throw new Error('Unsafe coercion'); } },
+    maxRequests: 2 }), /Select deepseek or jev/);
 });
 test('imported non-fixture predictions remain pure local declarations, not authenticated measurements', async t => {
   const f = await fixtures(t);

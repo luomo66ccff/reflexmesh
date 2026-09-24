@@ -12,7 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: installed DeepSeek fenced-result probe
+## Latest local milestone: offline evaluation preflight
+
+On 2026-09-25, an account-free `evaluation plan` preview was added before the
+opt-in paid comparison runner. It uses each provider's trusted capability
+declaration to show compatible cases, unsupported cases, a request upper
+bound and selected canonical input bytes without loading credentials,
+labels, host profiles or a model. This makes provider selection and data
+egress easier to inspect before authorizing a run, but does not estimate
+money, verify model quality or authorize transfer. See the
+[local validation](VALIDATION-EVALUATION-PLAN-T001.md). Local checks passed
+**858 tests: 856 passed, zero failed, two symlink-privilege skips** and four
+offline demos. Publication, exact-head CI and main CI are not claimed in this
+local snapshot. Representative independent-model quality and broader host
+lifecycle acceptance remain open.
+
+## Previous milestone: installed DeepSeek fenced-result probe
 
 On 2026-09-25, an opt-in, isolated installed DeepSeek Harness 0.1.2-rc.1
 probe exercised the Loader's existing fenced-drain option with one genuine
