@@ -59,6 +59,8 @@ keeps remote CI distinct from the local validation.
 An optional [plan-to-run guard](VALIDATION-EVALUATION-PLAN-GUARD-T001.md)
 now rejects accidental dataset/provider/request-cap drift before key access;
 it is not authenticated approval or a monetary budget.
+Its [PR/main integration readback](VALIDATION-EVALUATION-PLAN-GUARD-INTEGRATION-T001.md)
+keeps CI evidence separate from local behavior checks.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: plan-to-run mismatch guard
+## Latest merged milestone: plan-to-run mismatch guard
 
 On 2026-09-25, the offline evaluation preview gained an optional
 `guardDigest`, and paid `run --expect-plan-digest` now refuses changed
@@ -21,10 +21,14 @@ before provider/key access or output-file reservation. This closes an
 accidental stale-preview handoff, not a permission or money gate. See the
 [local guard validation](VALIDATION-EVALUATION-PLAN-GUARD-T001.md).
 Local checks passed **859 tests: 857 passed, zero failed, two local
-symlink-privilege skips** and four offline demos. Publication and CI are
-not claimed in this local snapshot. Model route,
-independent quality, account spending and broader host lifecycle gates
-remain open.
+symlink-privilege skips** and four offline demos.
+[PR #41](https://github.com/luomo66ccff/reflexmesh/pull/41) merged the
+reviewed tree `ffa4d5582b9cfd535c78ee54b2a1121cf3dab3d5`; all five
+jobs passed on its [exact head](https://github.com/luomo66ccff/reflexmesh/actions/runs/36052609169)
+and again on the [main merge commit](https://github.com/luomo66ccff/reflexmesh/actions/runs/36052996575).
+See the distinct [integration readback](VALIDATION-EVALUATION-PLAN-GUARD-INTEGRATION-T001.md).
+Model route, independent quality, account spending and broader host
+lifecycle gates remain open.
 
 ## Previous milestone: offline evaluation preflight
 
