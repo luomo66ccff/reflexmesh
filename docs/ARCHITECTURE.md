@@ -38,6 +38,12 @@ complete chain availability, external truth or production restore authority.
 
 The runtime omits raw event state, action args, outputs and provider error bodies from its audit. Hashes are unsalted fingerprints, not anonymization. Pack names, choice labels, event identifiers and model metadata may still be sensitive. Audit storage still needs ACLs, retention/deletion controls and tamper protection.
 
+Decision and action deadlines are finite integer milliseconds in the range
+`1..2_147_483_647`. Construction rejects invalid values before a provider,
+authorizer, tool or durable admission can run. This prevents Node from turning
+an out-of-range timer into an approximately immediate timeout; a valid
+deadline still bounds waiting, not the underlying external side effect.
+
 ## Memory Governor
 
 The current pack assesses usefulness, expected stability, duplication, sensitivity and conflict. It returns `propose_persist`, `propose_ttl`, `drop`, `review_privacy` or `resolve_conflict`. It does not perform extraction, vector search, persistence, consent checks or deletion.

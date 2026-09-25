@@ -12,7 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: copied selected DeepSeek Web UI first evidence
+## Latest local milestone: bounded in-process deadlines
+
+On 2026-09-25, [Issue #72](https://github.com/luomo66ccff/reflexmesh/issues/72)
+was reproduced on Node 24.19.0: an out-of-range timeout became a 1-ms Node
+timer, causing a false provider failure or unknown action result. The
+`ReflexMesh` constructor and direct deadline helper now reject non-integer or
+out-of-range millisecond values `1..2_147_483_647` before any associated
+callback. Default timeouts, shadow authorization, outcome classifications and
+no-retry behavior remain unchanged. The durable wrapper inherits constructor
+validation before admission. Focused tests passed **47/47**. `npm ci
+--ignore-scripts`, `npm run check` (**969 tests: 967 passed, 0 failed, 2 local
+Windows symlink-privilege skips**) and the default, durable and recovery demos
+passed. See [validation](VALIDATION-DEADLINE-RANGE-T001.md). This is not a
+general guarantee that timed-out external work stopped or that all known
+product gaps are closed.
+
+## Previous merged milestone: copied selected DeepSeek Web UI first evidence
 
 On 2026-09-25, an opt-in command copied bounded selected `web` configuration
 to a disposable home, launched the installed 0.1.2-rc.1 Web stack on loopback,

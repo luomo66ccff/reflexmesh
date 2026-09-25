@@ -15,6 +15,16 @@ const setup = (kernel, opts = {}) => new DurableMesh({ kernel, provider: new Moc
 const disk = async t => { const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-kernel-')); t.after(() => rm(dir, { recursive: true, force: true })); return join(dir, 'kernel.sqlite'); };
 const claim = (kernel, overrides = {}) => kernel.claim({ key: 'key', requestDigest: 'digest', owner: 'one', leaseMs: 100, evidence: {}, ...overrides });
 
+test('invalid runtime deadline rejects before durable admission or pack registration', () => {
+  let calls = 0;
+  const kernel = { claim: () => { calls++; }, registerPack: () => { calls++; } };
+  for (const name of ['decisionTimeoutMs', 'actionTimeoutMs']) {
+    assert.throws(() => new DurableMesh({ kernel, provider: new MockProvider(result), binding,
+      [name]: 2_147_483_648 }), /Invalid .*TimeoutMs/);
+  }
+  assert.equal(calls, 0);
+});
+
 test('SQLite decision survives close/reopen, no second provider call, no raw state', async t => {
   const path = await disk(t); let calls = 0;
   let kernel = new SqliteKernel(path);

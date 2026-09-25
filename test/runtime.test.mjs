@@ -65,11 +65,50 @@ test('invalid provider probabilities fail closed', async () => {
   const { mesh } = harness({ mode: 'active', provider: new MockProvider(() => bad) });
   assert.equal((await mesh.run(event(), requestOptions())).verdict.effect, 'escalate');
 });
+test('constructor rejects unrepresentable decision and action deadlines before callbacks', () => {
+  const invalid = [0, -1, 0.5, 1.5, NaN, Infinity, -Infinity,
+    2_147_483_648, Number.MAX_SAFE_INTEGER, '50', null];
+  let callbacks = 0;
+  const provider = new MockProvider(() => { callbacks++; return result(); });
+  const ledger = { append: async () => { callbacks++; } };
+  for (const name of ['decisionTimeoutMs', 'actionTimeoutMs']) {
+    for (const value of invalid) {
+      assert.throws(() => new ReflexMesh({ provider, ledger, [name]: value }), {
+        name: 'ContractError',
+        message: `Invalid ${name}: expected integer milliseconds from 1 to 2147483647`,
+      });
+    }
+    for (const value of [1, 2_147_483_647])
+      assert.doesNotThrow(() => new ReflexMesh({ provider, ledger, [name]: value }));
+    assert.doesNotThrow(() => new ReflexMesh({ provider, ledger, [name]: undefined }));
+  }
+  assert.doesNotThrow(() => new ReflexMesh({ provider, ledger }));
+  assert.equal(callbacks, 0);
+});
+test('valid asynchronous provider completes within its decision budget', async () => {
+  const { mesh } = harness({ decisionTimeoutMs: 5000,
+    provider: new MockProvider(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return result();
+    }) });
+  const r = await mesh.run(event(), requestOptions());
+  assert.equal(r.status, 'shadow');
+  assert.equal(r.verdict.effect, 'allow');
+});
 test('uncooperative provider is bounded by a runtime deadline', async () => {
   const { mesh } = harness({ mode: 'active', decisionTimeoutMs: 15,
     provider: { id: 'hung', capabilities: new MockProvider(result).capabilities,
       evaluate: () => new Promise(() => {}) } });
   const r = await mesh.run(event(), requestOptions()); assert.equal(r.status, 'blocked');
+});
+test('authorization deadline denies instead of calling a tool', async () => {
+  let calls = 0;
+  const { mesh } = harness({ mode: 'active', decisionTimeoutMs: 10,
+    authorize: () => new Promise(() => {}) });
+  mesh.registerTool(readTool(async () => { calls++; return {}; }));
+  const r = await mesh.run(event(), requestOptions());
+  assert.equal(r.reasonCode, 'authorization_denied');
+  assert.equal(calls, 0);
 });
 test('tool timeout is unknown outcome and is not automatically retried', async () => {
   let calls = 0; const { mesh } = harness({ mode: 'active', authorize: () => true, actionTimeoutMs: 15 });
