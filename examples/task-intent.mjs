@@ -15,7 +15,7 @@ const PRIVATE_BODY = 'PRIVATE_PROMPT_BODY_NOT_SELECTED';
 const USAGE = `Usage: node examples/task-intent.mjs [--summary | --explain] [--out-dir NEW_DIRECTORY]
        npm run first-run [-- --out-dir NEW_DIRECTORY]
 Runs only synthetic evidence fixtures; no model, user profile or host tool is used.
-Without --out-dir, temporary databases are removed. A retained lesson contains only ledger.sqlite and START-HERE.md.
+Without --out-dir, temporary databases are removed. A retained lesson contains ledger.sqlite, candidate-pack.json and START-HERE.md.
 For paths with spaces, build first and pass the quoted path directly to node.
 `;
 
@@ -54,14 +54,28 @@ function markdownFence(value, language) {
   return `${fence}${language}\n${value}\n${fence}`;
 }
 
-function startHere(directory) {
+function lessonCandidatePack() {
+  return {
+    ...toolPreflightPack,
+    version: '0.1.0-synthetic-what-if',
+    rules: toolPreflightPack.rules.map(rule => rule.id !== 'intent-supported' ? rule : {
+      ...rule,
+      all: rule.all.map(condition => condition.answer === 'intentMatch' && condition.op === 'gte'
+        ? { ...condition, value: 0.99 } : condition),
+    }),
+  };
+}
+
+function startHere(directory, selectedKey) {
   const db = join(directory, 'ledger.sqlite');
+  const candidate = join(directory, 'candidate-pack.json');
   const prefix = process.platform === 'win32' ? '& ' : '';
   const command = (verb, extra = '') => `${prefix}node adapters/evidence-cli.mjs ${verb} --db ${shellQuote(db)}${extra}`;
   const commands = [command('list'), command('attention'),
-    command('inspect', ` --key ${shellQuote('<KEY_FROM_LIST>')}`)];
+    command('inspect', ` --key ${shellQuote('<KEY_FROM_LIST>')}`),
+    command('replay', ` --key ${shellQuote(selectedKey)} --candidate-pack ${shellQuote(candidate)}`)];
   const shell = process.platform === 'win32' ? 'powershell' : 'sh';
-  return `# Synthetic evidence lesson\n\nThis is an **account-free synthetic fixture**, not a real host session or user ledger. No model or host tool ran. The task-summary cache was temporary and has been removed; raw task text is not retained in this directory.\n\nFrom the ReflexMesh repository root, use these read-only commands. The inspector does not call providers, run tools, retry actions or change ledger records. SQLite may create or interact with WAL/SHM sidecars; read-only access is not a byte-for-byte filesystem immutability guarantee.\n\n1. List the synthetic decisions and copy one exact key from the output.\n\n${markdownFence(commands[0], shell)}\n\n2. Find records needing attention. Missing reports in this fixture are expected; they do not imply a crash or non-execution.\n\n${markdownFence(commands[1], shell)}\n\n3. Inspect a decision by replacing KEY_FROM_LIST with a key from list. The report keeps the decision, host outcome and labels separate.\n\n${markdownFence(commands[2], shell)}\n\nThis directory was created only if it did not already exist. Keep or remove this synthetic lesson as you prefer; it grants no permission to act on a real system.\n`;
+  return `# Synthetic evidence lesson\n\nThis is an **account-free synthetic fixture**, not a real host session or user ledger. No model or host tool ran. The task-summary cache is outside this directory; only a successful first-run exit confirms its cleanup. Raw task text is not retained here.\n\nFrom the ReflexMesh repository root, use these read-only commands. The inspector and policy replay do not call providers, run tools, retry actions or change ledger records. SQLite may create or interact with WAL/SHM sidecars; read-only access is not a byte-for-byte filesystem immutability guarantee.\n\n1. List the synthetic decisions and copy one exact key from the output.\n\n${markdownFence(commands[0], shell)}\n\n2. Find records needing attention. Missing reports in this fixture are expected; they do not imply a crash or non-execution.\n\n${markdownFence(commands[1], shell)}\n\n3. Inspect a decision by replacing KEY_FROM_LIST with a key from list. The report keeps the decision, host outcome and labels separate.\n\n${markdownFence(commands[2], shell)}\n\n4. Replay only the policy for the selected synthetic decision. The provided candidate keeps the exact question contract but changes the intent-match threshold from 0.90 to 0.99. Its old allow becomes a hypothetical escalate; neither verdict authorizes the host tool.\n\n${markdownFence(commands[3], shell)}\n\nFor a real ledger, supply a candidate DecisionPack JSON whose event type and questions match the recorded prediction. This command never proves model quality or grants retry permission.\n\nThis directory was created only if it did not already exist. Keep or remove this synthetic lesson as you prefer; it grants no permission to act on a real system.\n`;
 }
 
 function removeOwnedDirectory(path, ownership) {
@@ -83,8 +97,10 @@ function removeTemporaryDirectory(path, prefix, tempRoot) {
   } catch { throw new DemoCleanupError('Temporary cleanup could not be verified'); }
 }
 
-function retainInstructions(directory) {
-  const content = startHere(directory);
+function retainInstructions(directory, selectedKey) {
+  writeFileSync(join(directory, 'candidate-pack.json'), `${JSON.stringify(lessonCandidatePack(), null, 2)}\n`,
+    { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+  const content = startHere(directory, selectedKey);
   const destination = join(directory, 'START-HERE.md');
   writeFileSync(destination, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
 }
@@ -172,7 +188,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
 
     cache.close(); cache = undefined;
     kernel.close(); kernel = undefined;
-    if (retained) retainInstructions(outputDir);
+    if (retained) retainInstructions(outputDir, assessed.decisionId);
     successful = true;
 
     if (options.mode === 'summary') completionText = summaryOutput({ runtime, report, outputDir, retained });
