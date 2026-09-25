@@ -22,10 +22,12 @@ test('production Codex MCP setup probe reopens synthetic evidence with zero labe
   assert.equal(report.status, 'passed');
   assert.equal(report.nativeCodexConfig, 'not_requested');
   assert.deepEqual(report.productionMcp, { status: 'passed', processCount: 2, listedTools: 4,
-    decisions: 2, outcomeStatus: 'unknown', outcomeProvenance: 'model-reported', labels: 0 });
+    decisions: 2, outcomeStatus: 'unknown', outcomeProvenance: 'model-reported', labels: 0,
+    restartReplay: true, restartConflictRejected: true });
   assert.equal(report.actualCodexAgent, 'not_tested');
   assert.equal(report.modelRequest, 'none');
   assert.equal(result.stdout.includes('SYNTHETIC: Read'), false);
+  assert.equal(result.stdout.includes('SYNTHETIC: Different task'), false);
   assert.equal(result.stdout.includes('ledger.sqlite'), false);
 });
 

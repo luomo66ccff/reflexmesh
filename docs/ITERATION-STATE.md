@@ -12,7 +12,19 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: what-if source consistency guards
+## Latest local milestone: Codex MCP process restart and task conflict
+
+On 2026-09-25, the account-free Codex setup probe was extended to send the
+same model-reported call through a second production MCP process using the
+same isolated ledger. The second process reuses the prior decision; changing
+the summary without changing call identity returns a fixed conflict. Readback
+still finds two decisions, one model-reported unknown outcome and zero labels.
+The local installed DeepSeek 0.1.2-rc.1 synthetic lifecycle matrix was also
+rechecked (17/17 assertions); it remains separate from this Codex check. See
+[local restart validation](VALIDATION-CODEX-MCP-RESTART-T001.md). Neither probe
+tests a real resumed Codex Agent, default profile or real model quality.
+
+## Previous merged milestone: what-if source consistency guards
 
 On 2026-09-25, two tamper fixtures exposed plausible but unbound what-if
 results: source-pack export accepted a stored verdict that disagreed with its

@@ -95,7 +95,8 @@ is kept separate from the still-unverified live connection.
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;
 `npm run compat:codex-setup` then checks the production MCP evidence path in
-isolation without an account. Both are described in the
+isolation without an account, including one process restart with same-call
+replay and changed-task conflict. Both are described in the
 [Codex first-run guide](docs/CODEX-FIRST-RUN.md). This does not install a server
 or verify that a real Codex Agent chose to call it.
 For an explicitly opted-in synthetic Agent read, the separate
