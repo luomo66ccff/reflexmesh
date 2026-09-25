@@ -33,6 +33,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Export one source pack from a completed prediction to a new-only local candidate file after checking its recorded run/pack binding and prediction contract. This closes the manual-pack-discovery gap without exposing pack instructions on stdout or changing the ledger; see the [what-if guide](EVIDENCE.md#ask-a-policy-only-what-if-question) and [local validation](VALIDATION-PACK-TEMPLATE-T001.md).
 - [x] Reject a source-pack export if the stored original verdict disagrees with the bound pack and prediction; reject replay if the recorded model drifts from its deployment binding. These are local consistency checks, not authentication of a mutable ledger; see [integrity validation](VALIDATION-POLICY-INTEGRITY-T001.md).
 - [x] Give policy replay the same bound-source consistency check under one read transaction, and visibly mark a stripped legacy source as unverified instead of silently presenting its stored verdict as checked. This remains unauthenticated local evidence; see [replay-source validation](VALIDATION-REPLAY-SOURCE-T001.md).
+- [x] Summarize rule add/remove/structural modifications, shared-rule order and fallback edits in verified policy replay, while marking legacy source diffs unavailable and avoiding source instructions on stdout; see [policy-delta validation](VALIDATION-POLICY-DELTA-T001.md).
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
 - [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [x] Offer an account-free installed Claude CLI/native Read/hook loop using strict synthetic localhost Messages, including duplicate-observer rejection; see [setup and limits](CLAUDE-LOCAL-LOOP.md).
@@ -254,6 +255,10 @@ The follow-up source-pack export can construct the candidate starting point
 from the selected ledger itself, with explicit new-file output and digest
 checks. The exported full pack may contain sensitive instructions and is not
 an authenticated deployment artifact.
+The follow-up replay receipt also summarizes structural policy-body edits
+against a locally verified source without printing conditions or instructions;
+it marks legacy sources as unavailable. This distinguishes a version-only
+candidate from changed rules, but does not identify which edit caused a verdict.
 
 ## v0.3: memory governance and calibrated comparison
 

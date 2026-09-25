@@ -451,8 +451,15 @@ export class SqliteKernel {
         requireValue(this.#schemaVersion === 1, 'Bound source pack is unavailable for replay');
         return { state: sizes.state, evidence, result, sourceConsistency: 'legacy_unverified' };
       }
-      this.#boundPolicyPack(evidence, result);
-      return { state: sizes.state, evidence, result, sourceConsistency: 'verified' };
+      const { pack } = this.#boundPolicyPack(evidence, result);
+      // Keep question instructions and other pack prose out of the replay
+      // projection; only the deterministic policy body is needed for a diff.
+      return { state: sizes.state, evidence, result, sourceConsistency: 'verified',
+        sourcePolicy: { rules: pack.rules.map(rule => ({ id: rule.id,
+          all: rule.all.map(condition => ({ answer: condition.answer, metric: condition.metric,
+            op: condition.op, value: condition.value })), effect: rule.effect,
+          ...(rule.directive === undefined ? {} : { directive: rule.directive }) })),
+        fallback: pack.fallback } };
     });
   }
   policyPackTemplate(key) {

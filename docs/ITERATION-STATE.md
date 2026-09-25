@@ -12,7 +12,20 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: original-source-checked policy replay
+## Latest local milestone: policy replay edit summary
+
+On 2026-09-25, policy replay now compares the verified bound source policy with
+the candidate's rules and fallback. The narrow receipt counts added, removed
+and structurally modified rules, distinguishes shared-rule reordering and
+fallback edits, and identifies a version-only/no-policy-body change. The human
+view states that this is structural, not causal attribution. A stripped
+schema-1 source cannot be diffed and explicitly reports `legacy_unverified`.
+Only one selected run and its bound pack are read; no source question prose,
+provider, tool or ledger write is involved. See
+[local validation](VALIDATION-POLICY-DELTA-T001.md). Host/profile and model
+quality gates remain open.
+
+## Previous merged milestone: original-source-checked policy replay
 
 On 2026-09-25, a tamper regression showed that direct `evidence replay` could
 display a plausible original-versus-candidate change even after the original

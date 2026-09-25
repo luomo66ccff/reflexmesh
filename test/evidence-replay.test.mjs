@@ -47,8 +47,11 @@ test('policy-only replay gives a narrow hypothetical receipt and keeps ledger by
   const receipt = JSON.parse(json.stdout);
   assert.deepEqual(Object.keys(receipt).sort(),
     ['candidate','candidatePackDigest','executionAllowed','hypothetical','original',
-      'originalSourceConsistency'].sort());
+      'originalSourceConsistency','policyChanges'].sort());
   assert.equal(receipt.originalSourceConsistency, 'verified');
+  assert.deepEqual(receipt.policyChanges, { status: 'verified', rulesAdded: 0,
+    rulesRemoved: 0, rulesModified: 1, sharedRuleOrderChanged: false,
+    fallbackChanged: false, structureUnchanged: false });
   assert.deepEqual(receipt.original, { effect: 'allow', ruleId: 'intent-supported' });
   assert.deepEqual(receipt.candidate, { effect: 'escalate', ruleId: 'fallback' });
   assert.equal(receipt.hypothetical, true);
@@ -58,10 +61,40 @@ test('policy-only replay gives a narrow hypothetical receipt and keeps ledger by
   assert.equal(human.status, 0, human.stderr);
   assert.match(human.stdout, /allow -> escalate/);
   assert.match(human.stdout, /Original source consistency: verified/);
+  assert.match(human.stdout, /Policy changes: 1 modified rule/);
   assert.match(human.stdout, /hypothetical: true/);
   assert.match(human.stdout, /execution allowed: false/);
   assert.deepEqual(readFileSync(f.db), before);
   assert.ok(!json.stdout.includes('PRIVATE_KEY'));
+});
+
+test('replay distinguishes a version-only pack from structural policy edits', async t => {
+  const f = await fixture(t);
+  const versionOnly = structuredClone(toolPreflightPack);
+  versionOnly.version = 'new-name-same-policy';
+  versionOnly.rules[0].note = 'PRIVATE_IGNORED_RULE_EXTRA';
+  versionOnly.rules[0].all[0].note = 'PRIVATE_IGNORED_CONDITION_EXTRA';
+  writeFileSync(f.candidate, JSON.stringify(versionOnly));
+  const versionResponse = cli(...args(f), '--json');
+  assert.equal(versionResponse.status, 0, versionResponse.stderr);
+  assert.ok(!versionResponse.stdout.includes('PRIVATE_IGNORED'));
+  const noChange = JSON.parse(versionResponse.stdout);
+  assert.deepEqual(noChange.policyChanges, { status: 'verified', rulesAdded: 0,
+    rulesRemoved: 0, rulesModified: 0, sharedRuleOrderChanged: false,
+    fallbackChanged: false, structureUnchanged: true });
+
+  const edited = structuredClone(f.candidatePack);
+  edited.rules = [
+    { id: 'new-no-op', all: [{ answer: 'injection', metric: 'value', op: 'gte', value: 1 }], effect: 'deny' },
+    edited.rules[2], edited.rules[0],
+  ];
+  edited.fallback = 'deny';
+  writeFileSync(f.candidate, JSON.stringify(edited));
+  const response = cli(...args(f), '--json');
+  assert.equal(response.status, 0, response.stderr);
+  assert.deepEqual(JSON.parse(response.stdout).policyChanges, { status: 'verified',
+    rulesAdded: 1, rulesRemoved: 1, rulesModified: 1, sharedRuleOrderChanged: true,
+    fallbackChanged: true, structureUnchanged: false });
 });
 
 test('same effect with changed directive remains visible in both output modes', async t => {
@@ -223,6 +256,7 @@ test('schema-1 read-only replay works without migrating or reading other tables'
   assert.equal(response.status, 0, response.stderr);
   assert.equal(JSON.parse(response.stdout).candidate.effect, 'escalate');
   assert.equal(JSON.parse(response.stdout).originalSourceConsistency, 'legacy_unverified');
+  assert.deepEqual(JSON.parse(response.stdout).policyChanges, { status: 'legacy_unverified' });
   const human = cli('--db', oldDb, '--key', f.key, '--candidate-pack', f.candidate);
   assert.equal(human.status, 0, human.stderr);
   assert.match(human.stdout, /Original source consistency: legacy_unverified/);

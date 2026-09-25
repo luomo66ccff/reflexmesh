@@ -52,6 +52,10 @@ To keep an inspectable synthetic ledger in a **new directory** and try the read-
 
 For an existing local ledger, `node adapters/evidence-cli.mjs pack-template --db PATH --key KEY --out NEW_FILE` exports the exact source pack bound to one completed prediction into a **new file only**. Review its full question instructions privately, edit the copied version and rules, then pass it to `evidence replay`. Neither step calls a provider or tool; the export does write the selected local file and never changes the ledger. See the [policy what-if guide](docs/EVIDENCE.md#ask-a-policy-only-what-if-question).
 Export and replay now reject a recorded verdict that cannot be reproduced from the bound pack and prediction; replay also rejects a recorded model that differs from its binding. A stripped legacy ledger without a source-pack table can still replay, but explicitly marks its original verdict `legacy_unverified`. These checks detect inconsistency, not ledger tampering by a capable writer.
+For a verified source, replay also summarizes structural policy edits: rules added,
+removed or modified, shared-rule order and fallback. A version-only candidate
+reports unchanged policy structure; the summary does not attribute a decision
+change to any one edit or reveal rule conditions.
 
 After a restart, `npm run evidence -- attention --db PATH` gives a read-only,
 paged list of decision rows with missing/uncertain outcome evidence, ambiguous
