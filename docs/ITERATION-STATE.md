@@ -12,7 +12,21 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: real selected DeepSeek web home synthetic tool round trip
+## Latest local milestone: copied selected DeepSeek Web UI first evidence
+
+On 2026-09-25, an opt-in command copied bounded selected `web` configuration
+to a disposable home, launched the installed 0.1.2-rc.1 Web stack on loopback,
+and waited for a fixed synthetic task sent through the actual browser UI in
+read-only mode. The page displayed one `reflexmesh_fixture_read` call, the
+`synthetic-read-ok` result and the final fixture marker. A bound shadow ledger
+was retained to a new private directory with a working `evidence inspect`
+entrypoint. The final local run passed **21/21** gates, checked source config
+unchanged and removed the temporary home; `npm run check` reported **962
+tests: 960 passed, 0 failed, 2 local Windows symlink-privilege skips**.
+This does not prove real-home UI use, arbitrary plugin safety, paid-model
+quality or the long-term bug-free objective. See [local validation](VALIDATION-DEEPSEEK-WEB-FIRST-EVIDENCE-T001.md).
+
+## Previous merged milestone: real selected DeepSeek web home synthetic tool round trip
 
 On 2026-09-25, a separate, explicit real-home check booted the installed
 0.1.2-rc.1 selected `web` profile with temporary CLI overlays. It required a
