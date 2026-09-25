@@ -50,6 +50,8 @@ through shadow decision, separate host report and task clear, then points to
 
 To keep an inspectable synthetic ledger in a **new directory** and try the read-only CLI against it, use `npm run first-run -- --out-dir evidence-lesson`. Existing paths are never overwritten. The output's `START-HERE.md` contains copyable `list`, `attention`, `inspect` and policy-only `replay` commands; its candidate pack changes one fixture threshold to show an `allow` becoming a hypothetical `escalate`. This is still a fixture, not your deployment data or a host permission. For a real local ledger, see the [evidence CLI guide](docs/EVIDENCE.md).
 
+For an existing local ledger, `node adapters/evidence-cli.mjs pack-template --db PATH --key KEY --out NEW_FILE` exports the exact source pack bound to one completed prediction into a **new file only**. Review its full question instructions privately, edit the copied version and rules, then pass it to `evidence replay`. Neither step calls a provider or tool; the export does write the selected local file and never changes the ledger. See the [policy what-if guide](docs/EVIDENCE.md#ask-a-policy-only-what-if-question).
+
 After a restart, `npm run evidence -- attention --db PATH` gives a read-only,
 paged list of decision rows with missing/uncertain outcome evidence, ambiguous
 hook pairing, or execution recovery requirements. It never infers a crash or
@@ -187,7 +189,7 @@ that concurrency; this setting does not serialize the production runtime.
 | DeepSeek Harness | Loader-ready shadow plugin with opt-in claimed-task summaries; isolated CLI/Agent tool round trip verified with synthetic and authorized real-model transport; broader lifecycle matrix remains open |
 | Outcome evidence | Bound to exact tool and arguments; raw output not persisted; model/harness observations cannot automatically create labels |
 | Evidence browser | Read-only CLI with bounded pages, decision explanations, task coverage and outcome provenance; no provider or tool invocation |
-| Policy-only what-if | Single-key, read-only replay of a recorded valid prediction against an explicitly supplied same-question pack; hypothetical verdicts never grant execution or retry |
+| Policy-only what-if | Single-key replay of a recorded valid prediction against an explicitly supplied same-question pack; a bound source pack can be exported to a new local file, while hypothetical verdicts never grant execution or retry |
 | Storage diagnostics | Read-only schema-1/2/3/4 table/state/pair-only samples and file/page metadata; no deletion, age eligibility or retry authority |
 | Consistent ledger archives | Native SQLite online backup into a new private directory, offline integrity/hash verification and synthetic isolated restore/no-retry lesson; no production overwrite restore |
 | Ledger compaction | Backup-bound preview, exclusive maintenance and complete logical-content verification; explicit local VACUUM, no historical row deletion or automatic retry |

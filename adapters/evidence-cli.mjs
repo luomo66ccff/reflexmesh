@@ -6,19 +6,22 @@ import { isDirectRun } from './direct-run.mjs';
 import { resolveStorageDatabasePath } from './storage-files.mjs';
 import { formatStorageReport, storageReport } from './storage-report.mjs';
 import { formatPolicyReplay, policyReplayReceipt, readCandidatePack } from './policy-replay.mjs';
+import { formatPackTemplate, writePackTemplate } from './pack-template.mjs';
 
-const USAGE = `ReflexMesh evidence: explain decisions separately from host outcomes (read-only)
+const USAGE = `ReflexMesh evidence: explain decisions separately from host outcomes (ledger read-only)
   npm run evidence -- list --db PATH [--limit 20] [--after KEY] [--state STATE] [--json]
   npm run evidence -- attention --db PATH [--limit 20] [--after KEY] [--json]
   npm run evidence -- inspect --db PATH --key KEY [--json]
   npm run evidence -- replay --db PATH --key KEY --candidate-pack FILE [--json]
+  npm run evidence -- pack-template --db PATH --key KEY --out NEW_FILE [--json]
   npm run evidence -- storage --db PATH [--scan-limit 1000] [--json]
 States: admitted, executing, completed, unknown. Pages are ordered by key, not recency.
 Attention covers decision rows only; pair-only reservations are excluded, and this is not a complete error inventory.
 Storage includes bounded table/pair-only counts and file lengths, never deletion eligibility or automatic cleanup.
 Archived audit bodies require audit-archive-cli history/query and explicit archive files; a backup does not verify external archives.
 Replay is a policy-only hypothetical using a local JSON candidate; it never invokes a provider or tool.
-No permission change is invoked. Use --json for metadata receipts.
+Pack-template reads a bound pack and writes only the explicitly selected, new local file; it never prints pack contents.
+No permission change or ledger write is invoked. Use --json for metadata receipts.
 The database must already exist. Build once with npm run build before using this CLI.
 For paths containing spaces on Windows, use the direct node adapters/evidence-cli.mjs entrypoint with a quoted path.
 `;
@@ -26,11 +29,12 @@ const fail = message => { throw new ContractError(message); };
 export function parseEvidenceOptions(argv) {
   if (!argv.length || (argv.length === 1 && argv[0] === '--help')) return { help: true };
   const [command, ...rest] = argv;
-  if (!['list','attention','inspect','replay','storage'].includes(command)) fail('Expected list, attention, inspect, replay or storage; use --help');
+  if (!['list','attention','inspect','replay','pack-template','storage'].includes(command)) fail('Expected list, attention, inspect, replay, pack-template or storage; use --help');
   const allowed = command === 'list' ? ['db','limit','after','state','json']
     : command === 'attention' ? ['db','limit','after','json']
       : command === 'storage' ? ['db','scan-limit','json']
-        : command === 'replay' ? ['db','key','candidate-pack','json'] : ['db','key','json'];
+        : command === 'replay' ? ['db','key','candidate-pack','json']
+          : command === 'pack-template' ? ['db','key','out','json'] : ['db','key','json'];
   const options = { command };
   for (let i = 0; i < rest.length; i++) {
     const name = rest[i].startsWith('--') ? rest[i].slice(2) : '';
@@ -43,8 +47,9 @@ export function parseEvidenceOptions(argv) {
     }
   }
   if (!options.db || options.db === ':memory:') fail('An existing --db PATH is required');
-  if (['inspect','replay'].includes(command) && !options.key) fail('An evidence --key is required');
+  if (['inspect','replay','pack-template'].includes(command) && !options.key) fail('An evidence --key is required');
   if (command === 'replay' && !options['candidate-pack']) fail('A --candidate-pack JSON file is required');
+  if (command === 'pack-template' && !options.out) fail('A new --out FILE is required');
   if (options.limit !== undefined) {
     if (!/^[0-9]+$/.test(options.limit) || Number(options.limit) < 1 || Number(options.limit) > 100) fail('Evidence limit must be 1 through 100');
     options.limit = Number(options.limit);
@@ -59,6 +64,7 @@ export function parseEvidenceOptions(argv) {
 }
 export function formatEvidence(result, command) {
   if (command === 'replay') return formatPolicyReplay(result);
+  if (command === 'pack-template') return formatPackTemplate(result);
   if (command === 'storage') return formatStorageReport(result);
   const quote = value => JSON.stringify(value ?? 'not recorded');
   const sources = item => item.hostOutcome.byProvenance.map(group => `${group.provenance}:${group.status}=${group.count}`).join(', ') || 'none';
@@ -108,7 +114,9 @@ export async function evidenceMain(argv, output = process.stdout) {
   const path = options.command === 'storage' ? resolveStorageDatabasePath(options.db) : resolve(options.db);
   const kernel = new SqliteKernel(path, { readOnly: true });
   try {
-    const result = options.command === 'replay' ? policyReplayReceipt(kernel.policyReplayRecord(options.key), candidate)
+    const result = options.command === 'pack-template'
+      ? await writePackTemplate(options.out, kernel.policyPackTemplate(options.key))
+      : options.command === 'replay' ? policyReplayReceipt(kernel.policyReplayRecord(options.key), candidate)
       : options.command === 'storage' ? storageReport(kernel, path, options['scan-limit'] ?? 1000)
       : options.command === 'list'
       ? kernel.listEvidence({ limit: options.limit ?? 20, after: options.after ?? '', state: options.state ?? null })
