@@ -17,18 +17,25 @@ const plugin = {
       || typeof config.overlayPath !== 'string') {
       throw new TypeError('Synthetic fixture paths required');
     }
-    const profileManifest = JSON.parse(readFileSync(join(config.homePath, 'profiles', 'reflexmesh-probe', 'package.json'), 'utf8'));
+    const profileName = config.profileName ?? 'reflexmesh-probe';
+    if (profileName !== 'reflexmesh-probe' && profileName !== 'web')
+      throw new TypeError('Unsupported synthetic fixture profile');
+    const profileManifest = JSON.parse(readFileSync(join(config.homePath, 'profiles', profileName, 'package.json'), 'utf8'));
+    const bundles = profileManifest.dsh?.profile?.bundles;
+    const bundleShape = profileName === 'web'
+      ? Array.isArray(bundles) && bundles.includes('@deepseek-ai/dsh-base')
+        && bundles.includes('@deepseek-ai/dsh-web-app')
+      : Array.isArray(bundles) && bundles.length === 0;
     const isolatedProfileLoaded = process.env.DSH_HOME === config.homePath && process.cwd() === config.cwdPath
-      && Array.isArray(profileManifest.dsh?.profile?.bundles) && profileManifest.dsh.profile.bundles.length === 0
-      && profileManifest.dsh.profile.patchReload === 'startup';
+      && bundleShape && (profileName === 'web' || profileManifest.dsh.profile.patchReload === 'startup');
     const observerReady = ctx.get('reflexmeshObserverReady');
-    const profileFile = join(config.homePath, 'profiles', 'reflexmesh-probe', 'cordis.yml');
+    const profileFile = join(config.homePath, 'profiles', profileName, 'cordis.yml');
     const loaderProfileBound = ctx.fiber?.entry?.parent?.tree?.filename === profileFile;
     const expectedObserverUrl = new URL('../../adapters/deepseek-loader-plugin.mjs', import.meta.url).href;
     const observerEntry = [...(ctx.get('loader')?.entries() ?? [])].find(entry => entry.options?.id === 'reflexmesh-observer');
     const observerEntryActivated = observerEntry?.options?.name === expectedObserverUrl
       && observerEntry.fiber?.state === 2 && observerEntry.parent?.tree?.filename === profileFile;
-    const profilePatch = readFileSync(join(config.homePath, 'profiles', 'reflexmesh-probe', 'cordis.patch.yml'), 'utf8');
+    const profilePatch = readFileSync(join(config.homePath, 'profiles', profileName, 'cordis.patch.yml'), 'utf8');
     const overlayPatch = readFileSync(config.overlayPath, 'utf8');
     const patchArg = process.argv.indexOf('--patch');
     const observerOverlayViaCli = observerEntryActivated && patchArg >= 0
@@ -51,7 +58,8 @@ const plugin = {
     const state = { isolatedProfileLoaded, loaderProfileBound, observerEntryActivated,
       observerOverlayViaCli,
       naturalBeforeExit: false, observerDrainedAtExit: false, kernelClosedAtExit: false,
-      requests: 0, bodyCalls: 0, toolAdvertised: false, toolCount: 0,
+      requests: 0, backgroundRequests: 0, totalRequests: 0,
+      bodyCalls: 0, toolAdvertised: false, toolCount: 0,
       toolHadAgent: false, toolArgsExact: false, toolResultSeen: false, sessionConsistent: false,
       modelSessionId: null, toolSessionId: null, toolAgentId: null };
     const save = () => writeFileSync(config.telemetryPath, JSON.stringify(state), 'utf8');
@@ -64,11 +72,22 @@ const plugin = {
     });
     class SyntheticAdapter extends LlmAdapter {
       async *stream(options) {
-        state.requests += 1;
+        state.totalRequests += 1;
         options.signal?.throwIfAborted();
-        if (options.provider !== PROVIDER || options.model !== MODEL || state.requests > 2) {
+        if (options.provider !== PROVIDER || options.model !== MODEL || state.totalRequests > 4) {
           throw new Error('Unexpected synthetic adapter request');
         }
+        const fixtureTask = options.messages?.some(message =>
+          message.source?.kind === 'user' && message.content?.some(block => block.type === 'text'
+            && block.text.startsWith('ReflexMesh-Intent: '))) === true;
+        if (!fixtureTask && profileName === 'web') {
+          state.backgroundRequests += 1;
+          save();
+          yield { type: 'text-delta', index: 0, text: 'Synthetic fixture title' };
+          yield { type: 'finish', reason: { kind: 'stop' } };
+          return;
+        }
+        state.requests += 1;
         if (state.requests === 1) {
           state.modelSessionId = options.sessionId ?? null;
           state.toolCount = Array.isArray(options.tools) ? options.tools.length : -1;

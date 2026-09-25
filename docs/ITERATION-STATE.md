@@ -12,7 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: copied selected DeepSeek web stack startup
+## Latest milestone: copied selected DeepSeek web native tool round trip
+
+On 2026-09-25, the opt-in selected `web` check advanced from startup-only to
+one synthetic Agent turn inside the copied full Web bundle stack. A fixed
+synthetic adapter advertises one in-memory read tool, receives the native tool
+result, and produces a fixed final marker. The probe checks one shadow ledger
+decision, exact host Agent/session identity, host-reported success, abstain
+binding, zero labels, Loader/Web activation and natural cleanup. The installed
+0.1.2-rc.1 selected stack passed **17/17** checks; checked real-profile config
+bytes/metadata stayed unchanged and the disposable home was removed. A Web
+session-title request was answered locally by the bounded synthetic adapter,
+not sent to a paid model. It still does not prove real-home install, browser
+user flow, real-model quality or arbitrary plugin safety. See
+[local validation](VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md).
+
+## Previous merged milestone: copied selected DeepSeek web stack startup
 
 On 2026-09-25, an opt-in check now preflights the selected `web` profile for
 duplicate observer/composition failure, copies bounded manifest and patch

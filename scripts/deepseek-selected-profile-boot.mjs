@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
 import { loaderInsert } from '../adapters/doctor.mjs';
+import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
+import { intentDigest } from '../adapters/task-evidence.mjs';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 import { processFailureReason, runBounded } from './real-host-compat.mjs';
 import { boundedFile, previewDeepSeekProfile, safeCleanup, safePath, safeProfile, within } from './deepseek-profile-preview.mjs';
@@ -14,7 +16,11 @@ const PREFLIGHT_REASONS = new Set(['observer_already_present',
   'composed_config_unavailable', 'overlay_not_composed']);
 const CHECKS = Object.freeze(['startupCommitted', 'observerEntryActivated',
   'overlayArgPresent', 'profileTreeBound', 'webServerReady',
-  'observerDrainedAtExit', 'kernelClosedAtExit', 'naturalBeforeExit']);
+  'observerDrainedAtExit', 'kernelClosedAtExit', 'naturalBeforeExit',
+  'selectedWebBundleLoaded', 'nativeAgentLoopExercised',
+  'syntheticToolAdvertised', 'nativeToolResultCorrelated',
+  'shadowBindingOnly', 'zeroLabels', 'exactFixtureScope', 'oneLedgerDecision',
+  'hostIdentityBound']);
 const REQUIRED = ['packageRoot', 'dshHome', 'profile'];
 const FLAGS = new Map([['--deepseek-package-root', 'packageRoot'],
   ['--dsh-home', 'dshHome'], ['--profile', 'profile']]);
@@ -24,10 +30,11 @@ export const SELECTED_BOOT_USAGE = `ReflexMesh selected DeepSeek profile-stack b
   node scripts/deepseek-selected-profile-boot.mjs --help
 Copies bounded configuration into a disposable home and boots its installed
 bundle stack with a temporary abstain-only ReflexMesh overlay and one-shot
-readiness fixture. Web binds to 127.0.0.1 on an OS-selected port without
+synthetic Agent/tool fixture. Web binds to 127.0.0.1 on an OS-selected port without
 opening a browser. It starts selected third-party plugin code. Credential-store
 files are not copied, but selected patch files may contain secrets and the
-plugins may have ambient access. The probe requests no model/tool, does not
+plugins may have ambient access. The probe calls one fixed in-memory read tool
+through a synthetic model adapter; no paid model is requested. It does not
 intentionally write the source profile and verifies checked source files.
 `;
 
@@ -53,19 +60,50 @@ export function parseSelectedBootArgs(argv) {
 }
 
 function fixedReport() {
-  return { schemaVersion: 1, kind: 'deepseek_selected_profile_stack_boot',
+  return { schemaVersion: 2, kind: 'deepseek_selected_profile_synthetic_tool',
     status: 'failed', reason: 'invalid_arguments', hostVersion: 'unknown',
-    hostBoot: 'not_started', modelInference: 'not_requested',
-    harnessToolCalls: 'not_requested', sourceConfigurationUnchanged: null,
+    hostBoot: 'not_started', modelInference: 'not_confirmed',
+    harnessToolCalls: 'not_confirmed', sourceConfigurationUnchanged: null,
     temporaryProfileRemoved: 'not_created',
     assertions: CHECKS.map(name => ({ name, passed: false })) };
 }
 
 function fixtureOverlay(config) {
+  const synthetic = { id: 'reflexmesh-synthetic-fixture',
+    name: new URL('./fixtures/deepseek-agent-fixture.mjs', import.meta.url).href,
+    config: { packageRoot: config.packageRoot, telemetryPath: config.syntheticTelemetryPath,
+      homePath: config.homePath, cwdPath: config.homePath,
+      overlayPath: config.observerOverlayPath, profileName: config.profile } };
   const row = { id: 'reflexmesh-selected-profile-boot-fixture',
     name: new URL('./fixtures/deepseek-selected-profile-boot-fixture.mjs', import.meta.url).href,
     config };
-  return `- insert:\n  - ${JSON.stringify(row)}\n`;
+  return `- insert:\n  - ${JSON.stringify(synthetic)}\n  - ${JSON.stringify(row)}\n`;
+}
+
+function readSelectedEvidence(dbPath, synthetic) {
+  const kernel = new SqliteKernel(dbPath, { readOnly: true });
+  try {
+    const page = kernel.listEvidence({ limit: 2 });
+    const item = page.items.length === 1 && page.nextCursor === null ? page.items[0] : null;
+    const detail = item && kernel.inspect(item.key);
+    const scope = { harness: 'deepseek-harness', sessionId: synthetic.toolSessionId,
+      agentId: synthetic.toolAgentId };
+    return {
+      oneLedgerDecision: item !== null,
+      shadowBindingOnly: item?.run?.mode === 'shadow'
+        && item?.binding?.providerId === 'abstain' && item?.binding?.modelId === 'not-configured',
+      nativeToolResultCorrelated: synthetic.toolResultSeen === true
+        && item?.hostOutcome?.status === 'succeeded' && item?.hostOutcome?.count === 1
+        && item?.hostOutcome?.byProvenance?.[0]?.provenance === 'harness-reported',
+      zeroLabels: item?.labelCount === 0,
+      hostIdentityBound: typeof synthetic.modelSessionId === 'string'
+        && synthetic.modelSessionId === synthetic.toolSessionId
+        && synthetic.toolSessionId === synthetic.toolAgentId
+        && item?.taskEvidence?.source === 'host-declared'
+        && item?.taskEvidence?.recordedStatus === 'ready'
+        && detail?.evidence?.taskEvidence?.scopeDigest === intentDigest(scope),
+    };
+  } finally { kernel.close(); }
 }
 
 export function selectedWebHostArgs({ binPath, profile, overlayPath, fixturePath }) {
@@ -87,6 +125,7 @@ export async function runSelectedProfileBoot(options, {
   previewProfile = previewDeepSeekProfile,
   linkModules = (source, target) => symlink(source, target, process.platform === 'win32' ? 'junction' : 'dir'),
   runHost = defaultRunHost,
+  readEvidence = readSelectedEvidence,
 } = {}) {
   const report = fixedReport();
   let tempRoot = null, tempModules = null, tempIdentity = null, sourceFiles = null;
@@ -141,10 +180,12 @@ export async function runSelectedProfileBoot(options, {
     const overlayPath = join(tempRoot, 'observer.patch.yml');
     const fixturePath = join(tempRoot, 'fixture.patch.yml');
     const telemetryPath = join(tempRoot, 'startup-receipt.json');
+    const syntheticTelemetryPath = join(tempRoot, 'synthetic-receipt.json');
     const observer = loaderInsert({ dbPath, tenantId: 'isolated-fixture',
-      scope: 'selected-profile-boot', intentMode: 'off' });
+      scope: 'selected-profile-boot', intentMode: 'explicit-summary' });
     await writeFile(overlayPath, observer.yamlInsert, { flag: 'wx', mode: 0o600 });
-    await writeFile(fixturePath, fixtureOverlay({ telemetryPath, homePath: tempRoot,
+    await writeFile(fixturePath, fixtureOverlay({ telemetryPath, syntheticTelemetryPath,
+      packageRoot: installed.root, homePath: tempRoot,
       profile: options.profile, observerOverlayPath: overlayPath,
       fixtureOverlayPath: fixturePath }), { flag: 'wx', mode: 0o600 });
     const env = Object.fromEntries(Object.entries({ DSH_HOME: tempRoot,
@@ -158,19 +199,56 @@ export async function runSelectedProfileBoot(options, {
       telemetryPath, env });
     if (!child?.ok) {
       report.reason = processFailureReason(child);
+      try {
+        const diagnostic = await boundedFile(telemetryPath, 4096, false);
+        const state = diagnostic && JSON.parse(diagnostic.bytes.toString('utf8'));
+        const phase = state?.phase;
+        report.fixturePhase = ['waiting_ready', 'importing_api', 'creating_agent', 'running_agent',
+          'reading_outcome', 'complete'].includes(phase) ? phase : 'not_started';
+        report.fixtureChecks = { agentTurnCompleted: state?.agentTurnCompleted === true,
+          finalFixtureMarker: state?.finalFixtureMarker === true,
+          webServerReady: state?.webServerReady === true };
+      } catch { report.fixturePhase = 'unavailable'; }
+      try {
+        const diagnostic = await boundedFile(syntheticTelemetryPath, 4096, false);
+        const state = diagnostic && JSON.parse(diagnostic.bytes.toString('utf8'));
+        report.syntheticChecks = { requests: state?.requests ?? null,
+          bodyCalls: state?.bodyCalls ?? null, toolResultSeen: state?.toolResultSeen === true,
+          sessionConsistent: state?.sessionConsistent === true };
+      } catch { report.syntheticChecks = null; }
       keepTemporaryHome = child?.kind === 'timeout';
       return report;
     }
-    let received;
+    let received, synthetic;
     try {
       const receipt = await boundedFile(telemetryPath, 4096, true);
       received = JSON.parse(receipt.bytes.toString('utf8'));
+      const toolReceipt = await boundedFile(syntheticTelemetryPath, 4096, true);
+      synthetic = JSON.parse(toolReceipt.bytes.toString('utf8'));
     } catch { throw new Error('startup_receipt_unavailable'); }
-    report.assertions = CHECKS.map(name => ({ name, passed: received?.[name] === true }));
+    const evidence = readEvidence(dbPath, synthetic);
+    const checks = { ...received,
+      selectedWebBundleLoaded: synthetic.isolatedProfileLoaded === true
+        && synthetic.loaderProfileBound === true,
+      nativeAgentLoopExercised: received.agentTurnCompleted === true
+        && received.finalFixtureMarker === true
+        && synthetic.requests === 2 && synthetic.bodyCalls === 1,
+      syntheticToolAdvertised: synthetic.toolAdvertised === true,
+      exactFixtureScope: synthetic.toolHadAgent === true
+        && synthetic.toolArgsExact === true && synthetic.sessionConsistent === true
+        && Number.isSafeInteger(synthetic.toolCount) && synthetic.toolCount >= 1
+        && Number.isSafeInteger(synthetic.backgroundRequests)
+        && synthetic.backgroundRequests <= 2,
+      ...evidence };
+    report.assertions = CHECKS.map(name => ({ name, passed: checks[name] === true }));
     report.status = report.assertions.every(item => item.passed) ? 'passed' : 'failed';
-    report.reason = report.status === 'passed' ? 'selected_profile_overlay_boot_passed'
-      : 'startup_assertion_failed';
+    report.reason = report.status === 'passed' ? 'selected_profile_synthetic_tool_passed'
+      : 'selected_profile_assertion_failed';
     report.hostBoot = received?.startupCommitted === true ? 'startup_committed' : 'attempted';
+    if (report.status === 'passed') {
+      report.modelInference = 'synthetic_adapter_only';
+      report.harnessToolCalls = 'one_fixture_read';
+    }
   } catch (error) {
     report.status = 'failed';
     report.reason = ['profile_path_outside_home', 'profile_modules_unavailable',
@@ -209,10 +287,10 @@ export async function selectedProfileBootMain(argv = process.argv.slice(2), outp
   if (options.help) { output.write(SELECTED_BOOT_USAGE); return 0; }
   const report = options.invalid ? fixedReport() : await runSelectedProfileBoot(options);
   output.write(options.json ? `${JSON.stringify(report)}\n`
-    : `ReflexMesh selected-profile stack boot: ${report.status}; ${report.reason}.\n`
+    : `ReflexMesh selected-profile Web tool check: ${report.status}; ${report.reason}.\n`
       + `Installed host: ${report.hostVersion}; startup: ${report.hostBoot}.\n`
       + `Checks: ${report.assertions.filter(item => item.passed).length}/${report.assertions.length}; source config unchanged: ${report.sourceConfigurationUnchanged ?? 'unverified'}; temporary home removed: ${report.temporaryProfileRemoved}.\n`
-      + 'No model or tool was requested by this probe; selected plugin code did run.\n'
+      + `Model: ${report.modelInference}; tool: ${report.harnessToolCalls}. Selected plugin code did run.\n`
       + (report.cleanupPath ? `Inspect temporary directory privately: ${JSON.stringify(report.cleanupPath)}\n` : ''));
   return report.status === 'passed' ? 0 : 1;
 }
