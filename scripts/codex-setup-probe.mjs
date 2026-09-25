@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { lstatSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join } from 'node:path';
-import { randomBytes } from 'node:crypto';
-import { createCodexSetup } from '../adapters/codex-setup.mjs';
+import { createCodexSetup, isSafeCodexPath } from '../adapters/codex-setup.mjs';
+import { diagnoseCodexDoctor } from '../adapters/codex-doctor.mjs';
 import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { assertSqliteWalRuntime } from '../adapters/sqlite-runtime.mjs';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 
 const USAGE = `Usage: npm run compat:codex-setup -- [--codex-executable ABS] [--json]
 Account-free isolated probe of generated Codex MCP settings and the production ReflexMesh STDIO server.
-With --codex-executable, native Codex CLI parses an override for the generated fields; it may read its existing local config, but does not change it or run an Agent/model.
+With --codex-executable, native Codex CLI adds the generated row to a disposable CODEX_HOME, then doctor reads it back as matching; it does not change your Codex profile or run an Agent/model.
 The MCP check uses a new temporary ledger, synthetic calls and abstain only. No user settings, profile or account are changed.
 `;
 const SUMMARY = 'SYNTHETIC: Read the public README without editing files';
@@ -60,24 +60,51 @@ function toolValue(response, id) {
   return JSON.parse(item[0].text);
 }
 
-function verifyNativeCodex(executable, setup, name) {
-  if (!isAbsolute(executable) || !lstatSync(executable).isFile()) throw new Error('invalid_codex_executable');
-  const entries = { command: setup.command, args: setup.args };
-  const overrides = Object.entries(entries).map(([key, value]) => `mcp_servers.${name}.${key}=${JSON.stringify(value)}`);
-  for (const [key, value] of Object.entries(setup.env))
-    overrides.push(`mcp_servers.${name}.env.${key}=${JSON.stringify(value)}`);
-  const argv = ['mcp', 'get', name, '--json', ...overrides.flatMap(value => ['-c', value])];
-  const result = spawnSync(executable, argv, { encoding: 'utf8', timeout: 12000,
-    maxBuffer: 1024 * 1024, windowsHide: true });
-  if (result.error || result.status !== 0) throw new Error('codex_config_parse_failed');
+export async function verifyNativeCodex(executable, setup, directory, spawnNative = spawnSync) {
+  if (!isSafeCodexPath(executable) || !isAbsolute(executable) || !lstatSync(executable).isFile())
+    throw new Error('invalid_codex_executable');
+  const codexHome = join(directory, 'codex-home');
+  mkdirSync(codexHome, { mode: 0o700 });
+  const userHome = join(directory, 'user-home');
+  const appData = join(userHome, 'AppData', 'Roaming');
+  const localAppData = join(userHome, 'AppData', 'Local');
+  mkdirSync(appData, { recursive: true, mode: 0o700 });
+  mkdirSync(localAppData, { recursive: true, mode: 0o700 });
+  const allowed = ['PATH', 'SystemRoot', 'WINDIR'];
+  const env = { ...Object.fromEntries(allowed.filter(key => typeof process.env[key] === 'string')
+    .map(key => [key, process.env[key]])), TEMP: directory, TMP: directory,
+    USERPROFILE: userHome, HOME: userHome, APPDATA: appData, LOCALAPPDATA: localAppData,
+    XDG_CONFIG_HOME: join(userHome, '.config'), XDG_DATA_HOME: join(userHome, '.local', 'share'),
+    CODEX_HOME: codexHome };
+  const runCli = args => spawnNative(executable, args, { env, encoding: 'utf8', timeout: 12000,
+    maxBuffer: 256 * 1024, windowsHide: true });
+  const doctorArgs = ['--node-executable', setup.command, '--codex-executable', executable,
+    '--db', setup.env.REFLEXMESH_DB, '--tenant', setup.env.REFLEXMESH_TENANT,
+    '--scope', setup.env.REFLEXMESH_SCOPE];
+  const inspect = () => diagnoseCodexDoctor(doctorArgs, {
+    runRegistrationList: () => runCli(['mcp', 'list', '--json']),
+  });
+  const before = await inspect();
+  assert.equal(before.report.status, 'prerequisites_ready');
+  assert.equal(before.report.registration.status, 'not_registered');
+  assert.ok(before.report.setup.registration);
+  const add = runCli(before.report.setup.registration.args);
+  if (add.error || add.status !== 0) throw new Error('codex_isolated_add_failed');
+  const after = await inspect();
+  assert.equal(after.report.status, 'prerequisites_ready');
+  assert.equal(after.report.registration.status, 'matching_config');
+  assert.equal(after.report.setup.registration, null);
+  const get = runCli(['mcp', 'get', 'reflexmesh-shadow', '--json']);
+  if (get.error || get.status !== 0) throw new Error('codex_isolated_get_failed');
   let parsed;
-  try { parsed = JSON.parse(result.stdout); } catch { throw new Error('codex_config_parse_failed'); }
-  assert.equal(parsed.name, name);
+  try { parsed = JSON.parse(get.stdout); } catch { throw new Error('codex_config_parse_failed'); }
+  assert.equal(parsed.name, 'reflexmesh-shadow');
   assert.equal(parsed.transport?.type, 'stdio');
   assert.equal(parsed.transport.command, setup.command);
   assert.deepEqual(parsed.transport.args, setup.args);
   assert.deepEqual(parsed.transport.env, setup.env);
-  return 'parsed_by_installed_cli';
+  assert.equal(existsSync(setup.env.REFLEXMESH_DB), false);
+  return { config: 'parsed_by_installed_cli', registration: 'isolated_add_list_matching' };
 }
 
 function verifyLedger(dbPath, first, second) {
@@ -107,16 +134,16 @@ function cleanupOwnedTemp(directory, root) {
   rmSync(resolved, { recursive: true, force: false });
 }
 
-export function runCodexSetupProbe(options = {}) {
+export async function runCodexSetupProbe(options = {}) {
   assertSqliteWalRuntime();
   const root = realpathSync(tmpdir());
   const directory = mkdtempSync(join(root, 'reflexmesh-codex-setup-probe-'));
   try {
-    const name = `reflexmesh_probe_${randomBytes(6).toString('hex')}`;
     const setup = createCodexSetup({ nodePath: process.execPath, dbPath: join(directory, 'ledger.sqlite'),
-      tenantId: 'isolated-probe', scope: 'isolated-probe', serverName: name });
-    const codexConfig = options.codexExecutable === null || options.codexExecutable === undefined
-      ? 'not_requested' : verifyNativeCodex(options.codexExecutable, setup, name);
+      tenantId: 'isolated-probe', scope: 'isolated-probe' });
+    const native = options.codexExecutable === null || options.codexExecutable === undefined
+      ? { config: 'not_requested', registration: 'not_requested' }
+      : await verifyNativeCodex(options.codexExecutable, setup, directory);
     const firstCall = call('missing-task'), secondCall = call('reported-task');
     const responses = runMcp(setup, [rpc(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {},
       clientInfo: { name: 'reflexmesh-setup-probe', version: '1' } }), initialized,
@@ -159,21 +186,23 @@ export function runCodexSetupProbe(options = {}) {
     assert.equal(toolValue(reopened[3], 14).control, 'abstain');
     const persisted = verifyLedger(setup.env.REFLEXMESH_DB, first, second);
     return { schemaVersion: 1, kind: 'codex_setup_probe', status: 'passed',
-      nativeCodexConfig: codexConfig, productionMcp: { status: 'passed', processCount: 2,
+      nativeCodexConfig: native.config, nativeCodexRegistration: native.registration,
+      productionMcp: { status: 'passed', processCount: 2,
         listedTools: 4, ...persisted, restartReplay: true, restartConflictRejected: true },
       actualCodexAgent: 'not_tested', modelRequest: 'none' };
   } finally { cleanupOwnedTemp(directory, root); }
 }
 
-export function codexSetupProbeMain(argv = process.argv.slice(2), output = process.stdout, errors = process.stderr) {
+export async function codexSetupProbeMain(argv = process.argv.slice(2), output = process.stdout, errors = process.stderr) {
   let options;
   try { options = parseCodexProbeOptions(argv); }
   catch { errors.write('ReflexMesh Codex setup probe: invalid options; use --help.\n'); return 1; }
   if (options.help) { output.write(USAGE); return 0; }
   try {
-    const report = runCodexSetupProbe(options);
+    const report = await runCodexSetupProbe(options);
     output.write(options.json ? `${JSON.stringify(report)}\n` :
       `ReflexMesh Codex setup probe: passed. Native Codex config: ${report.nativeCodexConfig}; `
+      + `isolated registration: ${report.nativeCodexRegistration}; `
       + `production MCP: ${report.productionMcp.processCount} isolated processes, `
       + `${report.productionMcp.decisions} decisions, one model-reported unknown outcome, zero labels; `
       + 'restart reused the same decision and rejected changed task evidence. '
@@ -185,4 +214,4 @@ export function codexSetupProbeMain(argv = process.argv.slice(2), output = proce
   }
 }
 
-if (isDirectRun(import.meta.url)) process.exitCode = codexSetupProbeMain();
+if (isDirectRun(import.meta.url)) process.exitCode = await codexSetupProbeMain();

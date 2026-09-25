@@ -12,7 +12,24 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: startup-race CI watchdog repair
+## Latest local milestone: isolated Codex registration/readback
+
+On 2026-09-25, the optional installed-CLI `compat:codex-setup` probe began
+exercising the doctor's generated `mcp add` arguments in a disposable
+`CODEX_HOME`, with HOME and app-data fallbacks redirected into the same owned
+temporary directory. It requires absent-before and exact matching-after
+registration, checks `mcp get --json` fields, confirms no ledger was created
+by registration, and then runs its existing two-process synthetic MCP evidence
+probe. Installed Codex CLI 0.155.0-alpha.16.4 passed locally; the ordinary
+user `config.toml` hash was unchanged in a separate before/after check. The
+four-command hermetic registration test and installed-CLI probe passed. Local
+`npm run check` passed **976 tests: 974 passed, 0 failed, 2 Windows
+symlink-privilege skips**; `npm run demo` passed. See
+[local validation](VALIDATION-CODEX-ISOLATED-REGISTRATION-T001.md). Remote
+PR/main CI still requires readback. No real profile installation, Agent/model
+call or default-profile acceptance is claimed.
+
+## Previous merged milestone: startup-race CI watchdog repair
 
 On 2026-09-25, [main CI run 36144882669](https://github.com/luomo66ccff/reflexmesh/actions/runs/36144882669)
 for the merged Codex registration preview failed only Windows Node 24's
@@ -26,9 +43,10 @@ Node 24.19.0; local `npm run check` passed **975 tests: 973 passed, 0 failed,
 2 Windows symlink-privilege skips** and the default demo passed. Shared-runner
 scheduling is a plausible inference, not a proven
 root cause. See [local validation](VALIDATION-SQLITE-STARTUP-WATCHDOG-T001.md).
-Production startup/admission code is unchanged. Full CI readback remains
-required before treating the repair as accepted; this does not complete the
-long-term objective.
+Production startup/admission code is unchanged. [PR #77](https://github.com/luomo66ccff/reflexmesh/pull/77)
+merged after all five [exact-head checks](https://github.com/luomo66ccff/reflexmesh/actions/runs/36148082231)
+passed; the five checks on [merged main](https://github.com/luomo66ccff/reflexmesh/actions/runs/36150200215)
+also passed. This does not complete the long-term objective.
 
 ## Previous merged milestone: reviewable Codex registration path
 

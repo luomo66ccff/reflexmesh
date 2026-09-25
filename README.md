@@ -150,7 +150,10 @@ command when absent; it never runs that command or edits your profile. Review
 the command before manually running it, then restart the Codex session;
 `npm run compat:codex-setup` then checks the production MCP evidence path in
 isolation without an account, including one process restart with same-call
-replay and changed-task conflict. Both are described in the
+replay and changed-task conflict. With an explicit CLI path, it also registers
+the generated row inside a disposable `CODEX_HOME` and confirms that the CLI
+and doctor read back matching fields; your profile is not changed. Both are
+described in the
 [Codex first-run guide](docs/CODEX-FIRST-RUN.md). The doctor does not install a
 server or verify that a real Codex Agent chose to call it.
 For an explicitly opted-in synthetic Agent read, the separate

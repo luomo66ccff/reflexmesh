@@ -80,7 +80,7 @@ without secrets, paths, tenant and scope can be sensitive metadata.
 
 ```powershell
 npm run compat:codex-setup
-# Optional installed Codex CLI parser check, with an explicit executable:
+# Optional isolated registration/readback check with an installed Codex CLI:
 npm run compat:codex-setup -- --codex-executable "C:\path\to\codex.exe"
 ```
 
@@ -94,11 +94,14 @@ same call identity must return a fixed contract conflict; a genuinely new task
 needs a new call ID. The reopened ledger must still have only two decisions,
 one model-reported unknown outcome and zero labels. The provider is `abstain`;
 no model, real Codex Agent or host tool runs. Its temporary ledger is removed
-after the check. The optional CLI check asks the installed
-Codex executable to parse equivalent generated config fields via read-only
-overrides; it does not install the server. Codex may still read its existing
-local config during that parser check, so omit the option if you do not want
-that access. Neither check changes your user configuration.
+after the check. The optional CLI check uses a disposable `CODEX_HOME`: it
+first confirms the row is absent, executes the generated `mcp add` arguments
+there, then verifies `mcp list --json` through the doctor's exact-field
+matching check and `mcp get --json` through the installed CLI. The temporary
+registration is removed with the probe directory. HOME, USERPROFILE and the
+usual app-data directories also point there to fence an unexpected fallback.
+It never installs the row in your own Codex profile, starts an Agent or calls
+a model. Neither check changes your user configuration.
 
 This verifies one production MCP process-restart/idempotency boundary with
 synthetic input. It does not demonstrate that the Codex Agent itself resumed a
