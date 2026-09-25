@@ -10,6 +10,11 @@ Harness **0.1.2-rc.1** contracts; other versions need another compatibility chec
 Start with the [read-only doctor](DOCTOR.md) to check the selected installation
 and obtain an escaped configuration snippet. It works even before the build;
 it will explain that missing prerequisite instead of loading the host.
+Before editing an existing profile, the separate
+[isolated profile-composition preview](DOCTOR.md#preview-an-existing-profile-without-editing-it)
+can check whether the proposed overlay composes with that profile's current
+patch layers without running an Agent or writing its generated root file.
+It is not a live installation test.
 
 Build ReflexMesh with `npm ci --ignore-scripts` and `npm run build`. Back up the
 profile you intend to change, then add an insertion to that profile's

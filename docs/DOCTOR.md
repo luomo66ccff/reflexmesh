@@ -98,6 +98,44 @@ the freshness of generated build artifacts, compatibility of arbitrary host
 plugins or successful real-model behavior. Full live testing remains separate
 and requires an explicitly authorized profile, data scope and model budget.
 
+## Preview an existing profile without editing it
+
+For an explicitly selected DeepSeek profile, run the separate isolated
+composition preview after building the project:
+
+```powershell
+npm run compat:deepseek-profile -- --deepseek-package-root 'D:\DeepSeekHarness\app\node_modules\@deepseek-ai\dsh' --dsh-home 'D:\DeepSeekHarness\data' --profile web --db 'C:\ReflexMeshData\shadow.sqlite' --tenant local --scope my-project
+```
+
+Replace all paths and identifiers. This is **not** the read-only doctor: it
+reads only bounded `package.json`, profile/home patch files and the generated
+root file, then copies the manifest and patches into a local temporary home.
+It links the selected profile's installed modules, runs the pinned host's
+boot-free `--dump-config`
+there twice (before and after a temporary ReflexMesh overlay), suppresses the
+raw composed configuration, then removes the temporary home. It reports whether
+the observer is already in the composed config, whether the proposed overlay
+appears, whether the checked source config files kept their bytes, modification
+times and file identities,
+and whether cleanup was verified. Existing profile settings, credentials and
+the real ledger are not intentionally changed; no host Agent, provider or tool
+is started. An unexpected concurrent source-file change is reported, not
+rolled back. An unverified cleanup returns the temporary path for private
+inspection; profile configuration may itself contain secrets, and the
+temporary directory inherits the OS temporary location's access controls.
+Do not paste its contents into an issue or chat.
+`absent` means the known observer ID/URL was not seen in the composed dump;
+renamed or differently resolved entries, relative runtime imports, plugin
+startup and tool behavior are not certified by this preview.
+
+Do not use a direct `dsh --profile web --dump-config` against a real profile as
+a byte-for-byte read-only check: installed Harness 0.1.2-rc.1 rewrites its
+generated `cordis.yml` during profile preparation, even without booting plugins.
+The isolated preview avoids that source-profile write. A successful preview is
+only configuration composition, not proof that the observer loads or works in
+the default profile. The profile remains unchanged until you separately choose
+to install and start it; see the [Loader guide](DEEPSEEK-AGENT.md).
+
 SQLite can interact with WAL/SHM sidecars even during read-only inspection.
 Read-only application behavior is not a guarantee of byte-for-byte filesystem
 immutability, and bounded output does not promise constant-time queries on an

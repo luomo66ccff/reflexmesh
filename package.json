@@ -23,6 +23,7 @@
     "publish:github": "node scripts/publish-github.mjs",
     "demo:durable": "npm run build && node examples/durable-shadow.mjs",
     "compat:hosts": "npm run build && node scripts/real-host-compat.mjs",
+    "compat:deepseek-profile": "npm run build && node scripts/deepseek-profile-preview.mjs",
     "compat:codex-setup": "npm run build && node scripts/codex-setup-probe.mjs",
     "compat:codex-agent": "npm run build && node scripts/codex-agent-probe.mjs",
     "compat:claude-local": "npm run build && node scripts/claude-local-probe.mjs",

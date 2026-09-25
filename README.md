@@ -95,6 +95,12 @@ Connecting DeepSeek for the first time? Run `npm run doctor -- --help` for the
 installation and configuration prerequisites and prints a configuration snippet
 without changing your profile or loading credentials. Historical ledger evidence
 is kept separate from the still-unverified live connection.
+For an explicitly selected existing profile, `npm run compat:deepseek-profile --
+--help` offers an isolated configuration-composition preview. It copies only
+bounded profile config files to a temporary home, adds the proposed observer
+overlay there, and suppresses the host's potentially sensitive config dump.
+The real profile is not configured or booted; see the
+[DeepSeek first-run guide](docs/DOCTOR.md#preview-an-existing-profile-without-editing-it).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;

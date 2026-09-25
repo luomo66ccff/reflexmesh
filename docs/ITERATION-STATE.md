@@ -12,7 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: policy replay edit summary
+## Latest local milestone: isolated DeepSeek profile composition preview
+
+On 2026-09-25, direct installed Harness `--dump-config` was found to rewrite
+the selected profile's generated `cordis.yml` even without plugin boot. A new
+explicit-profile preview copies only bounded configuration to a disposable
+home, links installed modules, composes the current profile and a temporary
+ReflexMesh overlay there, suppresses raw output, and verifies checked source
+config bytes/metadata plus temporary cleanup. The installed 0.1.2-rc.1 `web`
+profile passed the isolated composition check: observer absent in current
+config, proposed overlay composed, no model/host tool started. This does not
+install the observer, prove live loading or read any real ledger. See
+[local validation](VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T001.md). The real-profile
+generated-file write from the exploratory direct dump was not automatically
+reverted without a prior content snapshot.
+
+## Previous merged milestone: policy replay edit summary
 
 On 2026-09-25, policy replay now compares the verified bound source policy with
 the candidate's rules and fallback. The narrow receipt counts added, removed
