@@ -26,6 +26,7 @@ function fixture(t) {
 
 test('preview arguments require explicit paths and reject duplicates or unsafe profile names', () => {
   assert.deepEqual(parsePreviewArgs(['--help']), { help: true });
+  assert.equal(parsePreviewArgs(['--profile', 'web', '--out-overlay', 'new.yml']).invalid, true);
   assert.equal(parsePreviewArgs(['--profile', 'web', '--profile', 'again']).invalid, true);
   assert.equal(parsePreviewArgs(['--profile', '..']).invalid, true);
   assert.equal(parsePreviewArgs(['--profile', 'web/other']).invalid, true);
@@ -66,6 +67,47 @@ test('isolated preview composes only a temporary overlay and preserves source co
   assert.equal(existsSync(temporaryHome), false);
 });
 
+test('a verified preview may publish a new overlay outside the profile home', async t => {
+  const f = fixture(t), outOverlay = join(f.root, 'new observer overlay.yml');
+  const report = await previewDeepSeekProfile({ ...f.options, outOverlay }, {
+    inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
+    linkModules: async (_source, target) => { mkdirSync(target); },
+    runDump: ({ overlayPath }) => ({ status: 0,
+      stdout: overlayPath ? '- id: reflexmesh-observer\n' : '- id: existing-tool\n' }),
+  });
+  assert.equal(report.status, 'passed');
+  assert.equal(report.overlayFile?.status, 'created');
+  assert.equal(report.overlayFile?.path, outOverlay);
+  assert.match(report.overlayFile?.sha256, /^[a-f0-9]{64}$/);
+  assert.match(readFileSync(outOverlay, 'utf8'), /reflexmesh-observer/);
+  assert.equal(readFileSync(join(f.profile, 'cordis.patch.yml'), 'utf8'), '- insert: []\n');
+});
+
+test('existing or profile-home destinations are refused before a dump', async t => {
+  const f = fixture(t), existing = join(f.root, 'existing.yml');
+  writeFileSync(existing, 'KEEP_THIS_FILE');
+  let dumps = 0;
+  const deps = {
+    inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
+    runDump: () => { dumps++; throw new Error('must not run'); },
+  };
+  const prior = await previewDeepSeekProfile({ ...f.options, outOverlay: existing }, deps);
+  assert.equal(prior.status, 'failed');
+  assert.equal(prior.reason, 'overlay_destination_exists');
+  assert.equal(readFileSync(existing, 'utf8'), 'KEEP_THIS_FILE');
+  const inside = join(f.home, 'observer.yml');
+  const nested = await previewDeepSeekProfile({ ...f.options, outOverlay: inside }, deps);
+  assert.equal(nested.status, 'failed');
+  assert.equal(nested.reason, 'overlay_destination_inside_profile_home');
+  assert.equal(existsSync(inside), false);
+  const relativeTarget = await previewDeepSeekProfile({ ...f.options, outOverlay: 'relative.yml' }, deps);
+  assert.equal(relativeTarget.reason, 'invalid_overlay_destination');
+  const missingParent = await previewDeepSeekProfile({ ...f.options,
+    outOverlay: join(f.root, 'missing-parent', 'observer.yml') }, deps);
+  assert.equal(missingParent.reason, 'overlay_destination_unavailable');
+  assert.equal(dumps, 0);
+});
+
 test('a profile that already contains the observer is not overlaid again', async t => {
   const f = fixture(t);
   let calls = 0;
@@ -97,8 +139,8 @@ test('dump failure cannot leak private output and temporary profile is removed',
 });
 
 test('a concurrent change to the source configuration is reported, never rolled back', async t => {
-  const f = fixture(t);
-  const report = await previewDeepSeekProfile(f.options, {
+  const f = fixture(t), outOverlay = join(f.root, 'must-not-publish.yml');
+  const report = await previewDeepSeekProfile({ ...f.options, outOverlay }, {
     inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
     linkModules: async (_source, target) => { mkdirSync(target); },
     runDump: ({ overlayPath }) => {
@@ -110,5 +152,6 @@ test('a concurrent change to the source configuration is reported, never rolled 
   assert.equal(report.reason, 'source_configuration_changed');
   assert.equal(report.sourceConfigurationUnchanged, false);
   assert.equal(report.temporaryProfileRemoved, true);
+  assert.equal(existsSync(outOverlay), false);
   assert.equal(readFileSync(join(f.profile, 'cordis.yml'), 'utf8'), '# CHANGED_DURING_PREVIEW\n');
 });

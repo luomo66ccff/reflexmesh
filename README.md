@@ -101,6 +101,10 @@ bounded profile config files to a temporary home, adds the proposed observer
 overlay there, and suppresses the host's potentially sensitive config dump.
 The real profile is not configured or booted; see the
 [DeepSeek first-run guide](docs/DOCTOR.md#preview-an-existing-profile-without-editing-it).
+After a successful preview, optional `--out-overlay ABS_NEW_FILE` exports the
+proposed patch to a new file outside the profile home for private review. It
+never applies that patch or starts the host; see the
+[export validation](docs/VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T002.md).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;

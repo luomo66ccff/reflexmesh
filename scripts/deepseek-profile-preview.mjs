@@ -1,9 +1,10 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { constants } from 'node:fs';
 import { lstat, mkdir, mkdtemp, open, realpath, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, isAbsolute, join, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
 import { loaderInsert } from '../adapters/doctor.mjs';
 import { validateDeepSeekLoaderConfig } from '../adapters/deepseek-loader-config.mjs';
@@ -18,13 +19,17 @@ const OBSERVER_ROW = /^\s*-\s+id:\s*['"]?reflexmesh-observer['"]?\s*$/mu;
 const OPTIONS = new Map([
   ['--deepseek-package-root', 'packageRoot'], ['--dsh-home', 'dshHome'],
   ['--profile', 'profile'], ['--db', 'db'], ['--tenant', 'tenant'], ['--scope', 'scope'],
+  ['--out-overlay', 'outOverlay'],
 ]);
+const REQUIRED = ['packageRoot', 'dshHome', 'profile', 'db', 'tenant', 'scope'];
 
 export const PREVIEW_USAGE = `ReflexMesh DeepSeek profile composition preview (isolated; no host boot)
-  node scripts/deepseek-profile-preview.mjs --deepseek-package-root ABS --dsh-home ABS --profile NAME --db ABS --tenant ID --scope ID [--json]
+  node scripts/deepseek-profile-preview.mjs --deepseek-package-root ABS --dsh-home ABS --profile NAME --db ABS --tenant ID --scope ID [--out-overlay NEW_FILE] [--json]
   node scripts/deepseek-profile-preview.mjs --help
 Copies bounded profile configuration to a temporary home and runs the installed
 host's boot-free config dump there. It does not prove the plugin loads or run a model.
+--out-overlay writes a reviewed, new-only patch after a successful preview; it
+never edits or starts the selected profile.
 `;
 
 export function parsePreviewArgs(argv) {
@@ -42,7 +47,7 @@ export function parsePreviewArgs(argv) {
       return { invalid: true, json: argv.includes('--json') };
     parsed[field] = value;
   }
-  if ([...OPTIONS.values()].some(field => !parsed[field]) || !safeProfile(parsed.profile))
+  if (REQUIRED.some(field => !parsed[field]) || !safeProfile(parsed.profile))
     return { invalid: true, json: argv.includes('--json') };
   return parsed;
 }
@@ -55,6 +60,48 @@ const within = (root, path) => {
   const rel = relative(root, path);
   return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 };
+
+async function newOverlayTarget(value, sourceHome) {
+  if (!safePath(value) || value.length > 1024) throw new Error('invalid_overlay_destination');
+  const target = resolve(value);
+  let parent;
+  try { parent = await realpath(dirname(target)); }
+  catch { throw new Error('overlay_destination_unavailable'); }
+  if (parent === sourceHome || within(sourceHome, parent))
+    throw new Error('overlay_destination_inside_profile_home');
+  try { await lstat(target); throw new Error('overlay_destination_exists'); }
+  catch (error) { if (error?.code !== 'ENOENT') throw error; }
+  return target;
+}
+
+async function publishOverlay(target, body) {
+  const bytes = Buffer.from(body, 'utf8');
+  let file, created = false;
+  try {
+    file = await open(target, 'wx+', 0o600);
+    created = true;
+    await file.writeFile(bytes);
+    await file.sync();
+    const info = await file.stat();
+    if (!info.isFile() || info.size !== bytes.length) throw new Error('readback_mismatch');
+    const readback = Buffer.alloc(bytes.length);
+    let used = 0;
+    while (used < bytes.length) {
+      const { bytesRead } = await file.read(readback, used, bytes.length - used, used);
+      if (!bytesRead) break;
+      used += bytesRead;
+    }
+    if (used !== bytes.length || !readback.equals(bytes)) throw new Error('readback_mismatch');
+    return { status: 'created', path: target, bytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex') };
+  } catch (error) {
+    if (error?.code === 'EEXIST') throw new Error('overlay_destination_exists');
+    throw new Error(created ? 'overlay_file_unverified' : 'overlay_destination_unavailable');
+  } finally {
+    try { await file?.close(); }
+    catch { throw new Error('overlay_file_unverified'); }
+  }
+}
 async function boundedFile(path, limit, required = false) {
   let info;
   try { info = await lstat(path); }
@@ -129,6 +176,7 @@ export async function previewDeepSeekProfile(options, {
     sourceConfigurationUnchanged: null, temporaryProfileRemoved: 'not_created',
     liveHost: 'not_started', modelCalls: 0 };
   let tempRoot = null, tempModules = null, tempIdentity = null, sourceFiles = null;
+  let overlayTarget = null, overlayBody = null;
   try {
     if (!options || !safePath(options.packageRoot) || !safePath(options.dshHome)
       || !safeProfile(options.profile)) return report;
@@ -138,6 +186,8 @@ export async function previewDeepSeekProfile(options, {
     report.hostVersion = installed.hostVersion ?? 'unknown';
     if (!installed.ok) { report.reason = installed.reason; return report; }
     const home = await realpath(options.dshHome);
+    if (options.outOverlay !== undefined)
+      overlayTarget = await newOverlayTarget(options.outOverlay, home);
     const profileDir = await realpath(join(home, 'profiles', options.profile));
     if (!within(home, profileDir)) throw new Error('profile_path_outside_home');
     const modules = await realpath(join(profileDir, 'node_modules'));
@@ -151,6 +201,7 @@ export async function previewDeepSeekProfile(options, {
     sourceFiles = await Promise.all(specs.map(async spec => ({ ...spec,
       original: await boundedFile(spec.path, spec.limit, spec.required) })));
     const insertion = loaderInsert(config), overlay = insertion.yamlInsert;
+    overlayBody = overlay;
     tempRoot = await mkdtemp(join(tmpdir(), PREFIX));
     const tempInfo = await lstat(tempRoot);
     tempIdentity = { dev: tempInfo.dev, ino: tempInfo.ino };
@@ -187,7 +238,9 @@ export async function previewDeepSeekProfile(options, {
   } catch (error) {
     report.status = 'failed';
     report.reason = ['profile_path_outside_home', 'profile_modules_unavailable',
-      'profile_file_unavailable', 'composed_config_unavailable', 'overlay_not_composed']
+      'profile_file_unavailable', 'composed_config_unavailable', 'overlay_not_composed',
+      'invalid_overlay_destination', 'overlay_destination_inside_profile_home',
+      'overlay_destination_exists', 'overlay_destination_unavailable']
       .includes(error?.message) ? error.message : 'preview_unavailable';
   } finally {
     if (sourceFiles) {
@@ -211,6 +264,17 @@ export async function previewDeepSeekProfile(options, {
       }
     }
   }
+  if (report.status === 'passed' && overlayTarget) {
+    try { report.overlayFile = await publishOverlay(overlayTarget, overlayBody); }
+    catch (error) {
+      report.status = 'failed';
+      report.reason = ['overlay_destination_exists', 'overlay_file_unverified',
+        'overlay_destination_unavailable'].includes(error?.message)
+        ? error.message : 'overlay_file_unverified';
+      if (report.reason === 'overlay_file_unverified')
+        report.overlayFile = { status: 'unverified', path: overlayTarget };
+    }
+  }
   return report;
 }
 
@@ -227,6 +291,10 @@ export async function profilePreviewMain(argv = process.argv.slice(2), output = 
       + `Source config unchanged: ${report.sourceConfigurationUnchanged ?? 'unverified'}; temporary profile removed: ${report.temporaryProfileRemoved ?? 'not_created'}.\n`
       + 'Host CLI composition only; no Agent/plugin runtime, model or tool was started.\n'
       + 'Composition is not live-plugin acceptance.\n'
+      + (report.overlayFile?.status === 'created'
+        ? `New overlay: ${JSON.stringify(report.overlayFile.path)}; sha256: ${report.overlayFile.sha256}.\nReview it privately before any manual host start.\n`
+        : report.overlayFile?.status === 'unverified'
+          ? `Inspect incomplete new overlay: ${JSON.stringify(report.overlayFile.path)}\n` : '')
       + (report.cleanupPath ? `Inspect temporary directory: ${JSON.stringify(report.cleanupPath)}\n` : ''));
   return report.status === 'passed' ? 0 : 1;
 }
