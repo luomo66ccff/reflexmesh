@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Current local candidate: account-listed DeepSeek evaluation gate
+## Latest merged milestone: account-listed DeepSeek evaluation gate
 
 On 2026-09-25, a small synthetic intent/scope slice exposed a real operator
 trap: the installed Harness default named an older DeepSeek alias, while the
@@ -27,9 +27,13 @@ A separately named run using the account-listed `deepseek-flash` returned
 eight complete, tool-free results; the 4/4 preset synthetic labels yielded
 Brier 0.0012 and ECE 0.03. This is not a representative quality benchmark,
 default-profile acceptance, immutable-weight proof or cost guarantee. See the
-[local validation](VALIDATION-EVALUATION-CATALOG-LIVE-T001.md).
+[local validation](VALIDATION-EVALUATION-CATALOG-LIVE-T001.md). The guarded
+implementation reached main through [PR #51](https://github.com/luomo66ccff/reflexmesh/pull/51)
+without a tree change; all five configured jobs passed on its exact head and
+main merge commit. See the separate
+[integration readback](VALIDATION-EVALUATION-CATALOG-LIVE-INTEGRATION-T001.md).
 
-## Latest merged milestone: reviewed wire-plan guard
+## Previous merged milestone: reviewed wire-plan guard
 
 On 2026-09-25, a route-declared plan could check exact local request-body
 sizes but its route guard did not bind DeepSeek output tokens or body bytes.
