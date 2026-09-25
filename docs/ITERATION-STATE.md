@@ -12,7 +12,19 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: isolated Codex registration/readback
+## Latest local CI follow-up: Claude hook fixture watchdog
+
+The first PR #78 checks exposed a separate Windows Node 24 test-fixture child
+deadline: `test/claude-local-hook.test.mjs` returned null exit status after its
+five-second wait in the duplicate-pre scenario; four other jobs passed. A
+test-only follow-up uses a finite 20-second child deadline and checks the
+child error before exit status. The same three scenario assertions remain;
+ten focused local runs passed 30/30 cases and the full local 976-test suite
+passed with zero failures and two Windows symlink-privilege skips. See
+[validation](VALIDATION-CLAUDE-LOCAL-HOOK-WATCHDOG-T001.md). The exact cause of
+the remote delay is unproven, and updated PR/main CI still needs readback.
+
+## Previous local milestone: isolated Codex registration/readback
 
 On 2026-09-25, the optional installed-CLI `compat:codex-setup` probe began
 exercising the doctor's generated `mcp add` arguments in a disposable

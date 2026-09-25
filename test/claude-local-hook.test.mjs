@@ -20,11 +20,12 @@ function fixture(t, scenario = 'single-read') {
   writeFileSync(env.REFLEXMESH_LOCAL_FIXTURE, 'synthetic file');
   writeFileSync(env.REFLEXMESH_LOCAL_RECEIPTS, '');
   const run = (event, extra = {}) => {
-    const processResult = spawnSync(process.execPath, [wrapper], { cwd: directory, env, encoding: 'utf8', timeout: 5000,
+    const processResult = spawnSync(process.execPath, [wrapper], { cwd: directory, env, encoding: 'utf8', timeout: 20000,
       input: JSON.stringify({ hook_event_name: event, session_id: 'synthetic-session', tool_use_id: 'synthetic-call',
         tool_name: 'Read', tool_input: { file_path: env.REFLEXMESH_LOCAL_FIXTURE }, ...extra }) });
-    assert.equal(processResult.status, 0, processResult.stderr);
-    assert.equal(processResult.error, undefined);
+    if (processResult.error)
+      throw new Error(`${event}: child_${processResult.error.code ?? 'unknown'}`);
+    assert.equal(processResult.status, 0, `${event}: child_exit_${processResult.status}`);
     return JSON.parse(processResult.stdout);
   };
   const receipts = () => readFileSync(env.REFLEXMESH_LOCAL_RECEIPTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
