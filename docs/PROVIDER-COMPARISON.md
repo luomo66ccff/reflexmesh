@@ -283,6 +283,32 @@ anonymization. Do not publish real data or credentials in PRs or issues.
 
 ## Read the report
 
+### Start with one prediction file
+
+The first bounded run may be the only result available. Score it directly;
+do not copy it into a fake champion or invent a baseline:
+
+```bash
+npm run evaluation -- score --dataset DATASET.json --labels LABELS.json --predictions RUN.json
+# Optional: --json --out NEW_SCORE_REPORT.json
+```
+
+`score` is local-only: it validates the dataset, separate labels and one
+prediction artifact, reads no key or host profile, constructs no provider and
+sends no request. `--out` requires a new file and never overwrites the source
+receipt. For each question it reports status coverage over all cases and over
+labeled cases, class balance of all labels versus only successfully scored
+labels, and metrics on those successful labeled cases. If none qualify,
+metrics are `null` (`no estimate` in human output), not zero. A failed or
+unattempted case is never converted into a negative label. The report includes
+the dataset/label/prediction and deployment digests and explicitly has no
+paired delta or model-promotion decision. Labels, origin and model route remain
+operator declarations, not authenticated truth. Tiny or selected samples are
+not population accuracy or calibrated safety evidence. See the
+[single-side local validation](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-T001.md).
+
+### Compare two independently bound sides
+
 Each question has its own population counts; labels for one question never
 substitute for another. The report gives:
 

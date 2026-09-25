@@ -12,6 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current local candidate: honest first-result scoring
+
+On 2026-09-25, the only scoring entrypoint still required two deployments,
+even when an operator had just made a first bounded prediction run. The new
+local `evaluation score` path validates one existing prediction artifact and
+independent labels, then reports all/labeled coverage, scored-only class
+balance and per-question metrics without a fabricated comparator or delta.
+The prior successful synthetic DeepSeek receipt scored 8/8 with Brier 0.0012
+and ECE 0.03; the prior failed receipt scored 0/8 with metrics null, one
+failure and seven unattempted cases. No new model request ran. Local checks
+passed 878/880 tests with two Windows symlink-privilege skips and the default
+demo passed. See the
+[local validation](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-T001.md).
+Real-user usefulness, representative labels, Jev comparison and broad host
+acceptance remain open.
+
 ## Latest merged milestone: account-listed DeepSeek evaluation gate
 
 On 2026-09-25, a small synthetic intent/scope slice exposed a real operator
