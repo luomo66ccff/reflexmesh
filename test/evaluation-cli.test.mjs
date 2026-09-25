@@ -48,6 +48,7 @@ test('evaluation CLI validates exact options and explicit request budgets before
     [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--expect-route-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--expect-wire-plan-digest', 'not-a-sha256'],
+    [...runArgs('a'), '--require-listed-model'],
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
@@ -462,6 +463,83 @@ test('Jev wire guard works alone or beside older guards without a token option',
     createProvider() { throw new Error('Provider constructed'); },
   }), /DeepSeek output token limit requires a declared route/);
   assert.equal(existsSync(rejectedOut), false);
+});
+test('opt-in account catalog blocks stale routes before evaluation and pins the checked key', async t => {
+  const f = await fixtures(t), path = join(f.dir, 'dataset.json');
+  const route = { dataset: f.dataset, provider: 'deepseek', maxRequests: 1,
+    modelId: 'deepseek-v4-flash', revision: 'offline-v1' };
+  const plan = planEvaluation(route);
+  const args = out => ['run', '--dataset', path, '--deployment-id', 'catalog-run', '--id', 'catalog-run-1',
+    '--out', out, '--max-requests', '1', '--allow-remote', '--expect-route-plan-digest', plan.routeGuardDigest,
+    '--require-listed-model'];
+  const values = { REFLEXMESH_ALLOW_REMOTE: 'true', REFLEXMESH_PROVIDER: 'deepseek',
+    REFLEXMESH_PROVIDER_REVISION: route.revision, DEEPSEEK_MODEL: route.modelId };
+  let factoryCalls = 0, catalogCalls = 0;
+  const staleOut = join(f.dir, 'catalog-stale.json');
+  await assert.rejects(evaluationMain(args(staleOut), sink(), {
+    env: { ...values, DEEPSEEK_API_KEY: 'private-fixture-key' },
+    modelCatalogFetch: async () => { catalogCalls++; return Response.json({ object: 'list',
+      data: [{ id: 'deepseek-flash', object: 'model' }] }); },
+    createProvider() { factoryCalls++; throw new Error('Provider must not be constructed'); },
+  }), /not listed/);
+  assert.equal(catalogCalls, 1); assert.equal(factoryCalls, 0); assert.equal(existsSync(staleOut), false);
+  const disabledOut = join(f.dir, 'catalog-disabled.json');
+  await assert.rejects(evaluationMain(args(disabledOut), sink(), {
+    env: { ...values, REFLEXMESH_ALLOW_REMOTE: 'false', DEEPSEEK_API_KEY: 'private-fixture-key' },
+    modelCatalogFetch() { catalogCalls++; throw new Error('No remote opt-in'); },
+  }), /not enabled/);
+  assert.equal(catalogCalls, 1); assert.equal(existsSync(disabledOut), false);
+  const changed = structuredClone(f.dataset); changed.cases[0].state.observedKey = 'drift';
+  const changedPath = join(f.dir, 'catalog-changed.json'); writeFileSync(changedPath, JSON.stringify(changed));
+  const driftOut = join(f.dir, 'catalog-drift-output.json');
+  await assert.rejects(evaluationMain(args(driftOut).map(x => x === path ? changedPath : x), sink(), {
+    env: new Proxy(values, { get(target, key) {
+      if (key === 'DEEPSEEK_API_KEY') throw new Error('Key read before route guard');
+      return target[key];
+    } }), modelCatalogFetch() { catalogCalls++; throw new Error('Catalog before guard'); },
+  }), /route plan mismatch/);
+  assert.equal(catalogCalls, 1); assert.equal(existsSync(driftOut), false);
+  const jevPlan = planEvaluation({ dataset: f.dataset, provider: 'jev', maxRequests: 1,
+    modelId: 'jev-model', revision: 'offline-v1' });
+  const jevOut = join(f.dir, 'catalog-jev.json');
+  await assert.rejects(evaluationMain(['run', '--dataset', path, '--deployment-id', 'jev-catalog',
+    '--id', 'jev-catalog-1', '--out', jevOut, '--max-requests', '1', '--allow-remote',
+    '--expect-route-plan-digest', jevPlan.routeGuardDigest, '--require-listed-model'], sink(), {
+    env: { REFLEXMESH_PROVIDER: 'jev', TYPESAFE_MODEL: 'jev-model', REFLEXMESH_PROVIDER_REVISION: 'offline-v1' },
+    modelCatalogFetch() { catalogCalls++; throw new Error('Wrong provider'); },
+  }), /DeepSeek only/);
+  assert.equal(catalogCalls, 1); assert.equal(existsSync(jevOut), false);
+  const canonicalRoute = { ...route, modelId: 'deepseek-flash' }, canonicalPlan = planEvaluation(canonicalRoute);
+  const matchedOut = join(f.dir, 'catalog-matched.json');
+  const matchedArgs = args(matchedOut).map(x => x === plan.routeGuardDigest ? canonicalPlan.routeGuardDigest : x);
+  let keyReads = 0, completionCalls = 0;
+  const changingEnv = new Proxy({ ...values, DEEPSEEK_MODEL: canonicalRoute.modelId }, { get(target, key) {
+    if (key === 'DEEPSEEK_API_KEY') { keyReads++; return keyReads === 1 ? 'first-private-key' : 'changed-private-key'; }
+    return target[key];
+  } });
+  const output = sink();
+  assert.equal(await evaluationMain(matchedArgs, output, {
+    env: changingEnv,
+    modelCatalogFetch: async (_url, request) => {
+      catalogCalls++;
+      assert.equal(request.headers.Authorization, 'Bearer first-private-key');
+      return Response.json({ object: 'list', data: [{ id: canonicalRoute.modelId, object: 'model' }] });
+    },
+    createProvider: (selectedEnv, options) => {
+      factoryCalls++;
+      assert.equal(selectedEnv.DEEPSEEK_API_KEY, 'first-private-key');
+      return createEvaluationProvider(selectedEnv, { ...options, fetch: async () => {
+        completionCalls++;
+        return Response.json({ object: 'chat.completion', model: canonicalRoute.modelId,
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant',
+            content: JSON.stringify({ answers: { match: { type: 'noul', noul: 0.8 } } }) } }],
+          usage: { prompt_tokens: 12, completion_tokens: 8 } });
+      } });
+    },
+  }), 0);
+  assert.equal(catalogCalls, 2); assert.equal(factoryCalls, 1); assert.equal(completionCalls, 1);
+  assert.equal(keyReads, 1); assert.equal(readEvaluationJson(matchedOut).rows[0].status, 'ok');
+  assert.equal(output.text.includes('private-key'), false);
 });
 test('imported non-fixture predictions remain pure local declarations, not authenticated measurements', async t => {
   const f = await fixtures(t);

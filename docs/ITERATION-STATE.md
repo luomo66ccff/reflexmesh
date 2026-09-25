@@ -12,6 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Current local candidate: account-listed DeepSeek evaluation gate
+
+On 2026-09-25, a small synthetic intent/scope slice exposed a real operator
+trap: the installed Harness default named an older DeepSeek alias, while the
+account's current model catalog listed the canonical `deepseek-flash` and
+`deepseek-v4-pro` IDs. An initial guarded evaluation produced one
+`provider_error` and stopped seven later cases; its remote reception/billing
+is unknown and its receipt is retained, not retried. The new opt-in
+`--require-listed-model` checks the same account key and exact route with one
+bounded catalog GET after the offline guards and before provider construction
+or output. A real stale-alias check rejected with no completion or output.
+A separately named run using the account-listed `deepseek-flash` returned
+eight complete, tool-free results; the 4/4 preset synthetic labels yielded
+Brier 0.0012 and ECE 0.03. This is not a representative quality benchmark,
+default-profile acceptance, immutable-weight proof or cost guarantee. See the
+[local validation](VALIDATION-EVALUATION-CATALOG-LIVE-T001.md).
+
 ## Latest merged milestone: reviewed wire-plan guard
 
 On 2026-09-25, a route-declared plan could check exact local request-body
