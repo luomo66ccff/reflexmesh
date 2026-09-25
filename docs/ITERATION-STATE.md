@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Current local candidate: Codex first connection
+## Latest merged milestone: Codex first connection
 
 On 2026-09-25, the Codex path gained a read-only first-run doctor that generates
 an explicit, reviewable STDIO MCP fragment with a private ledger, tenant and
@@ -25,10 +25,14 @@ probe passed. Existing ledger inspection skips possible active WAL side files
 and does not certify a concurrent ledger. No real Codex Agent, model, profile
 installation or native tool call was exercised. See the
 [first-run guide](CODEX-FIRST-RUN.md) and
-[local validation](VALIDATION-CODEX-FIRST-RUN-T001.md). Publication and CI
-readback remain separate; broader host and real-user gates remain open.
+[local validation](VALIDATION-CODEX-FIRST-RUN-T001.md).
+[PR #55](https://github.com/luomo66ccff/reflexmesh/pull/55) merged the
+reviewed tree `08cd2fb7d00b7422657b4e63b6da0c9cf1c04510` unchanged;
+all five configured jobs passed on both the PR head and main merge commit.
+See the separate [integration readback](VALIDATION-CODEX-FIRST-RUN-INTEGRATION-T001.md).
+Broader host and real-user gates remain open.
 
-## Latest merged milestone: honest first-result scoring
+## Previous merged milestone: honest first-result scoring
 
 On 2026-09-25, the only scoring entrypoint still required two deployments,
 even when an operator had just made a first bounded prediction run. The new

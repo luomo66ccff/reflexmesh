@@ -1,6 +1,7 @@
 # Codex first connection: local validation t001
 
-Date: 2026-09-25. Scope: this unmerged local candidate. This report is not
+Date: 2026-09-25. Scope: the local candidate before PR #55 merged; the remote
+[integration readback](VALIDATION-CODEX-FIRST-RUN-INTEGRATION-T001.md) is separate. This report is not
 evidence of a current Codex profile, an actual Agent decision, a model call,
 or host-native tool execution.
 
