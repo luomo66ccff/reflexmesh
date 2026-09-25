@@ -53,8 +53,72 @@ test('explicit executable and missing database give a reviewable, abstaining fra
   assert.equal(result.report.setup.env.REFLEXMESH_PROVIDER, 'abstain');
   assert.equal(result.report.setup.env.REFLEXMESH_ALLOW_REMOTE, 'false');
   assert.match(result.report.setup.toml, /\[mcp_servers\.reflexmesh-shadow\]/u);
+  assert.deepEqual(result.report.registration, { status: 'not_requested' });
+  assert.equal(result.report.setup.registration, null);
   assert.equal(existsSync(w.db), false);
   assert.deepEqual(lstatSync(w.root).isDirectory(), true);
+});
+
+test('explicit installed-CLI list check distinguishes absent, matching and conflicting registration without writes', async t => {
+  const w = workspace(t);
+  const base = await diagnoseCodexDoctor(args(w));
+  const setup = base.report.setup, codexArgs = [...args(w), '--codex-executable', process.execPath];
+  let calls = 0;
+  const run = rows => () => { calls++; return { status: 0, stdout: JSON.stringify(rows), stderr: '' }; };
+  const absent = await diagnoseCodexDoctor(codexArgs, { runRegistrationList: run([]) });
+  assert.equal(absent.report.registration.status, 'not_registered');
+  assert.equal(absent.report.status, 'prerequisites_ready');
+  assert.ok(absent.report.setup.registration);
+  assert.equal(absent.report.setup.registration.command, process.execPath);
+  assert.ok(absent.report.setup.registration.powershell.includes(process.execPath));
+  assert.ok(formatCodexDoctor(absent.report).includes(absent.report.setup.registration.powershell));
+  assert.equal(calls, 1);
+  const matching = await diagnoseCodexDoctor(codexArgs, { runRegistrationList: run([{
+    name: 'reflexmesh-shadow', enabled: true,
+    transport: { type: 'stdio', command: setup.command, args: setup.args, env: setup.env },
+  }]) });
+  assert.equal(matching.report.registration.status, 'matching_config');
+  assert.equal(matching.report.setup.registration, null);
+  assert.equal(formatCodexDoctor(matching.report).includes(' --env '), false);
+  const conflict = await diagnoseCodexDoctor(codexArgs, { runRegistrationList: run([{
+    name: 'reflexmesh-shadow', enabled: true,
+    transport: { type: 'stdio', command: 'PRIVATE_OTHER_COMMAND', args: [], env: { SECRET: 'PRIVATE_VALUE' } },
+  }]) });
+  assert.equal(conflict.report.registration.status, 'different_config');
+  assert.equal(conflict.report.setup.registration, null);
+  assert.equal(conflict.report.status, 'action_required');
+  assert.ok(codes(conflict.report).includes('registration_conflict'));
+  assert.equal(JSON.stringify(conflict.report).includes('PRIVATE_'), false);
+  assert.equal(formatCodexDoctor(conflict.report).includes(' --env '), false);
+  const extraEnvironment = await diagnoseCodexDoctor(codexArgs, { runRegistrationList: run([{
+    name: 'reflexmesh-shadow', enabled: true,
+    transport: { type: 'stdio', command: setup.command, args: setup.args, env: setup.env,
+      env_vars: ['PRIVATE_INHERITED'], cwd: null },
+  }]) });
+  assert.equal(extraEnvironment.report.registration.status, 'different_config');
+  assert.equal(JSON.stringify(extraEnvironment.report).includes('PRIVATE_INHERITED'), false);
+  assert.equal(existsSync(w.db), false);
+});
+
+test('CLI registration probe fails closed on bad paths, malformed or excessive output', async t => {
+  const w = workspace(t);
+  let called = false;
+  const invalid = await diagnoseCodexDoctor([...args(w), '--codex-executable', 'codex'], {
+    runRegistrationList: () => { called = true; throw new Error('must not run'); },
+  });
+  assert.equal(invalid.report.registration.status, 'invalid_executable');
+  assert.equal(called, false);
+  for (const output of ['PRIVATE_NOT_JSON', JSON.stringify({ secret: 'PRIVATE_VALUE' }),
+    JSON.stringify(Array(201).fill({ name: 'other' }))]) {
+    const result = await diagnoseCodexDoctor([...args(w), '--codex-executable', process.execPath], {
+      runRegistrationList: () => ({ status: 0, stdout: output }),
+    });
+    assert.equal(result.report.registration.status, 'unavailable');
+    assert.equal(result.report.status, 'action_required');
+    assert.equal(JSON.stringify(result.report).includes('PRIVATE_'), false);
+    assert.equal(formatCodexDoctor(result.report).includes('PRIVATE_'), false);
+  }
+  assert.equal(existsSync(w.db), false);
 });
 
 test('bad paths and malformed options use bounded errors and never echo hostile values', async t => {

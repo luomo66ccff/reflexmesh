@@ -143,12 +143,16 @@ profile passed 20/20 fixed checks, with a generated-root timestamp change;
 see the [real-home validation and limits](docs/VALIDATION-DEEPSEEK-REAL-PROFILE-T001.md).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
-the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;
+the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet.
+An optional, explicitly named Codex CLI path lets the doctor read only the
+current same-name registration status and print a copyable `codex mcp add`
+command when absent; it never runs that command or edits your profile. Review
+the command before manually running it, then restart the Codex session;
 `npm run compat:codex-setup` then checks the production MCP evidence path in
 isolation without an account, including one process restart with same-call
 replay and changed-task conflict. Both are described in the
-[Codex first-run guide](docs/CODEX-FIRST-RUN.md). This does not install a server
-or verify that a real Codex Agent chose to call it.
+[Codex first-run guide](docs/CODEX-FIRST-RUN.md). The doctor does not install a
+server or verify that a real Codex Agent chose to call it.
 For an explicitly opted-in synthetic Agent read, the separate
 `npm run compat:codex-agent -- --help` command describes its logged-in model
 request, read-only sandbox, retained-evidence option and limits. It does not
@@ -344,9 +348,9 @@ First build, then configure the **absolute Node entrypoint**, not an npm command
 
 For Codex, generate an explicit, reviewable TOML row with
 `npm run doctor:codex -- --help`, then manually merge it into your own
-`config.toml`. The [first-run guide](docs/CODEX-FIRST-RUN.md) keeps its
-ledger, tenant and scope explicit and validates the production MCP path
-without modifying your profile.
+`config.toml` or opt into its same-name CLI check for a reviewable add command.
+The [first-run guide](docs/CODEX-FIRST-RUN.md) keeps its ledger, tenant and scope
+explicit and validates the production MCP path without modifying your profile.
 
 This installs **advisory** tools: `reflexmesh_assess`, `reflexmesh_observe_outcome`, `reflexmesh_replay_policy`, `reflexmesh_inspect_pack`. The model may choose not to call them. It does not gain or lose native tool permissions.
 

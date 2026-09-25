@@ -24,6 +24,14 @@ test('pure setup emits the production MCP entry and frozen, explicit abstaining 
   assert.equal(Object.isFrozen(setup), true);
   assert.equal(Object.isFrozen(setup.args), true);
   assert.equal(Object.isFrozen(setup.env), true);
+  assert.equal(Object.isFrozen(setup.registration), true);
+  assert.equal(Object.isFrozen(setup.registration.args), true);
+  assert.deepEqual(setup.registration.args, ['mcp', 'add', 'reflexmesh_probe_x',
+    ...Object.entries(setup.env).flatMap(([key, value]) => ['--env', `${key}=${value}`]),
+    '--', process.execPath, entry]);
+  assert.equal(setup.registration.changesUserConfigIfRun, true);
+  assert.match(setup.registration.powershell, /^codex mcp add 'reflexmesh_probe_x' /u);
+  assert.match(setup.registration.posix, /^codex mcp add 'reflexmesh_probe_x' /u);
   assert.match(setup.toml, /^\[mcp_servers\.reflexmesh_probe_x\]\n/u);
   assert.ok(setup.toml.includes(`command = ${JSON.stringify(process.execPath)}`));
   assert.ok(setup.toml.includes(`args = [${JSON.stringify(entry)}]`));
@@ -41,6 +49,14 @@ test('Windows backslashes, quotes, spaces and Chinese text are escaped as TOML b
   assert.ok(setup.toml.includes(`REFLEXMESH_DB = ${JSON.stringify(dbPath)}`));
   assert.ok(setup.toml.includes(`REFLEXMESH_TENANT = ${JSON.stringify('组"A\\B')}`));
   assert.equal(setup.env.REFLEXMESH_DB, dbPath);
+  assert.equal(setup.registration, null, 'quoted values use reviewed TOML, not an unverified native shell command');
+});
+
+test('registration commands quote apostrophes and preserve Unicode without running a host', () => {
+  const setup = createCodexSetup({ ...input, tenantId: "团队 O'Brien" });
+  assert.ok(setup.registration.powershell.includes("REFLEXMESH_TENANT=团队 O''Brien"));
+  assert.ok(setup.registration.posix.includes("REFLEXMESH_TENANT=团队 O'\\''Brien"));
+  assert.ok(setup.registration.args.includes("REFLEXMESH_TENANT=团队 O'Brien"));
 });
 
 test('missing, relative, nonlocal, interpolated and ambiguous input is rejected without accessors', () => {

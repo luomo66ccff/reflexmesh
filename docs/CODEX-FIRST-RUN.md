@@ -26,8 +26,10 @@ exists, `--key KEY_FROM_EVIDENCE_LIST` asks for one historical record; otherwise
 the doctor may show the first key-order record, **not** the latest activity.
 It never uses that history as proof of the present Codex configuration. The
 doctor checks explicit paths, the current Node/SQLite write gate, the build,
-and optional read-only ledger history. It does not inspect your Codex profile,
-read a provider key, run Codex, call a model, or write settings or a database.
+and optional read-only ledger history. By default it does not inspect your
+Codex profile, read a provider key, run Codex, call a model, or write settings
+or a database. The separate explicit `--codex-executable` option below only
+invokes the CLI's registration-list subcommand.
 If WAL side files exist or cannot be ruled out, historical inspection is
 skipped. Otherwise the doctor uses an immutable read-only SQLite view and
 discards the result if file metadata or side-file state changes. This is a
@@ -43,6 +45,36 @@ Do not paste it over an existing server row or assume a newly edited config
 has been loaded by a running Codex session. [OpenAI's MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 describes the `mcp_servers` STDIO `command`, `args`, `env` and `cwd` fields;
 `codex mcp list` checks registration, not a tool call or model behavior.
+
+### Optional: check the current registration before a copyable add command
+
+If you explicitly provide an installed Codex CLI path, the doctor invokes only
+that binary's `mcp list --json` subcommand and reduces its output to a fixed
+same-name status. The raw list, including any existing environment values, is
+not printed. On Windows, get the CLI path with `(Get-Command codex).Source`:
+
+```powershell
+npm run doctor:codex -- --node-executable "C:\path\to\node.exe" --codex-executable "C:\path\to\codex.exe" --db "C:\private\reflexmesh\shadow.sqlite" --tenant local --scope my-project
+```
+
+When the default `reflexmesh-shadow` name is absent and all prerequisites pass,
+the doctor prints a PowerShell or POSIX `codex mcp add` command using the exact
+reviewed environment and the same absolute Codex executable it inspected,
+not a potentially different CLI from `PATH`. **It never runs that command.** Running it yourself
+changes your personal Codex configuration; first review the paths, identifiers
+and existing rows with `codex mcp list`. The check only searches that one name,
+so another row could already point to ReflexMesh. A matching same-name row
+needs no add; a differing row is a conflict and no add command is printed.
+Unparseable, excessive or failed CLI output is a fixed failure, not permission
+to overwrite. Names and paths with unusual literal double quotes retain the
+TOML fallback instead of an unverified native-shell command.
+
+The optional check reads the current CLI profile and may encounter private
+settings; omit it if you do not want that access. It does not call a model or
+MCP tool, create the database, or prove that an already-running Codex session
+loaded the entry. After a manual add, use `codex mcp list` and start a fresh
+Codex session before an opt-in Agent check. Protect the doctor output: even
+without secrets, paths, tenant and scope can be sensitive metadata.
 
 ## Verify the setup without an account
 
