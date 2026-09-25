@@ -22,6 +22,13 @@ export; inspect it privately before choosing to use it. If you later start
 operation: back up the profile first, because the installed host prepares and
 rewrites its generated `cordis.yml`, and its plugins may load. The preview does
 not run this command for you.
+If your trusted installation has a `web` profile, the separate
+`npm run compat:deepseek-web-profile -- --help` check goes one step beyond
+composition: it boots a disposable copy of that selected bundle/patch stack
+with a temporary Loader overlay, verifies host readiness and clean exit, and
+does not target the real profile for writes. It intentionally executes those selected
+plugins, so read the [safety scope](DOCTOR.md#preview-an-existing-profile-without-editing-it)
+and [dated validation](VALIDATION-DEEPSEEK-SELECTED-WEB-BOOT-T001.md) first.
 
 Build ReflexMesh with `npm ci --ignore-scripts` and `npm run build`. Back up the
 profile you intend to change, then add an insertion to that profile's

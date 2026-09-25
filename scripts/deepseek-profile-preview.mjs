@@ -52,11 +52,11 @@ export function parsePreviewArgs(argv) {
   return parsed;
 }
 
-const safePath = value => typeof value === 'string' && value.length > 0 && value.length <= 4096
+export const safePath = value => typeof value === 'string' && value.length > 0 && value.length <= 4096
   && isAbsolute(value) && !UNSAFE.test(value) && !value.startsWith('\\\\');
-const safeProfile = value => typeof value === 'string' && value.length <= 64
+export const safeProfile = value => typeof value === 'string' && value.length <= 64
   && /^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(value) && value !== '.' && value !== '..';
-const within = (root, path) => {
+export const within = (root, path) => {
   const rel = relative(root, path);
   return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 };
@@ -102,7 +102,7 @@ async function publishOverlay(target, body) {
     catch { throw new Error('overlay_file_unverified'); }
   }
 }
-async function boundedFile(path, limit, required = false) {
+export async function boundedFile(path, limit, required = false) {
   let info;
   try { info = await lstat(path); }
   catch (error) {
@@ -138,7 +138,7 @@ function dumpConfig({ binPath, home, profile, overlayPath }) {
     windowsHide: true, shell: false, timeout: 20_000, maxBuffer: MAX_DUMP_BYTES });
 }
 
-async function safeCleanup(root, modulesLink, identity) {
+export async function safeCleanup(root, modulesLink, identity, prefix = PREFIX) {
   if (!root) return true;
   try {
     const rootInfo = await lstat(root);
@@ -148,7 +148,7 @@ async function safeCleanup(root, modulesLink, identity) {
     const target = await realpath(root);
     const rel = relative(parent, target);
     if (!rel || rel.startsWith('..') || isAbsolute(rel) || rel.includes(sep)
-      || !basename(target).startsWith(PREFIX)) return false;
+      || !basename(target).startsWith(prefix)) return false;
     if (modulesLink) {
       let link;
       try { link = await lstat(modulesLink); }
