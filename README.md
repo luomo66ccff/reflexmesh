@@ -127,6 +127,10 @@ appear better simply by failing harder cases. Keep editable inputs with
 `npm run evaluation -- --help` workflow separates datasets, independently
 supplied labels and separately bound prediction runs. Its main delta uses the
 same labeled, both-successful cases, with missing/failure coverage beside it.
+When only one prediction file exists, `npm run evaluation -- score --dataset
+FILE --labels FILE --predictions FILE` reports that side's coverage and
+available labeled-case metrics without inventing a champion or improvement
+delta. It is offline, descriptive and does not promote a model.
 Before a paid run, `npm run evaluation -- plan --dataset FILE --provider deepseek --max-requests N`
 shows offline capability coverage and a request upper bound;
 it does not read credentials, send data or estimate cost.
@@ -163,7 +167,7 @@ that concurrency; this setting does not serialize the production runtime.
 | --- | --- |
 | Evidence-bound deployment | Event/action digest + immutable pack version/hash + provider/model/revision/capabilities digest + host authorization/toolset revisions |
 | Independent decision providers | Jev and independent DeepSeek binary JSON estimates, immutable capability declarations and fail-before-egress conformance; no calibration or automatic fallback |
-| Paired evaluation | Versioned datasets, separate label files, independently bound prediction artifacts and per-question paired metrics/coverage; descriptive only, no automatic promotion |
+| Single-side and paired evaluation | Versioned datasets, separate label files, independently bound prediction artifacts; one-side coverage/metrics or common-case paired deltas, descriptive only, no automatic promotion |
 | Durable admission | SQLite WAL, transactional uniqueness, leases and fencing epochs; separate-process tests and real process-kill tests |
 | Recovery | Durable UNKNOWN tombstones plus local, preview-first operator reviews; conclusions never enable replay or retries |
 | Portable contracts | Additive `binary / choice / ordinal` authoring facade; legacy `noul / score` remain inside the v0.1 engine |

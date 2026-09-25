@@ -85,6 +85,10 @@ the eight-case synthetic intent slice is a plumbing check, not representative
 quality or default-profile acceptance.
 Its [PR/main integration readback](VALIDATION-EVALUATION-CATALOG-LIVE-INTEGRATION-T001.md)
 keeps remote CI evidence separate from the local paid-run receipt.
+The [single-side score increment](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-T001.md)
+lets a first provider run show honest coverage and available labeled-case
+metrics without fabricating a comparison side. Representative paired quality
+and real-user usefulness remain open.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

@@ -69,6 +69,46 @@ function side(predictions) {
   };
 }
 
+/** Descriptive score for one prediction artifact; no invented comparator or promotion decision. */
+export function scoreEvaluation({ dataset, labels, predictions, binCount = 10 }) {
+  check(Number.isSafeInteger(binCount) && binCount >= 1 && binCount <= 1000, 'Invalid evaluation bin count');
+  const data = validateEvaluationDataset(dataset);
+  const labeled = validateEvaluationLabels(labels, data);
+  const predicted = validateEvaluationPredictions(predictions, data);
+  const labelsByCase = new Map(), rows = new Map(predicted.rows.map(row => [row.caseId, row]));
+  for (const { caseId, label } of labeled.labels) {
+    if (!labelsByCase.has(caseId)) labelsByCase.set(caseId, new Map());
+    labelsByCase.get(caseId).set(label.questionId, label);
+  }
+  const questions = Object.entries(data.pack.questions).map(([questionId, question]) => {
+    const coverage = { all: counts(), labeled: counts() };
+    const all = distribution(question), scoredDistribution = distribution(question), samples = [];
+    let labeledCases = 0;
+    for (const item of data.cases) {
+      const label = labelsByCase.get(item.id)?.get(questionId);
+      const row = rows.get(item.id), status = row?.status ?? 'missing';
+      coverage.all[status]++;
+      if (!label) continue;
+      labeledCases++; addLabel(all, label); coverage.labeled[status]++;
+      if (status === 'ok') {
+        samples.push({ answer: row.result.answers[questionId], label });
+        addLabel(scoredDistribution, label);
+      }
+    }
+    return { questionId, type: question.type, totalCases: data.cases.length, labeledCases,
+      labelDistribution: { all, scored: scoredDistribution }, coverage,
+      scored: { count: samples.length, metrics: metrics(question, samples, binCount) } };
+  });
+  return snapshot({
+    schemaVersion: 1, kind: 'reflexmesh-evaluation-score', interpretation: 'descriptive-only',
+    dataset: { id: data.id, revision: data.revision, digest: evaluationDatasetDigest(data),
+      packDigest: digest(data.pack), caseCount: data.cases.length, dataKind: data.dataKind, populationRef: data.populationRef },
+    labelset: { id: labeled.id, revision: labeled.revision, digest: digest(labeled),
+      independence: labeled.independence, labelIndependenceVerified: false },
+    prediction: side(predicted), questions, executionAllowed: false, promotionAllowed: false,
+  });
+}
+
 /** Descriptive, paired offline comparison; never an authorization or promotion decision. */
 export function compareEvaluations({ dataset, labels, champion, challenger, binCount = 10 }) {
   check(Number.isSafeInteger(binCount) && binCount >= 1 && binCount <= 1000, 'Invalid evaluation bin count');

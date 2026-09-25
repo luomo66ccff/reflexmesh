@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { evaluationMain, formatEvaluationReport, parseEvaluationOptions } from '../adapters/evaluation-cli.mjs';
+import { evaluationMain, formatEvaluationReport, formatEvaluationScore, parseEvaluationOptions } from '../adapters/evaluation-cli.mjs';
 import { EVALUATION_FILE_LIMIT, readEvaluationJson, reserveEvaluationOutput } from '../adapters/evaluation-files.mjs';
 import { comparisonFixture, fixtureDeployment } from '../examples/evaluation-fixture.mjs';
 import { runEvaluation } from '../adapters/evaluation-runner.mjs';
@@ -34,7 +34,7 @@ const runArgs = (dir, out = 'run.json') => ['run', '--dataset', join(dir, 'datas
   '--id', 'bounded-run-1', '--out', join(dir, out), '--max-requests', '1', '--allow-remote'];
 test('evaluation CLI validates exact options and explicit request budgets before any work', () => {
   assert.equal(parseEvaluationOptions([]).help, true); assert.equal(parseEvaluationOptions(['--help']).help, true);
-  for (const args of [['wrong'], ['validate'], ['plan'], ['validate', '--dataset', 'a', '--dataset', 'b'],
+  for (const args of [['wrong'], ['validate'], ['plan'], ['score'], ['validate', '--dataset', 'a', '--dataset', 'b'],
     ['validate', '--dataset', 'a', '--unknown'], ['validate', '--dataset'], ['compare', '--dataset', 'a'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '0'],
@@ -44,6 +44,8 @@ test('evaluation CLI validates exact options and explicit request budgets before
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--provider-revision', 'revision-only'],
     ['plan', '--dataset', 'a', '--provider', 'deepseek', '--max-requests', '1', '--max-output-tokens', '64'],
     ['plan', '--dataset', 'a', '--provider', 'jev', '--max-requests', '1', '--model-id', 'm', '--provider-revision', 'r', '--max-output-tokens', '64'],
+    ['score', '--dataset', 'a', '--labels', 'b'],
+    ['score', '--dataset', 'a', '--labels', 'b', '--predictions', 'c', '--allow-remote'],
     ['run', '--dataset', 'a'], [...runArgs('a'), '--labels', 'forbidden'],
     [...runArgs('a'), '--expect-plan-digest', 'not-a-sha256'],
     [...runArgs('a'), '--expect-route-plan-digest', 'not-a-sha256'],
@@ -52,7 +54,7 @@ test('evaluation CLI validates exact options and explicit request budgets before
     [...runArgs('a'), '--timeout-ms', 'NaN'], [...runArgs('a'), '--max-output-tokens', '4097'],
     runArgs('a').map(x => x === '1' ? '0' : x), runArgs('a').filter(x => x !== '--allow-remote')]) assert.throws(() => parseEvaluationOptions(args));
 });
-test('help, validate, plan and compare never inspect environment credentials or create a provider', async t => {
+test('help, validate, plan, score and compare never inspect environment credentials or create a provider', async t => {
   const f = await fixtures(t), trap = { env: new Proxy({}, { get() { throw new Error('Credential access'); } }),
     createProvider() { throw new Error('Factory must not run'); } };
   const output = sink();
@@ -62,12 +64,15 @@ test('help, validate, plan and compare never inspect environment credentials or 
   assert.equal(JSON.parse(validation.text).labelIndependenceVerified, false);
   const files = ['dataset', 'labels', 'champion', 'challenger'].map(name => join(f.dir, `${name}.json`)), before = files.map(hash);
   const comparison = sink();
+  const single = sink();
   const previousFetch = globalThis.fetch; globalThis.fetch = () => { throw new Error('Network forbidden'); };
   const plan = sink();
   try {
     assert.equal(await evaluationMain(['plan', '--dataset', join(f.dir, 'dataset.json'), '--provider', 'deepseek',
       '--max-requests', '2', '--json'], plan, trap), 0);
     assert.equal(await evaluationMain([...f.args, '--json'], comparison, trap), 0);
+    assert.equal(await evaluationMain(['score', '--dataset', join(f.dir, 'dataset.json'), '--labels', join(f.dir, 'labels.json'),
+      '--predictions', join(f.dir, 'champion.json'), '--json'], single, trap), 0);
   }
   finally { globalThis.fetch = previousFetch; }
   assert.deepEqual(files.map(hash), before);
@@ -84,6 +89,32 @@ test('help, validate, plan and compare never inspect environment credentials or 
   assert.equal(report.executionAllowed, false); assert.equal(report.promotionAllowed, false);
   assert.match(formatEvaluationReport(report), /different population; no direct delta/);
   assert.match(formatEvaluationReport(report), /SYNTHETIC/);
+  const score = JSON.parse(single.text);
+  assert.equal(score.kind, 'reflexmesh-evaluation-score');
+  assert.equal(score.questions[0].scored.count, 4);
+  assert.equal(Object.hasOwn(score, 'sides'), false);
+  assert.match(formatEvaluationScore(score), /no comparator or automatic promotion/);
+  assert.equal(single.text.includes('requestedKey'), false);
+});
+test('single-side score writes only a new local report and never overwrites inputs', async t => {
+  const f = await fixtures(t), out = join(f.dir, 'score.json'), output = sink();
+  const inputs = ['dataset', 'labels', 'champion'].map(name => join(f.dir, `${name}.json`));
+  const before = inputs.map(hash);
+  const args = ['score', '--dataset', inputs[0], '--labels', inputs[1], '--predictions', inputs[2], '--out', out];
+  const trap = { env: new Proxy({}, { get() { throw new Error('Environment accessed'); } }),
+    createProvider() { throw new Error('Provider constructed'); },
+    modelCatalogFetch() { throw new Error('Network accessed'); } };
+  assert.equal(await evaluationMain(args, output, trap), 0);
+  assert.deepEqual(inputs.map(hash), before);
+  const report = readEvaluationJson(out);
+  assert.equal(report.questions[0].scored.count, 4);
+  assert.equal(report.executionAllowed, false);
+  assert.equal(report.promotionAllowed, false);
+  assert.match(output.text, /no comparator or automatic promotion/);
+  assert.equal(output.text.includes('requestedKey'), false);
+  const original = hash(out);
+  await assert.rejects(evaluationMain(args, sink(), trap), /new file/);
+  assert.equal(hash(out), original);
 });
 test('offline plan mirrors trusted provider compatibility and omits raw case state', async t => {
   const dir = directory(t), dataset = structuredClone(comparisonFixture().dataset);

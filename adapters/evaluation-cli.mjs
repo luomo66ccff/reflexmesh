@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { ContractError } from '../dist/index.js';
-import { compareEvaluations } from './evaluation-report.mjs';
+import { compareEvaluations, scoreEvaluation } from './evaluation-report.mjs';
 import { evaluationDatasetDigest, validateEvaluationDataset, validateEvaluationLabels } from './evaluation-contract.mjs';
 import { readEvaluationJson, reserveEvaluationOutput } from './evaluation-files.mjs';
 import { EVALUATION_PROVIDER_IDS, planEvaluation } from './evaluation-plan.mjs';
@@ -10,9 +10,11 @@ import { isDirectRun } from './direct-run.mjs';
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
   npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV [--max-output-tokens N]] [--json]
+  npm run evaluation -- score --dataset FILE --labels FILE --predictions FILE [--bins 10] [--json] [--out NEW_FILE]
   npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--expect-wire-plan-digest SHA256] [--require-listed-model] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
-Validate/plan/compare are local only. A plan without a declared route checks capabilities only; a route also checks local request-body size, not model quality, endpoint availability or cost.
+Validate/plan/score/compare are local only. Score reports one side without inventing a comparator or improvement claim.
+A plan without a declared route checks capabilities only; a route also checks local request-body size, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
 Run never reads labels, loads a host profile or executes tools. Each case keeps its full question contract.
 --require-listed-model adds one authenticated DeepSeek GET /models before provider construction; it requires a route guard and is outside the completion request cap.
@@ -26,9 +28,10 @@ export function parseEvaluationOptions(argv) {
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
     plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'max-output-tokens', 'json'],
+    score: ['dataset', 'labels', 'predictions', 'bins', 'json', 'out'],
     run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'expect-wire-plan-digest', 'require-listed-model', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
-  if (!allowed) fail('Expected validate, plan, run or compare; use --help');
+  if (!allowed) fail('Expected validate, plan, score, run or compare; use --help');
   const options = { command };
   for (let i = 0; i < args.length; i++) {
     const key = args[i].startsWith('--') ? args[i].slice(2) : '';
@@ -37,6 +40,7 @@ export function parseEvaluationOptions(argv) {
     else { const value = args[++i]; if (!value || value.startsWith('--')) fail('Missing evaluation option value'); options[key] = value; }
   }
   const required = { validate: ['dataset'], plan: ['dataset', 'provider', 'max-requests'],
+    score: ['dataset', 'labels', 'predictions'],
     run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote'],
     compare: ['dataset', 'labels', 'champion', 'challenger'] }[command];
   if (required.some(key => !Object.hasOwn(options, key))) fail('Missing required evaluation option; use --help');
@@ -91,6 +95,24 @@ export function formatEvaluationReport(report) {
     'Policy transitions are not false-allow/false-deny rates. No tool, permission, threshold or deployment change is made.');
   return lines.join('\n') + '\n';
 }
+export function formatEvaluationScore(report) {
+  const lines = ['ReflexMesh single-side score — descriptive only; no comparator or automatic promotion',
+    `Dataset ${quote(report.dataset.id)} @ ${quote(report.dataset.revision)}: ${report.dataset.caseCount} cases (${report.dataset.dataKind})`,
+    `Prediction: ${quote(report.prediction.deploymentId)} / ${quote(report.prediction.providerId)} / ${quote(report.prediction.modelId)} @ ${quote(report.prediction.revision)}; ${report.prediction.probabilitySemantics}; origin=${report.prediction.origin}`,
+    'Label independence and prediction origin are operator assertions, not authenticated truth.'];
+  if (report.dataset.dataKind === 'synthetic' || report.prediction.probabilitySemantics === 'synthetic-fixture'
+    || report.prediction.origin === 'synthetic-fixture')
+    lines.push('SYNTHETIC evidence is present. This is not a measured real-world model-quality claim.');
+  for (const question of report.questions) {
+    lines.push(`\n${quote(question.questionId)} (${question.type}): labeled ${question.labeledCases}/${question.totalCases}; scored ${question.scored.count}/${question.labeledCases}`,
+      `  all-case coverage: ${counts(question.coverage.all)}`,
+      `  labeled-case coverage: ${counts(question.coverage.labeled)}`,
+      `  all labeled classes: ${quote(question.labelDistribution.all.byClass)}; scored classes: ${quote(question.labelDistribution.scored.byClass)}`,
+      `  scored metrics: ${metricText(question.scored.metrics)}`);
+  }
+  lines.push('\nA failed, missing or unlabeled case is not a successful negative. No paired delta, tool execution or model promotion is implied.');
+  return lines.join('\n') + '\n';
+}
 
 export async function evaluationMain(argv, output = process.stdout, { env = process.env, createProvider, modelCatalogFetch, signal } = {}) {
   const options = parseEvaluationOptions(argv);
@@ -118,6 +140,13 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
         + 'No key, label, host profile or network was accessed. The wire guard binds locally serialized bodies and output tokens, not endpoint availability, model weights, quality, cost or authorization. Older guards keep their narrower meanings.\n');
     return 0;
   }
+  if (options.command === 'score') {
+    const report = scoreEvaluation({ dataset, labels: readEvaluationJson(options.labels),
+      predictions: readEvaluationJson(options.predictions), binCount: options.bins ?? 10 });
+    if (options.out) { const file = reserveEvaluationOutput(options.out); try { file.finish(report); } finally { file.close(); } }
+    output.write(options.json ? JSON.stringify(report, null, 2) + '\n' : formatEvaluationScore(report));
+    return 0;
+  }
   if (options.command === 'compare') {
     const report = compareEvaluations({ dataset, labels: readEvaluationJson(options.labels), champion: readEvaluationJson(options.champion),
       challenger: readEvaluationJson(options.challenger), binCount: options.bins ?? 10 });
@@ -125,7 +154,7 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
     output.write(options.json ? JSON.stringify(report, null, 2) + '\n' : formatEvaluationReport(report));
     return 0;
   }
-  // The three local branches above do not construct providers or read credentials.
+  // The four local branches above do not construct providers or read credentials.
   // An optional reviewed plan guard fails before provider/key access or output reservation.
   const routeGuard = options['expect-route-plan-digest'] !== undefined;
   const wireGuard = options['expect-wire-plan-digest'] !== undefined;

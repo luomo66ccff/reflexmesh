@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { canonical } from '../dist/index.js';
 import { evaluationDatasetDigest, evaluationCaseDigest } from '../adapters/evaluation-contract.mjs';
-import { compareEvaluations } from '../adapters/evaluation-report.mjs';
+import { compareEvaluations, scoreEvaluation } from '../adapters/evaluation-report.mjs';
 
 const hash = value => createHash('sha256').update(canonical(value)).digest('hex');
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} != ${expected}`);
@@ -213,4 +213,62 @@ test('comparison revalidates identities, disallows same deployment and invalid b
   assert.throws(() => compareEvaluations(bad), /sum to one/);
   const mismatched = fixture(); mismatched.labels.datasetDigest = '0'.repeat(64);
   assert.throws(() => compareEvaluations(mismatched), /labelset identity/);
+});
+
+test('single-side score uses the same validated metrics without a fabricated comparator', () => {
+  const { dataset, labels, champion } = fixture();
+  const report = scoreEvaluation({ dataset, labels, predictions: champion });
+  assert.equal(report.kind, 'reflexmesh-evaluation-score');
+  assert.equal(report.interpretation, 'descriptive-only');
+  assert.equal(report.executionAllowed, false); assert.equal(report.promotionAllowed, false);
+  assert.equal(report.prediction.deploymentId, 'deploy-champion');
+  assert.equal(report.prediction.origin, 'synthetic-fixture');
+  assert.equal(report.labelset.labelIndependenceVerified, false);
+  assert.equal(Object.hasOwn(report, 'sides'), false);
+  assert.equal(Object.hasOwn(report, 'paired'), false);
+  assert.equal(Object.hasOwn(report, 'delta'), false);
+  const [binary, choice, score] = report.questions;
+  assert.equal(binary.labeledCases, 2); assert.equal(binary.scored.count, 2);
+  assert.deepEqual(binary.coverage.all, { ok: 3, unsupported: 0, failed: 0, not_attempted: 0, missing: 0 });
+  assert.deepEqual(binary.labelDistribution.scored.byClass, { '0': 1, '1': 1 });
+  near(binary.scored.metrics.brier, 0.025);
+  assert.equal(choice.scored.metrics.accuracy, 1);
+  near(choice.scored.metrics.multiclassBrier, 0.05);
+  near(score.scored.metrics.mae, 0.45);
+  assert.equal(Object.isFrozen(report.questions[0].scored), true);
+});
+
+test('single-side score preserves failed and missing coverage, selection balance and null metrics', () => {
+  const inputs = fixture();
+  const report = scoreEvaluation({ dataset: inputs.dataset, labels: inputs.labels, predictions: inputs.challenger });
+  const binary = report.questions[0];
+  assert.deepEqual(binary.coverage.all, { ok: 2, unsupported: 0, failed: 1, not_attempted: 0, missing: 0 });
+  assert.deepEqual(binary.coverage.labeled, { ok: 1, unsupported: 0, failed: 1, not_attempted: 0, missing: 0 });
+  assert.deepEqual(binary.labelDistribution.all.byClass, { '0': 1, '1': 1 });
+  assert.deepEqual(binary.labelDistribution.scored.byClass, { '0': 0, '1': 1 });
+  assert.equal(binary.scored.count, 1); near(binary.scored.metrics.brier, 0.16);
+  const missing = fixture(); missing.challenger.rows = missing.challenger.rows.filter(row => row.caseId === 'c2');
+  const missingScore = scoreEvaluation({ dataset: missing.dataset, labels: missing.labels,
+    predictions: missing.challenger }).questions[0];
+  assert.equal(missingScore.coverage.all.missing, 2);
+  assert.equal(missingScore.coverage.labeled.missing, 1);
+  assert.equal(missingScore.scored.count, 0);
+  assert.equal(missingScore.scored.metrics, null);
+  assert.deepEqual(missingScore.labelDistribution.scored.byClass, { '0': 0, '1': 0 });
+  const unlabeled = fixture(); unlabeled.labels.labels = [];
+  const noLabels = scoreEvaluation({ dataset: unlabeled.dataset, labels: unlabeled.labels,
+    predictions: unlabeled.champion }).questions[0];
+  assert.equal(noLabels.labeledCases, 0); assert.equal(noLabels.scored.count, 0);
+  assert.equal(noLabels.scored.metrics, null); assert.equal(noLabels.coverage.all.ok, 3);
+});
+
+test('single-side score rejects bad bins, mismatched labels and invalid prediction rows', () => {
+  const inputs = fixture();
+  const args = { dataset: inputs.dataset, labels: inputs.labels, predictions: inputs.champion };
+  assert.throws(() => scoreEvaluation({ ...args, binCount: 0 }), /bin count/);
+  const badLabels = structuredClone(inputs.labels); badLabels.datasetDigest = '0'.repeat(64);
+  assert.throws(() => scoreEvaluation({ ...args, labels: badLabels }), /labelset identity/);
+  const badPredictions = structuredClone(inputs.champion);
+  badPredictions.rows[0].result.answers.score.probabilities['2'] = 0.8;
+  assert.throws(() => scoreEvaluation({ ...args, predictions: badPredictions }), /sum to one/);
 });
