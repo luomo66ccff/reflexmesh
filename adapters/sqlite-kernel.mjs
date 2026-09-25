@@ -428,38 +428,98 @@ export class SqliteKernel {
     requireValue(text(key), 'Invalid evidence key');
     // Select only the requested run. SQLite measures stored UTF-8 bytes before
     // either JSON body is fetched or parsed; audit, observations and labels are untouched.
+    return this.#readEvidence(() => this.#policyReplayRecordInTxn(key));
+  }
+  #policyReplayRecordInTxn(key) {
+    const sizes = this.#db.prepare(`SELECT state,
+      length(CAST(evidence AS BLOB)) AS evidence_bytes,
+      length(CAST(result AS BLOB)) AS result_bytes
+      FROM runs WHERE key=?`).get(key);
+    if (!sizes) return null;
+    requireValue(sizes.state === 'completed' && sizes.result_bytes !== null,
+      'Completed prediction required');
+    requireValue(sizes.evidence_bytes > 0 && sizes.evidence_bytes <= 1024 * 1024
+      && sizes.result_bytes > 0 && sizes.result_bytes <= 1024 * 1024,
+      'Stored replay evidence exceeds size limit');
+    const row = this.#db.prepare('SELECT evidence,result FROM runs WHERE key=?').get(key);
+    requireValue(row, 'Unknown evidence key');
+    let evidence, result;
+    try { evidence = JSON.parse(row.evidence); result = JSON.parse(row.result); }
+    catch { throw new ContractError('Stored replay evidence is invalid'); }
+    const sourceTable = this.#db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='packs'").get();
+    if (!sourceTable) {
+      // An old stripped schema-1 fixture can still be replayed, but its
+      // stored original verdict must be visibly marked as unverified.
+      requireValue(this.#schemaVersion === 1, 'Bound source pack is unavailable for replay');
+      return { state: sizes.state, evidence, result, sourceConsistency: 'legacy_unverified' };
+    }
+    const { pack } = this.#boundPolicyPack(evidence, result);
+    // Keep question instructions and other pack prose out of the replay
+    // projection; only the deterministic policy body is needed for a diff.
+    return { state: sizes.state, evidence, result, sourceConsistency: 'verified',
+      sourcePolicy: { rules: pack.rules.map(rule => ({ id: rule.id,
+        all: rule.all.map(condition => ({ answer: condition.answer, metric: condition.metric,
+          op: condition.op, value: condition.value })), effect: rule.effect,
+        ...(rule.directive === undefined ? {} : { directive: rule.directive }) })),
+      fallback: pack.fallback } };
+  }
+  policyImpactSnapshot({ anchorKey, scanLimit = 1000, after = '' } = {}) {
+    requireValue(text(anchorKey) && Number.isSafeInteger(scanLimit) && scanLimit >= 1 && scanLimit <= 10000
+      && typeof after === 'string' && after.length <= 1024, 'Invalid impact scan');
     return this.#readEvidence(() => {
-      const sizes = this.#db.prepare(`SELECT state,
+      const anchor = this.#policyReplayRecordInTxn(anchorKey);
+      requireValue(anchor && anchor.sourceConsistency === 'verified', 'Verified completed anchor required');
+      const anchorEvidence = anchor.evidence;
+      requireValue(text(anchorEvidence.tenantId) && text(anchorEvidence.source)
+        && text(anchorEvidence.mode), 'Stored impact scope is invalid');
+      const sameGroup = evidence => evidence?.tenantId === anchorEvidence.tenantId
+        && evidence?.source === anchorEvidence.source && evidence?.mode === anchorEvidence.mode
+        && evidence?.pack?.digest === anchorEvidence.pack.digest
+        && evidence?.binding && typeof evidence.binding === 'object'
+        && canonical(evidence?.binding) === canonical(anchorEvidence.binding);
+      const rows = this.#db.prepare(`SELECT key,state,
         length(CAST(evidence AS BLOB)) AS evidence_bytes,
         length(CAST(result AS BLOB)) AS result_bytes
-        FROM runs WHERE key=?`).get(key);
-      if (!sizes) return null;
-      requireValue(sizes.state === 'completed' && sizes.result_bytes !== null,
-        'Completed prediction required');
-      requireValue(sizes.evidence_bytes > 0 && sizes.evidence_bytes <= 1024 * 1024
-        && sizes.result_bytes > 0 && sizes.result_bytes <= 1024 * 1024,
-      'Stored replay evidence exceeds size limit');
-      const row = this.#db.prepare('SELECT evidence,result FROM runs WHERE key=?').get(key);
-      requireValue(row, 'Unknown evidence key');
-      let evidence, result;
-      try { evidence = JSON.parse(row.evidence); result = JSON.parse(row.result); }
-      catch { throw new ContractError('Stored replay evidence is invalid'); }
-      const sourceTable = this.#db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='packs'").get();
-      if (!sourceTable) {
-        // An old stripped schema-1 fixture can still be replayed, but its
-        // stored original verdict must be visibly marked as unverified.
-        requireValue(this.#schemaVersion === 1, 'Bound source pack is unavailable for replay');
-        return { state: sizes.state, evidence, result, sourceConsistency: 'legacy_unverified' };
+        FROM runs WHERE key>? ORDER BY key LIMIT ?`).all(after, scanLimit + 1);
+      const page = rows.slice(0, scanLimit);
+      const excluded = { outOfScope: 0, unreadableEvidence: 0, incomplete: 0, unknown: 0,
+        noPrediction: 0 };
+      const records = [];
+      let matched = 0, bytes = 0;
+      for (const row of page) {
+        requireValue(text(row.key), 'Invalid stored evidence key');
+        if (!row.evidence_bytes || row.evidence_bytes > 1024 * 1024) {
+          excluded.unreadableEvidence++; continue;
+        }
+        bytes += row.evidence_bytes;
+        requireValue(bytes <= 32 * 1024 * 1024, 'Impact scan byte budget exceeded');
+        let evidence;
+        try {
+          const body = this.#db.prepare('SELECT evidence FROM runs WHERE key=?').get(row.key).evidence;
+          evidence = JSON.parse(body);
+        } catch { excluded.unreadableEvidence++; continue; }
+        if (!sameGroup(evidence)) { excluded.outOfScope++; continue; }
+        matched++;
+        if (row.state === 'unknown') { excluded.unknown++; continue; }
+        if (row.state !== 'completed') { excluded.incomplete++; continue; }
+        if (!row.result_bytes) { excluded.noPrediction++; continue; }
+        requireValue(row.result_bytes <= 1024 * 1024, 'Stored replay evidence exceeds size limit');
+        bytes += row.result_bytes;
+        requireValue(bytes <= 32 * 1024 * 1024, 'Impact scan byte budget exceeded');
+        let storedResult;
+        try {
+          storedResult = JSON.parse(this.#db.prepare('SELECT result FROM runs WHERE key=?').get(row.key).result);
+        } catch { throw new ContractError('Stored replay evidence is invalid'); }
+        if (!storedResult?.provider) { excluded.noPrediction++; continue; }
+        // A damaged matching decision is fatal, not a silently omitted row.
+        const record = this.#policyReplayRecordInTxn(row.key);
+        requireValue(record.sourceConsistency === 'verified', 'Bound source pack is unavailable for replay');
+        records.push({ key: row.key, record });
       }
-      const { pack } = this.#boundPolicyPack(evidence, result);
-      // Keep question instructions and other pack prose out of the replay
-      // projection; only the deterministic policy body is needed for a diff.
-      return { state: sizes.state, evidence, result, sourceConsistency: 'verified',
-        sourcePolicy: { rules: pack.rules.map(rule => ({ id: rule.id,
-          all: rule.all.map(condition => ({ answer: condition.answer, metric: condition.metric,
-            op: condition.op, value: condition.value })), effect: rule.effect,
-          ...(rule.directive === undefined ? {} : { directive: rule.directive }) })),
-        fallback: pack.fallback } };
+      return { anchorKey, anchorRecord: anchor, sourcePackDigest: anchorEvidence.pack.digest,
+        bindingDigest: digest(anchorEvidence.binding), after, scanLimit,
+        scanned: page.length, matched, excluded, records,
+        hasMore: rows.length > scanLimit, nextCursor: rows.length > scanLimit ? page.at(-1).key : null };
     });
   }
   policyPackTemplate(key) {

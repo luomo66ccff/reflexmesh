@@ -176,6 +176,46 @@ attribution: several edits may contribute to a changed verdict, and a reported
 structural edit may not affect this recorded prediction. For a stripped schema-1
 ledger the field is `{ "status": "legacy_unverified" }`, not a guessed diff.
 
+## Preview historical policy impact
+
+Use a completed, verified decision as the anchor, and supply the same edited
+candidate pack used for single-key replay:
+
+```bash
+node adapters/evidence-cli.mjs impact --db /private/path/shadow.sqlite --key ANCHOR_KEY --candidate-pack /private/path/candidate-pack.json --scan-limit 1000 --json
+```
+
+`impact` scans the ledger in **key order**, not time order. It compares only
+records with the anchor's tenant, source, mode, full source-pack digest and
+canonical deployment binding. The anchor's original pack/verdict and every
+included completed prediction are checked against their local bound pack in
+one SQLite read transaction. A changed question or event contract fails. A
+damaged matching completed record fails the entire command instead of being
+counted as unchanged. A stripped legacy pack cannot be an anchor or silently
+enter the comparison.
+
+The JSON receipt contains `scanned`, in-scope `matched`, `replayed`, excluded
+counts, effect transitions and separate counts for effect changes versus full
+verdict changes (including rule/directive changes). Up to 100 changed keys are
+shown for follow-up with `inspect` or `replay`; `changedTruncated` says when
+there are more. `replayed/matched` is the coverage for this page. Unreadable
+evidence cannot be assigned to the scope and sets `fullyClassified: false`.
+The scan is limited to 1–10,000 keys and a 32 MiB run-body budget. If more keys
+remain, repeat with `--after NEXT_CURSOR`; **separate pages are separate
+snapshots and their totals are not an atomic full-history result**. Only an
+unpaged scan from the beginning with no further page and no unclassified
+evidence reports `completeLedgerSnapshot: true`. This still does not imply
+that UNKNOWN or incomplete runs have predictions to replay.
+
+Only keys, digests, bounded verdicts and aggregate counts are printed. Bound
+pack bodies are checked internally; their instructions, raw predictions, task
+summaries and tool arguments are not printed. Observations, labels and audit
+bodies are neither printed nor queried. Keys and rule/directive
+names may themselves be sensitive; run this against a private local ledger.
+The command reads a local JSON file and the ledger only; it does not invoke a
+provider, host tool, permission change or retry. These are hypothetical policy
+effects on recorded predictions, not new model-quality or host-outcome evidence.
+
 ## Find evidence that needs attention
 
 ```bash
