@@ -12,7 +12,25 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: reviewable Codex registration path
+## Latest local milestone: startup-race CI watchdog repair
+
+On 2026-09-25, [main CI run 36144882669](https://github.com/luomo66ccff/reflexmesh/actions/runs/36144882669)
+for the merged Codex registration preview failed only Windows Node 24's
+existing four-process SQLite startup-race test: its fixture IPC reply exceeded
+a 4-second watchdog. The same tree's PR checks had passed, and no incorrect
+admission result was observed. The test-only follow-up retains eight rounds
+and the exact one-claim/three-busy invariant, widens the finite IPC/outer
+watchdogs to 12/120 seconds, and records round/worker/phase/open duration on
+a future timeout. Five original and ten updated focused local runs passed on
+Node 24.19.0; local `npm run check` passed **975 tests: 973 passed, 0 failed,
+2 Windows symlink-privilege skips** and the default demo passed. Shared-runner
+scheduling is a plausible inference, not a proven
+root cause. See [local validation](VALIDATION-SQLITE-STARTUP-WATCHDOG-T001.md).
+Production startup/admission code is unchanged. Full CI readback remains
+required before treating the repair as accepted; this does not complete the
+long-term objective.
+
+## Previous merged milestone: reviewable Codex registration path
 
 On 2026-09-25, the Codex first-run doctor gained an explicit, optional CLI
 registration check. It reads the selected CLI's bounded `mcp list --json`
