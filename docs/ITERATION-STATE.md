@@ -12,6 +12,27 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Latest local milestone: historical policy impact preview
+
+On 2026-09-25, the evidence CLI gained a read-only `impact` command. A verified
+completed decision anchors an exact tenant/source/mode, full source-pack digest
+and canonical deployment binding. One bounded, key-ordered SQLite read
+transaction checks matching completed predictions and reports effect
+transitions, changed verdict keys, excluded incomplete/UNKNOWN/no-prediction
+records and explicit partial-coverage flags. Candidate policy evaluation is
+hypothetical; it calls no provider or host tool and grants no execution or
+retry permission. The retained first-run lesson now includes a copyable impact
+step. See the [guide](EVIDENCE.md#preview-historical-policy-impact) and
+[local validation](VALIDATION-POLICY-IMPACT-T001.md). Remote PR/main CI for this
+increment remains pending until publication. Representative model-quality
+labels, default-profile host acceptance and broad bug-free claims remain open.
+
+[PR #78](https://github.com/luomo66ccff/reflexmesh/pull/78) merged at
+`b2719741f7c535ca4ec069382d3429ae0162cb1b`; all five jobs on the
+[merged main run](https://github.com/luomo66ccff/reflexmesh/actions/runs/36154615624)
+passed. This supersedes the remote-CI-pending sentence in the historical
+watchdog milestone below.
+
 ## Latest local CI follow-up: Claude hook fixture watchdog
 
 The first PR #78 checks exposed a separate Windows Node 24 test-fixture child

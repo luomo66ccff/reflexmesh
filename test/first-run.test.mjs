@@ -135,6 +135,7 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(guide, /evidence-cli\.mjs attention/);
   assert.match(guide, /evidence-cli\.mjs inspect/);
   assert.match(guide, /evidence-cli\.mjs replay/);
+  assert.match(guide, /evidence-cli\.mjs impact/);
   assert.match(guide, /evidence-cli\.mjs pack-template/);
   assert.match(guide, /0\.90 to 0\.99/);
   assert.ok(guide.includes(outputDir));
@@ -197,6 +198,16 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.equal(replay.original.effect, 'allow');
   assert.equal(replay.candidate.effect, 'escalate');
   assert.ok(!replayOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
+  const impactOutput = sink();
+  await evidenceMain(['impact', '--db', databasePath, '--key', key,
+    '--candidate-pack', join(outputDir, 'candidate-pack.json'), '--json'], impactOutput);
+  const impact = JSON.parse(impactOutput.text);
+  assert.equal(impact.hypothetical, true);
+  assert.equal(impact.executionAllowed, false);
+  assert.equal(impact.coverage.completeLedgerSnapshot, true);
+  assert.ok(impact.coverage.replayed >= 1);
+  assert.ok(impact.effectChanged >= 1);
+  assert.ok(!impactOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
   const sourceOutput = sink(), sourcePath = join(outputDir, 'source-pack.json');
   await evidenceMain(['pack-template', '--db', databasePath, '--key', key,
     '--out', sourcePath, '--json'], sourceOutput);

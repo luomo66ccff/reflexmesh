@@ -6,6 +6,7 @@ import { isDirectRun } from './direct-run.mjs';
 import { resolveStorageDatabasePath } from './storage-files.mjs';
 import { formatStorageReport, storageReport } from './storage-report.mjs';
 import { formatPolicyReplay, policyReplayReceipt, readCandidatePack } from './policy-replay.mjs';
+import { formatPolicyImpact, policyImpactReceipt } from './policy-impact.mjs';
 import { formatPackTemplate, writePackTemplate } from './pack-template.mjs';
 import { formatEvidenceStory, writeEvidenceStory } from './evidence-story.mjs';
 
@@ -14,6 +15,7 @@ const USAGE = `ReflexMesh evidence: explain decisions separately from host outco
   npm run evidence -- attention --db PATH [--limit 20] [--after KEY] [--json]
   npm run evidence -- inspect --db PATH --key KEY [--json]
   npm run evidence -- replay --db PATH --key KEY --candidate-pack FILE [--json]
+  npm run evidence -- impact --db PATH --key ANCHOR --candidate-pack FILE [--scan-limit 1000] [--after KEY] [--json]
   npm run evidence -- pack-template --db PATH --key KEY --out NEW_FILE [--json]
   npm run evidence -- story --db PATH --key KEY --out NEW_FILE [--json]
   npm run evidence -- storage --db PATH [--scan-limit 1000] [--json]
@@ -22,6 +24,8 @@ Attention covers decision rows only; pair-only reservations are excluded, and th
 Storage includes bounded table/pair-only counts and file lengths, never deletion eligibility or automatic cleanup.
 Archived audit bodies require audit-archive-cli history/query and explicit archive files; a backup does not verify external archives.
 Replay is a policy-only hypothetical using a local JSON candidate; it never invokes a provider or tool.
+Impact compares only the anchor's tenant/source/mode, source pack digest and deployment binding.
+Impact scans key-order pages; partial pages and unclassified evidence are not full-history results.
 Pack-template reads a bound pack and writes only the explicitly selected, new local file; it never prints pack contents.
 Story exports one bounded, static offline HTML view to a new private file; it never authorizes an action.
 No permission change or ledger write is invoked. Use --json for metadata receipts.
@@ -32,11 +36,12 @@ const fail = message => { throw new ContractError(message); };
 export function parseEvidenceOptions(argv) {
   if (!argv.length || (argv.length === 1 && argv[0] === '--help')) return { help: true };
   const [command, ...rest] = argv;
-  if (!['list','attention','inspect','replay','pack-template','story','storage'].includes(command)) fail('Expected list, attention, inspect, replay, pack-template, story or storage; use --help');
+  if (!['list','attention','inspect','replay','impact','pack-template','story','storage'].includes(command)) fail('Expected list, attention, inspect, replay, impact, pack-template, story or storage; use --help');
   const allowed = command === 'list' ? ['db','limit','after','state','json']
     : command === 'attention' ? ['db','limit','after','json']
       : command === 'storage' ? ['db','scan-limit','json']
         : command === 'replay' ? ['db','key','candidate-pack','json']
+          : command === 'impact' ? ['db','key','candidate-pack','scan-limit','after','json']
           : ['pack-template','story'].includes(command) ? ['db','key','out','json'] : ['db','key','json'];
   const options = { command };
   for (let i = 0; i < rest.length; i++) {
@@ -50,8 +55,8 @@ export function parseEvidenceOptions(argv) {
     }
   }
   if (!options.db || options.db === ':memory:') fail('An existing --db PATH is required');
-  if (['inspect','replay','pack-template','story'].includes(command) && !options.key) fail('An evidence --key is required');
-  if (command === 'replay' && !options['candidate-pack']) fail('A --candidate-pack JSON file is required');
+  if (['inspect','replay','impact','pack-template','story'].includes(command) && !options.key) fail('An evidence --key is required');
+  if (['replay','impact'].includes(command) && !options['candidate-pack']) fail('A --candidate-pack JSON file is required');
   if (['pack-template','story'].includes(command) && !options.out) fail('A new --out FILE is required');
   if (options.limit !== undefined) {
     if (!/^[0-9]+$/.test(options.limit) || Number(options.limit) < 1 || Number(options.limit) > 100) fail('Evidence limit must be 1 through 100');
@@ -60,13 +65,14 @@ export function parseEvidenceOptions(argv) {
   if (options.state !== undefined && !['admitted','executing','completed','unknown'].includes(options.state)) fail('Invalid evidence state');
   if (options['scan-limit'] !== undefined) {
     if (!/^[0-9]+$/.test(options['scan-limit']) || Number(options['scan-limit']) < 1 || Number(options['scan-limit']) > 10000)
-      fail('Storage scan limit must be 1 through 10000');
+      fail('Scan limit must be 1 through 10000');
     options['scan-limit'] = Number(options['scan-limit']);
   }
   return options;
 }
 export function formatEvidence(result, command) {
   if (command === 'replay') return formatPolicyReplay(result);
+  if (command === 'impact') return formatPolicyImpact(result);
   if (command === 'pack-template') return formatPackTemplate(result);
   if (command === 'story') return formatEvidenceStory(result);
   if (command === 'storage') return formatStorageReport(result);
@@ -114,7 +120,7 @@ export function formatEvidence(result, command) {
 export async function evidenceMain(argv, output = process.stdout) {
   const options = parseEvidenceOptions(argv);
   if (options.help) { output.write(USAGE); return; }
-  const candidate = options.command === 'replay' ? await readCandidatePack(options['candidate-pack']) : null;
+  const candidate = ['replay','impact'].includes(options.command) ? await readCandidatePack(options['candidate-pack']) : null;
   const path = options.command === 'storage' ? resolveStorageDatabasePath(options.db) : resolve(options.db);
   const kernel = new SqliteKernel(path, { readOnly: true });
   try {
@@ -122,6 +128,8 @@ export async function evidenceMain(argv, output = process.stdout) {
       ? await writePackTemplate(options.out, kernel.policyPackTemplate(options.key))
       : options.command === 'story' ? await writeEvidenceStory(options.out, kernel.evidenceSnapshot(options.key))
       : options.command === 'replay' ? policyReplayReceipt(kernel.policyReplayRecord(options.key), candidate)
+      : options.command === 'impact' ? policyImpactReceipt(kernel.policyImpactSnapshot({
+        anchorKey: options.key, scanLimit: options['scan-limit'] ?? 1000, after: options.after ?? '' }), candidate)
       : options.command === 'storage' ? storageReport(kernel, path, options['scan-limit'] ?? 1000)
       : options.command === 'list'
       ? kernel.listEvidence({ limit: options.limit ?? 20, after: options.after ?? '', state: options.state ?? null })
