@@ -84,26 +84,46 @@ runbook](RECOVERY.md) to investigate and record a review.
 
 ## Ask a policy-only what-if question
 
-After reviewing a completed decision with a valid recorded prediction, supply
-an explicit candidate `DecisionPack` JSON file. The candidate must keep the
-recorded event type and exact question contract; change rules or thresholds in
-a separately versioned pack. This command reads one existing key and computes
-only a hypothetical verdict from the recorded answers:
+After reviewing a completed decision with a valid recorded prediction, you can
+export its *original* full `DecisionPack` into a new local file. This checks
+the pack row against the decision's ID, version, full digest, event type and
+question digest, and validates the recorded prediction before writing. It
+refuses missing, UNKNOWN, damaged or oversized source records and never
+overwrites an existing destination:
+
+```bash
+node adapters/evidence-cli.mjs pack-template --db /private/path/shadow.sqlite --key KEY_FROM_LIST --out /private/path/new-candidate-pack.json
+```
+
+The export is not a generic dump: it reads only the selected run and its bound
+pack, not audit, observation or label bodies. The full pack **may contain
+sensitive question instructions**. It is written with a restrictive new-file
+mode where supported and is never printed to stdout or JSON; the containing
+directory's ACLs still matter, especially on Windows. If writing or readback
+fails, the new file may be incomplete; inspect it before continuing. No
+provider, tool or ledger write runs. An unchanged exported pack should replay
+to the original effect, but the ledger is not authenticated or tamper-proof.
+
+Review the exported JSON privately, then change its `version` and only the
+rules or thresholds you intend to test. Keep the recorded event type and exact
+question contract. The following command computes only a hypothetical verdict
+from the previously recorded answers:
 
 ```bash
 node adapters/evidence-cli.mjs replay --db /private/path/shadow.sqlite --key KEY_FROM_LIST --candidate-pack /private/path/candidate-pack.json
 ```
 
-The retained first-run lesson includes a candidate pack and a complete command
-with its synthetic key. Raising its intent-match threshold from `0.90` to
-`0.99` changes the already recorded fixture `allow` to a hypothetical
-`escalate`. No new provider call, host tool, permission decision or label is
-created. A hypothetical `allow` is **not** permission to execute or retry.
+The retained first-run lesson includes a candidate pack, a complete replay
+command with its synthetic key, and an optional source-pack export command.
+Raising its intent-match threshold from `0.90` to `0.99` changes the already
+recorded fixture `allow` to a hypothetical `escalate`. No new provider call,
+host tool, permission decision or label is created. A hypothetical `allow` is
+**not** permission to execute or retry.
 The result is not a comparison of model quality, not a new prediction and not
 evidence that an action did or did not happen. Missing, incomplete, UNKNOWN or
 contract-mismatched records fail instead of inventing answers.
 
-The CLI accepts a bounded regular JSON file, not executable code. It reads only
+The replay CLI accepts a bounded regular JSON file, not executable code. It reads only
 the selected run's replay fields, not the audit/observation/label bodies, and
 prints the original and candidate verdicts without prediction distributions,
 task summaries or tool arguments. Use `--json` for a machine-readable receipt;

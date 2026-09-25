@@ -30,6 +30,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Verify installed DeepSeek Loader unload against permanently pending built-in `before` and `after` storage continuations in an isolated synthetic Agent loop. This closes only the opt-in fenced async-callback boundary, not arbitrary host cancellation; see [validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md).
 - [x] Supervise an installed DeepSeek Agent whose synthetic native tool body never returns; verify bounded observer unload, unchanged missing-outcome evidence before/after an explicitly supervisor-terminated child, and actionable read-only doctor guidance. This is not natural host completion or a general timeout policy; see [validation](VALIDATION-DEEPSEEK-MISSING-RESULT-T001.md).
 - [x] Expose policy-only single-decision what-if replay through the read-only evidence CLI and a retained first-run lesson. Candidate rules use a full same-question JSON pack and an already recorded valid prediction; no model/tool/permission/label mutation is implied. See the [evidence guide](EVIDENCE.md) and [local validation](VALIDATION-POLICY-REPLAY-T001.md).
+- [x] Export one source pack from a completed prediction to a new-only local candidate file after checking its recorded run/pack binding and prediction contract. This closes the manual-pack-discovery gap without exposing pack instructions on stdout or changing the ledger; see the [what-if guide](EVIDENCE.md#ask-a-policy-only-what-if-question) and [local validation](VALIDATION-PACK-TEMPLATE-T001.md).
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
 - [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [x] Offer an account-free installed Claude CLI/native Read/hook loop using strict synthetic localhost Messages, including duplicate-observer rejection; see [setup and limits](CLAUDE-LOCAL-LOOP.md).
@@ -246,6 +247,10 @@ a single-key, read-only CLI path and a copyable synthetic first-run exercise.
 This makes a recorded decision useful for reviewing a changed rule without
 running a provider or tool. It is neither a quality comparison nor permission
 to execute; the broader host, independent-label and operational gates remain.
+The follow-up source-pack export can construct the candidate starting point
+from the selected ledger itself, with explicit new-file output and digest
+checks. The exported full pack may contain sensitive instructions and is not
+an authenticated deployment artifact.
 
 ## v0.3: memory governance and calibrated comparison
 

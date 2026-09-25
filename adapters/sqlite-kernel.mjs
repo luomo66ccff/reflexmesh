@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { configureJournal } from './sqlite-startup.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
-import { canonical, snapshot, validatePack, ContractError } from '../dist/index.js';
+import { canonical, snapshot, validatePack, validateResult, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
 import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
 import { storageTables, storageView } from './storage-view.mjs';
@@ -444,6 +444,55 @@ export class SqliteKernel {
       try {
         return { state: sizes.state, evidence: JSON.parse(row.evidence), result: JSON.parse(row.result) };
       } catch { throw new ContractError('Stored replay evidence is invalid'); }
+    });
+  }
+  policyPackTemplate(key) {
+    requireValue(text(key), 'Invalid evidence key');
+    return this.#readEvidence(() => {
+      const sizes = this.#db.prepare(`SELECT state,
+        length(CAST(evidence AS BLOB)) AS evidence_bytes,
+        length(CAST(result AS BLOB)) AS result_bytes
+        FROM runs WHERE key=?`).get(key);
+      if (!sizes) return null;
+      requireValue(sizes.state === 'completed' && sizes.result_bytes !== null,
+        'Completed prediction required');
+      requireValue(sizes.evidence_bytes > 0 && sizes.evidence_bytes <= 1024 * 1024
+        && sizes.result_bytes > 0 && sizes.result_bytes <= 1024 * 1024,
+      'Stored replay evidence exceeds size limit');
+      const run = this.#db.prepare('SELECT evidence,result FROM runs WHERE key=?').get(key);
+      requireValue(run, 'Unknown evidence key');
+      let evidence, result;
+      try { evidence = JSON.parse(run.evidence); result = JSON.parse(run.result); }
+      catch { throw new ContractError('Stored replay evidence is invalid'); }
+      requireValue(typeof result?.provider?.model === 'string',
+        'Bound pack or recorded prediction is invalid');
+      requireValue(typeof evidence?.binding?.modelId === 'string'
+        && result?.provider?.model === evidence.binding.modelId,
+      'Recorded provider binding mismatch');
+      const reference = evidence?.pack;
+      requireValue(reference && text(reference.id) && text(reference.version)
+        && hash(reference.digest) && hash(reference.questionsDigest)
+        && typeof evidence.eventType === 'string' && evidence.eventType.length > 0,
+      'Stored pack binding is invalid');
+      const stored = this.#db.prepare(`SELECT digest,
+        length(CAST(body AS BLOB)) AS body_bytes FROM packs WHERE id=? AND version=?`)
+        .get(reference.id, reference.version);
+      requireValue(stored && stored.body_bytes > 0 && stored.body_bytes <= 128 * 1024,
+        'Bound pack is unavailable or too large for replay');
+      requireValue(stored.digest === reference.digest, 'Bound pack digest mismatch');
+      const body = this.#db.prepare('SELECT body FROM packs WHERE id=? AND version=?')
+        .get(reference.id, reference.version)?.body;
+      let pack;
+      try {
+        pack = JSON.parse(body);
+        validatePack(pack);
+        validateResult(pack.questions, result?.provider);
+      } catch { throw new ContractError('Bound pack or recorded prediction is invalid'); }
+      requireValue(pack.id === reference.id && pack.version === reference.version
+        && pack.eventType === evidence.eventType && digest(pack) === reference.digest
+        && digest(pack.questions) === reference.questionsDigest,
+      'Bound pack contract mismatch');
+      return { pack, sourceKey: key, sourcePackDigest: reference.digest };
     });
   }
   evidenceSnapshot(key) {

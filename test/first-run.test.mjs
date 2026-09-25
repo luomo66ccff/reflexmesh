@@ -115,6 +115,7 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(output.text, /After task clear -> escalate; coverage: none \(old summary not reused\)/);
   assert.match(output.text, /A shadow allow is not host permission/);
   assert.match(output.text, /Next: open START-HERE\.md/);
+  assert.match(output.text, /optional new-file pack export/);
   assert.match(output.text, /No model, external provider, user profile or host tool was accessed/);
   assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
   if (process.platform !== 'win32') {
@@ -133,6 +134,7 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(guide, /evidence-cli\.mjs attention/);
   assert.match(guide, /evidence-cli\.mjs inspect/);
   assert.match(guide, /evidence-cli\.mjs replay/);
+  assert.match(guide, /evidence-cli\.mjs pack-template/);
   assert.match(guide, /0\.90 to 0\.99/);
   assert.ok(guide.includes(outputDir));
   assert.equal(guide.includes('Read README without editing files'), false);
@@ -173,16 +175,28 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.equal(replay.original.effect, 'allow');
   assert.equal(replay.candidate.effect, 'escalate');
   assert.ok(!replayOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
+  const sourceOutput = sink(), sourcePath = join(outputDir, 'source-pack.json');
+  await evidenceMain(['pack-template', '--db', databasePath, '--key', key,
+    '--out', sourcePath, '--json'], sourceOutput);
+  const exported = JSON.parse(sourceOutput.text);
+  assert.equal(exported.executionAllowed, false);
+  assert.equal(exported.outputPath, sourcePath);
+  const sourcePack = JSON.parse(readFileSync(sourcePath, 'utf8'));
+  assert.equal(sourcePack.version, '0.1.0');
+  assert.deepEqual(sourcePack.questions, candidate.questions);
+  assert.ok(!sourceOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
   assert.deepEqual(readFileSync(databasePath), ledger);
 
   const guideBefore = readFileSync(join(outputDir, 'START-HERE.md'));
   const candidateBefore = readFileSync(join(outputDir, 'candidate-pack.json'));
+  const sourceBefore = readFileSync(sourcePath);
   await assert.rejects(main(['--out-dir', outputDir], sink()));
   assert.deepEqual(readFileSync(databasePath), ledger);
   assert.deepEqual(readFileSync(join(outputDir, 'START-HERE.md')), guideBefore);
   assert.deepEqual(readFileSync(join(outputDir, 'candidate-pack.json')), candidateBefore);
+  assert.deepEqual(readFileSync(sourcePath), sourceBefore);
   assert.deepEqual(readdirSync(outputDir).filter(name => !['ledger.sqlite-shm', 'ledger.sqlite-wal'].includes(name)).sort(),
-    ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
+    ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite', 'source-pack.json']);
 });
 
 test('npm first-run forwards a Unicode/spaced output path and leaves no task-summary cache', t => {
