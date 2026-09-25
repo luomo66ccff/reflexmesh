@@ -89,6 +89,13 @@ installation and configuration prerequisites and prints a configuration snippet
 without changing your profile or loading credentials. Historical ledger evidence
 is kept separate from the still-unverified live connection.
 
+Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
+the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;
+`npm run compat:codex-setup` then checks the production MCP evidence path in
+isolation without an account. Both are described in the
+[Codex first-run guide](docs/CODEX-FIRST-RUN.md). This does not install a server
+or verify that a real Codex Agent chose to call it.
+
 Connecting Claude on Windows? `npm run doctor:claude -- --help` starts the
 [read-only setup guide](docs/CLAUDE-FIRST-RUN.md): explicit paths, seven generated
 production hooks and capture off by default, with no settings or account changes.
@@ -267,14 +274,11 @@ New label admissions also validate against the stored question contract: binary 
 
 First build, then configure the **absolute Node entrypoint**, not an npm command that prints build banners onto protocol stdout.
 
-Codex example (`config.toml`; replace the path):
-
-```toml
-[mcp_servers.reflexmesh]
-command = "node"
-args = ["/absolute/path/to/reflexmesh/adapters/mcp-server.mjs"]
-env = { REFLEXMESH_PROVIDER = "abstain", REFLEXMESH_SCOPE = "my-project" }
-```
+For Codex, generate an explicit, reviewable TOML row with
+`npm run doctor:codex -- --help`, then manually merge it into your own
+`config.toml`. The [first-run guide](docs/CODEX-FIRST-RUN.md) keeps its
+ledger, tenant and scope explicit and validates the production MCP path
+without modifying your profile.
 
 This installs **advisory** tools: `reflexmesh_assess`, `reflexmesh_observe_outcome`, `reflexmesh_replay_policy`, `reflexmesh_inspect_pack`. The model may choose not to call them. It does not gain or lose native tool permissions.
 
