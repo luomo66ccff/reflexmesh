@@ -150,6 +150,27 @@ do not assume the file was removed. The output is only a `cordis.patch.yml`
 fragment. It is not applied, and the preview still does not boot a host or
 call a model. See [local export validation](VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T002.md).
 
+For an additional **opt-in startup check** of a trusted installed `web`
+bundle stack, run:
+
+```powershell
+npm run compat:deepseek-web-profile -- --deepseek-package-root 'D:\DeepSeekHarness\app\node_modules\@deepseek-ai\dsh' --dsh-home 'D:\DeepSeekHarness\data' --profile web
+```
+
+This first requires the composition preview to pass with no current observer.
+It copies only bounded profile manifest/patch files into a disposable home,
+links installed modules, starts the selected bundles with two temporary CLI
+overlays, and requests a clean exit after host readiness. Web binds to
+`127.0.0.1` on an OS-assigned port and does not open a browser. The real
+profile, credential store and ledger are not the test target. **Unlike the
+preview, this runs installed plugin code**: selected patches may contain
+secrets, and third-party plugins can still access ambient files or network.
+Use only a trusted installation/profile. A timeout or unverified cleanup
+retains the temporary path for private inspection; do not publish its contents.
+This checks startup/Loader/cleanup, not a user tool call, model request or
+actual real-home/default-profile installation. See
+[local startup validation](VALIDATION-DEEPSEEK-SELECTED-WEB-BOOT-T001.md).
+
 SQLite can interact with WAL/SHM sidecars even during read-only inspection.
 Read-only application behavior is not a guarantee of byte-for-byte filesystem
 immutability, and bounded output does not promise constant-time queries on an

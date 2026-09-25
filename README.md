@@ -109,6 +109,14 @@ The account-free [installed CLI/Agent probe](docs/DEEPSEEK-AGENT.md#reproduce-th
 now loads a row from the same Loader-row generator via a separate `--patch` overlay and
 checks native tool/outcome evidence. It uses an isolated empty-bundle profile,
 not your selected or default profile; see the [overlay-boot result](docs/VALIDATION-DEEPSEEK-OVERLAY-BOOT-T001.md).
+For a trusted installed `web` profile, opt-in
+`npm run compat:deepseek-web-profile -- --help` gives a stronger isolated
+startup check: the selected bundle/patch stack is copied to a disposable home,
+preflighted, then booted with a temporary observer overlay on loopback and an
+OS-chosen port. Its one-shot fixture verifies Loader activation and cleanup;
+it does not copy credential-store or conversation files or request a model.
+Selected third-party plugin code does execute and may have ambient/network
+access; see the [scope and limits](docs/VALIDATION-DEEPSEEK-SELECTED-WEB-BOOT-T001.md).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;
