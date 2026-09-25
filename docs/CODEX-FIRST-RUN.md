@@ -55,14 +55,22 @@ npm run compat:codex-setup -- --codex-executable "C:\path\to\codex.exe"
 The first command uses the generated settings in a new temporary directory
 to launch the **production** MCP server twice. It sends fixed synthetic
 `initialize`/`tools/list`, a missing-task assessment, a model-reported task
-assessment and an explicitly `unknown` model-reported outcome, then reopens
-the ledger to check that those facts and zero labels persisted. The provider
-is `abstain`; no model, real Codex Agent or host tool runs. Its temporary
-ledger is removed after the check. The optional CLI check asks the installed
+assessment and an explicitly `unknown` model-reported outcome. After the first
+server exits, the second process repeats the same call and summary: it must
+reuse the persisted decision without another row. A changed summary under the
+same call identity must return a fixed contract conflict; a genuinely new task
+needs a new call ID. The reopened ledger must still have only two decisions,
+one model-reported unknown outcome and zero labels. The provider is `abstain`;
+no model, real Codex Agent or host tool runs. Its temporary ledger is removed
+after the check. The optional CLI check asks the installed
 Codex executable to parse equivalent generated config fields via read-only
 overrides; it does not install the server. Codex may still read its existing
 local config during that parser check, so omit the option if you do not want
 that access. Neither check changes your user configuration.
+
+This verifies one production MCP process-restart/idempotency boundary with
+synthetic input. It does not demonstrate that the Codex Agent itself resumed a
+session, retried a native tool, or authenticated the model-reported call ID.
 
 ## Optional logged-in Agent check
 

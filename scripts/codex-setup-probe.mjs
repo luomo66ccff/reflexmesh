@@ -140,14 +140,28 @@ export function runCodexSetupProbe(options = {}) {
     assert.equal(first.mode, 'shadow');
     assert.equal(second.mode, 'shadow');
     const reopened = runMcp(setup, [rpc(11, 'initialize', { protocolVersion: '2025-06-18' }), initialized,
-      rpc(12, 'tools/call', { name: 'reflexmesh_inspect_pack', arguments: {} })]);
-    assert.equal(reopened.length, 2);
+      rpc(12, 'tools/call', { name: 'reflexmesh_assess', arguments: { call: secondCall, userIntent: SUMMARY } }),
+      rpc(13, 'tools/call', { name: 'reflexmesh_assess', arguments: {
+        call: secondCall, userIntent: 'SYNTHETIC: Different task after restart' } }),
+      rpc(14, 'tools/call', { name: 'reflexmesh_inspect_pack', arguments: {} })]);
+    assert.equal(reopened.length, 4);
     assert.equal(reopened[0]?.result?.protocolVersion, '2025-06-18');
-    assert.equal(toolValue(reopened[1], 12).control, 'abstain');
+    const repeated = toolValue(reopened[1], 12);
+    assert.equal(repeated.decisionId, second.decisionId);
+    assert.equal(repeated.replayed, true);
+    assert.deepEqual(repeated.verdict, second.verdict);
+    assert.deepEqual(repeated.taskEvidence, second.taskEvidence);
+    assert.equal(repeated.control, 'abstain');
+    assert.equal(reopened[2]?.id, 13);
+    assert.equal(reopened[2]?.result?.isError, true);
+    assert.deepEqual(JSON.parse(reopened[2].result.content[0].text),
+      { error: 'assessment_unavailable_or_contract_conflict', executionAllowed: false });
+    assert.equal(toolValue(reopened[3], 14).control, 'abstain');
     const persisted = verifyLedger(setup.env.REFLEXMESH_DB, first, second);
     return { schemaVersion: 1, kind: 'codex_setup_probe', status: 'passed',
       nativeCodexConfig: codexConfig, productionMcp: { status: 'passed', processCount: 2,
-        listedTools: 4, ...persisted }, actualCodexAgent: 'not_tested', modelRequest: 'none' };
+        listedTools: 4, ...persisted, restartReplay: true, restartConflictRejected: true },
+      actualCodexAgent: 'not_tested', modelRequest: 'none' };
   } finally { cleanupOwnedTemp(directory, root); }
 }
 
@@ -161,7 +175,8 @@ export function codexSetupProbeMain(argv = process.argv.slice(2), output = proce
     output.write(options.json ? `${JSON.stringify(report)}\n` :
       `ReflexMesh Codex setup probe: passed. Native Codex config: ${report.nativeCodexConfig}; `
       + `production MCP: ${report.productionMcp.processCount} isolated processes, `
-      + `${report.productionMcp.decisions} decisions, one model-reported unknown outcome, zero labels. `
+      + `${report.productionMcp.decisions} decisions, one model-reported unknown outcome, zero labels; `
+      + 'restart reused the same decision and rejected changed task evidence. '
       + 'No Agent/model/tool execution was tested.\n');
     return 0;
   } catch {
