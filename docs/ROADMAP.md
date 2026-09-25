@@ -29,6 +29,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Preserve model-reported provenance for delegated DeepSeek summaries and verify official sequential spawn isolation with repeated call IDs and per-call result digests; see [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md).
 - [x] Verify installed DeepSeek Loader unload against permanently pending built-in `before` and `after` storage continuations in an isolated synthetic Agent loop. This closes only the opt-in fenced async-callback boundary, not arbitrary host cancellation; see [validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md).
 - [x] Supervise an installed DeepSeek Agent whose synthetic native tool body never returns; verify bounded observer unload, unchanged missing-outcome evidence before/after an explicitly supervisor-terminated child, and actionable read-only doctor guidance. This is not natural host completion or a general timeout policy; see [validation](VALIDATION-DEEPSEEK-MISSING-RESULT-T001.md).
+- [x] Expose policy-only single-decision what-if replay through the read-only evidence CLI and a retained first-run lesson. Candidate rules use a full same-question JSON pack and an already recorded valid prediction; no model/tool/permission/label mutation is implied. See the [evidence guide](EVIDENCE.md) and [local validation](VALIDATION-POLICY-REPLAY-T001.md).
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
 - [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [x] Offer an account-free installed Claude CLI/native Read/hook loop using strict synthetic localhost Messages, including duplicate-observer rejection; see [setup and limits](CLAUDE-LOCAL-LOOP.md).
@@ -239,6 +240,12 @@ The separate [missing native-result validation](VALIDATION-DEEPSEEK-MISSING-RESU
 requires a supervised child termination after two read-only ledger checks. It
 proves truthful missing-result evidence, not Agent completion or host-tool
 cancellation.
+
+**2026-09-25 policy what-if access:** the existing pure replay contract now has
+a single-key, read-only CLI path and a copyable synthetic first-run exercise.
+This makes a recorded decision useful for reviewing a changed rule without
+running a provider or tool. It is neither a quality comparison nor permission
+to execute; the broader host, independent-label and operational gates remain.
 
 ## v0.3: memory governance and calibrated comparison
 

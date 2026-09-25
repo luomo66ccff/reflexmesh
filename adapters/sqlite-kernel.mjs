@@ -424,6 +424,28 @@ export class SqliteKernel {
     }
     catch (error) { this.#db.exec('ROLLBACK'); throw error; }
   }
+  policyReplayRecord(key) {
+    requireValue(text(key), 'Invalid evidence key');
+    // Select only the requested run. SQLite measures stored UTF-8 bytes before
+    // either JSON body is fetched or parsed; audit, observations and labels are untouched.
+    return this.#readEvidence(() => {
+      const sizes = this.#db.prepare(`SELECT state,
+        length(CAST(evidence AS BLOB)) AS evidence_bytes,
+        length(CAST(result AS BLOB)) AS result_bytes
+        FROM runs WHERE key=?`).get(key);
+      if (!sizes) return null;
+      requireValue(sizes.state === 'completed' && sizes.result_bytes !== null,
+        'Completed prediction required');
+      requireValue(sizes.evidence_bytes > 0 && sizes.evidence_bytes <= 1024 * 1024
+        && sizes.result_bytes > 0 && sizes.result_bytes <= 1024 * 1024,
+      'Stored replay evidence exceeds size limit');
+      const row = this.#db.prepare('SELECT evidence,result FROM runs WHERE key=?').get(key);
+      requireValue(row, 'Unknown evidence key');
+      try {
+        return { state: sizes.state, evidence: JSON.parse(row.evidence), result: JSON.parse(row.result) };
+      } catch { throw new ContractError('Stored replay evidence is invalid'); }
+    });
+  }
   evidenceSnapshot(key) {
     requireValue(text(key), 'Invalid evidence key');
     return this.#readEvidence(now => {

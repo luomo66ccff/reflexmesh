@@ -116,10 +116,11 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(output.text, /A shadow allow is not host permission/);
   assert.match(output.text, /Next: open START-HERE\.md/);
   assert.match(output.text, /No model, external provider, user profile or host tool was accessed/);
-  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'ledger.sqlite']);
+  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
   if (process.platform !== 'win32') {
     assert.equal(statSync(outputDir).mode & 0o077, 0);
     assert.equal(statSync(join(outputDir, 'ledger.sqlite')).mode & 0o077, 0);
+    assert.equal(statSync(join(outputDir, 'candidate-pack.json')).mode & 0o077, 0);
   }
 
   const databasePath = join(outputDir, 'ledger.sqlite');
@@ -131,6 +132,8 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(guide, /evidence-cli\.mjs list/);
   assert.match(guide, /evidence-cli\.mjs attention/);
   assert.match(guide, /evidence-cli\.mjs inspect/);
+  assert.match(guide, /evidence-cli\.mjs replay/);
+  assert.match(guide, /0\.90 to 0\.99/);
   assert.ok(guide.includes(outputDir));
   assert.equal(guide.includes('Read README without editing files'), false);
   assert.equal(guide.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'), false);
@@ -145,6 +148,10 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.ok(selected);
   assert.equal(selected.hostOutcome.byProvenance[0].provenance, 'test-oracle');
   const key = selected.key;
+  assert.ok(guide.includes(key));
+  const candidate = JSON.parse(readFileSync(join(outputDir, 'candidate-pack.json'), 'utf8'));
+  assert.equal(candidate.version, '0.1.0-synthetic-what-if');
+  assert.equal(candidate.rules.find(rule => rule.id === 'intent-supported').all.find(condition => condition.answer === 'intentMatch').value, 0.99);
 
   const attentionOutput = sink();
   await evidenceMain(['attention', '--db', databasePath, '--json'], attentionOutput);
@@ -157,14 +164,25 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.equal(inspected.hostOutcome.status, 'succeeded');
   assert.equal(inspected.labelCount, 0);
   assert.equal(inspected.recovery.executionAllowed, false);
+  const replayOutput = sink();
+  await evidenceMain(['replay', '--db', databasePath, '--key', key,
+    '--candidate-pack', join(outputDir, 'candidate-pack.json'), '--json'], replayOutput);
+  const replay = JSON.parse(replayOutput.text);
+  assert.equal(replay.hypothetical, true);
+  assert.equal(replay.executionAllowed, false);
+  assert.equal(replay.original.effect, 'allow');
+  assert.equal(replay.candidate.effect, 'escalate');
+  assert.ok(!replayOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
   assert.deepEqual(readFileSync(databasePath), ledger);
 
   const guideBefore = readFileSync(join(outputDir, 'START-HERE.md'));
+  const candidateBefore = readFileSync(join(outputDir, 'candidate-pack.json'));
   await assert.rejects(main(['--out-dir', outputDir], sink()));
   assert.deepEqual(readFileSync(databasePath), ledger);
   assert.deepEqual(readFileSync(join(outputDir, 'START-HERE.md')), guideBefore);
+  assert.deepEqual(readFileSync(join(outputDir, 'candidate-pack.json')), candidateBefore);
   assert.deepEqual(readdirSync(outputDir).filter(name => !['ledger.sqlite-shm', 'ledger.sqlite-wal'].includes(name)).sort(),
-    ['START-HERE.md', 'ledger.sqlite']);
+    ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
 });
 
 test('npm first-run forwards a Unicode/spaced output path and leaves no task-summary cache', t => {
@@ -179,6 +197,6 @@ test('npm first-run forwards a Unicode/spaced output path and leaves no task-sum
   assert.match(result.stdout, /Synthetic evidence: 3 decisions, 1 fixture prediction, 0 labels/);
   assert.match(result.stdout, /Fixture host report: missing -> succeeded \(1 observation\)/);
   assert.equal(result.stdout.includes('SYNTHETIC-SECRET'), false);
-  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'ledger.sqlite']);
+  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
   assert.equal(lstatSync(outputDir).isSymbolicLink(), false);
 });

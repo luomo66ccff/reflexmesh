@@ -12,7 +12,24 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: supervised missing native result and doctor handoff
+## Latest local milestone: policy-only replay from a retained decision
+
+On 2026-09-25, the existing pure policy replay gained a read-only, single-key
+`evidence replay` CLI entrypoint. It uses an explicit bounded JSON candidate
+pack and a valid recorded prediction with the same event/question contract;
+its narrow receipt distinguishes original and hypothetical verdicts, including
+directives, while always denying execution authority. The retained synthetic
+first-run lesson now supplies a copyable candidate and actual key. A fresh
+Windows path containing Chinese and spaces returned `allow -> escalate` from
+the generated command, and the SQLite main-file hash was unchanged. Local
+`npm ci --ignore-scripts` and `npm run demo` passed; final `npm run check`
+passed 925/927 tests with zero failures and two local symlink-privilege skips.
+See [local validation](VALIDATION-POLICY-REPLAY-T001.md). This is not new-model
+inference, real-host permission, threshold calibration, production-ledger
+acceptance or proof that all bugs are absent. PR-head/main CI remain separate
+verification gates.
+
+## Previous merged milestone: supervised missing native result and doctor handoff
 
 On 2026-09-25, the installed DeepSeek Harness `0.1.2-rc.1` CLI/Loader/Agent
 entered a deliberately never-settling synthetic native tool body. The
@@ -28,6 +45,10 @@ probes passed 9/9, 10/10, 8/8 and 8/8. `npm run check` passed 917/919 with
 zero failures and two local Windows symlink skips; `npm run demo` passed. See
 the [local validation](VALIDATION-DEEPSEEK-MISSING-RESULT-T001.md). This is not
 real-model, default-profile, general host timeout or graceful-exit evidence.
+[PR #59](https://github.com/luomo66ccff/reflexmesh/pull/59) merged the
+reviewed tree `3f564be0b1d2b4fcbdcf899c77d3a4546495fea9` unchanged;
+all five configured jobs passed on its exact head and on
+[main](https://github.com/luomo66ccff/reflexmesh/actions/runs/36094876174).
 
 ## Previous merged milestone: installed DeepSeek permanent-pending observer unload
 
@@ -1021,7 +1042,7 @@ the following implementation and validation details remain historical evidence.
 | --- | --- |
 | Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation, observer unload before a late native result, and one separate authorized real-model round trip. Live, payload-free drain diagnostics fix the waiting-period missing-count misreport. An isolated installed-host probe covers the Loader's own permanently pending asynchronous `before`/`after` storage callbacks under an opt-in SQLite fence; it does not safely terminate arbitrary callbacks. A separate supervised fixture now covers a native body that does not return, with truthful missing-result evidence and explicit owner termination, not natural Agent completion. Caller-owned or event-loop-blocking callbacks, general host-tool timeout policy and real-world permanent-result absence remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
-| Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
+| Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A single recorded valid prediction can also be replayed against an explicit same-question policy pack through the read-only CLI; this is a policy what-if, not model quality evidence. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
 | Easy onboarding | DeepSeek, Windows Claude and Codex read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Codex's generated fields pass an installed-CLI parser check and isolated production MCP evidence probe; an optional logged-in Codex Agent now passes one synthetic assess/read/outcome loop. Default-profile installation, other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
