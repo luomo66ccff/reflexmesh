@@ -43,7 +43,7 @@ export function policyReplayReceipt(record, candidatePack) {
   let replay;
   try { replay = replayPolicy(record, candidatePack); }
   catch (error) {
-    if (error instanceof ContractError && error.message === 'Replay question contract mismatch') throw error;
+    if (error instanceof ContractError && ['Replay question contract mismatch', 'Recorded provider binding mismatch'].includes(error.message)) throw error;
     throw new ContractError('Completed prediction and valid matching candidate pack required');
   }
   const safeText = value => typeof value === 'string' && value.length > 0 && value.length <= 256

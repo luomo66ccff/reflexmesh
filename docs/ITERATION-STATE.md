@@ -12,7 +12,20 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: bound source-pack template for policy what-if
+## Latest local milestone: what-if source consistency guards
+
+On 2026-09-25, two tamper fixtures exposed plausible but unbound what-if
+results: source-pack export accepted a stored verdict that disagreed with its
+bound pack/prediction, and replay accepted a stored prediction from a different
+model than the recorded deployment binding. Both fixtures now fail closed
+without printing private marker text or writing an export file. The first
+guard recomputes the source verdict; the second compares the recorded model
+with the bound model ID. This does not authenticate a mutable ledger or make
+direct replay re-read the original source pack. See
+[local validation](VALIDATION-POLICY-INTEGRITY-T001.md). Full local and remote
+checks are separate evidence.
+
+## Previous merged milestone: bound source-pack template for policy what-if
 
 On 2026-09-25, the read-only evidence CLI gained an explicit, new-file-only
 `pack-template` path for one completed prediction. It checks the selected

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { configureJournal } from './sqlite-startup.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
-import { canonical, snapshot, validatePack, validateResult, ContractError } from '../dist/index.js';
+import { canonical, snapshot, validatePack, validateResult, evaluatePolicy, ContractError } from '../dist/index.js';
 import { validateRecoveryReview, validateLabelEnvelope, validateLabelValue } from './recovery-contract.mjs';
 import { evidenceAttentionView, evidenceColumns, evidenceView } from './evidence-view.mjs';
 import { storageTables, storageView } from './storage-view.mjs';
@@ -482,16 +482,21 @@ export class SqliteKernel {
       requireValue(stored.digest === reference.digest, 'Bound pack digest mismatch');
       const body = this.#db.prepare('SELECT body FROM packs WHERE id=? AND version=?')
         .get(reference.id, reference.version)?.body;
-      let pack;
+      let pack, expectedVerdict;
       try {
         pack = JSON.parse(body);
         validatePack(pack);
-        validateResult(pack.questions, result?.provider);
+        const prediction = validateResult(pack.questions, result?.provider);
+        expectedVerdict = evaluatePolicy(pack, prediction.answers);
       } catch { throw new ContractError('Bound pack or recorded prediction is invalid'); }
       requireValue(pack.id === reference.id && pack.version === reference.version
         && pack.eventType === evidence.eventType && digest(pack) === reference.digest
         && digest(pack.questions) === reference.questionsDigest,
       'Bound pack contract mismatch');
+      let verdictMatches = false;
+      try { verdictMatches = canonical(result?.verdict) === canonical(expectedVerdict); }
+      catch { /* Invalid stored verdict; do not expose its contents. */ }
+      requireValue(verdictMatches, 'Recorded policy verdict mismatch');
       return { pack, sourceKey: key, sourcePackDigest: reference.digest };
     });
   }

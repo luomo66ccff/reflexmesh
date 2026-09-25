@@ -86,6 +86,9 @@ export function replayPolicy(record, candidatePack) {
   if (record?.state !== 'completed' || !record.result?.provider) throw new ContractError('Completed prediction required');
   if (record.evidence.eventType !== candidatePack.eventType || record.evidence.pack.questionsDigest !== digest(candidatePack.questions)) throw new ContractError('Replay question contract mismatch');
   const prediction = validateResult(candidatePack.questions, record.result.provider);
+  if (typeof record.evidence?.binding?.modelId !== 'string'
+    || prediction.model !== record.evidence.binding.modelId)
+    throw new ContractError('Recorded provider binding mismatch');
   return snapshot({ hypothetical: true, executionAllowed: false, original: record.result.verdict,
     candidate: evaluatePolicy(candidatePack, prediction.answers), candidatePackDigest: digest(candidatePack),
     binding: record.evidence.binding });

@@ -139,6 +139,19 @@ test('unknown, incomplete and invalid stored predictions are rejected', async t 
   } finally { db.close(); }
 });
 
+test('model drift in the stored prediction is not accepted as a bound replay', async t => {
+  const f = await fixture(t), db = new DatabaseSync(f.db);
+  try {
+    const row = JSON.parse(db.prepare('SELECT result FROM runs WHERE key=?').get(f.key).result);
+    row.provider.model = 'PRIVATE_OTHER_MODEL';
+    db.prepare('UPDATE runs SET result=? WHERE key=?').run(JSON.stringify(row), f.key);
+  } finally { db.close(); }
+  const response = cli(...args(f), '--json');
+  assert.equal(response.status, 1);
+  assert.equal(response.stdout, '');
+  assert.ok(!response.stderr.includes('PRIVATE_OTHER_MODEL'));
+});
+
 test('candidate input is a bounded regular JSON file and errors do not echo payloads', async t => {
   const f = await fixture(t);
   for (const body of ['', '{ "secret": "PRIVATE_PARSE_PAYLOAD",', ' '.repeat(128 * 1024 + 1)]) {
