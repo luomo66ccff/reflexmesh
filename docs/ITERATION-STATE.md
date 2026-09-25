@@ -12,7 +12,17 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: isolated DeepSeek profile composition preview
+## Latest local milestone: new-only DeepSeek overlay export
+
+On 2026-09-25, the isolated selected-profile preview gained an optional
+`--out-overlay` destination. It refuses an existing file or a path inside the
+real home, then publishes a new patch only after composition, checked source
+stability and temporary cleanup pass. It reads back the exact bytes and reports
+a SHA-256 receipt. It never applies the patch, starts the real profile or calls
+a model. See [local validation](VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T002.md).
+Real-profile loading, default-profile and end-to-end tool behavior remain open.
+
+## Previous merged milestone: isolated DeepSeek profile composition preview
 
 On 2026-09-25, direct installed Harness `--dump-config` was found to rewrite
 the selected profile's generated `cordis.yml` even without plugin boot. A new

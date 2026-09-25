@@ -136,6 +136,20 @@ only configuration composition, not proof that the observer loads or works in
 the default profile. The profile remains unchanged until you separately choose
 to install and start it; see the [Loader guide](DEEPSEEK-AGENT.md).
 
+To retain the proposed insertion for private review, add
+`--out-overlay 'C:\ReflexMeshData\observer-overlay.yml'` to the preview command.
+Choose an absolute **new file** in an existing, trusted private directory
+outside `--dsh-home`. The preview refuses an existing destination and a path
+inside the selected home before running a dump. Only after composition,
+source-file checks and temporary cleanup pass does it create the file and
+read back its exact bytes; the reported SHA-256 identifies those bytes, not
+their authenticity. The OS creates it with a restrictive requested mode where
+supported; on Windows, check the inherited directory ACL yourself. A failed
+or incomplete export is not usable: inspect the reported path privately, and
+do not assume the file was removed. The output is only a `cordis.patch.yml`
+fragment. It is not applied, and the preview still does not boot a host or
+call a model. See [local export validation](VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T002.md).
+
 SQLite can interact with WAL/SHM sidecars even during read-only inspection.
 Read-only application behavior is not a guarantee of byte-for-byte filesystem
 immutability, and bounded output does not promise constant-time queries on an
