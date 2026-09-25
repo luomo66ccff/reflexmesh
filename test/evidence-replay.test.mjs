@@ -46,7 +46,9 @@ test('policy-only replay gives a narrow hypothetical receipt and keeps ledger by
   assert.equal(json.status, 0, json.stderr);
   const receipt = JSON.parse(json.stdout);
   assert.deepEqual(Object.keys(receipt).sort(),
-    ['candidate','candidatePackDigest','executionAllowed','hypothetical','original'].sort());
+    ['candidate','candidatePackDigest','executionAllowed','hypothetical','original',
+      'originalSourceConsistency'].sort());
+  assert.equal(receipt.originalSourceConsistency, 'verified');
   assert.deepEqual(receipt.original, { effect: 'allow', ruleId: 'intent-supported' });
   assert.deepEqual(receipt.candidate, { effect: 'escalate', ruleId: 'fallback' });
   assert.equal(receipt.hypothetical, true);
@@ -55,6 +57,7 @@ test('policy-only replay gives a narrow hypothetical receipt and keeps ledger by
   const human = cli(...args(f));
   assert.equal(human.status, 0, human.stderr);
   assert.match(human.stdout, /allow -> escalate/);
+  assert.match(human.stdout, /Original source consistency: verified/);
   assert.match(human.stdout, /hypothetical: true/);
   assert.match(human.stdout, /execution allowed: false/);
   assert.deepEqual(readFileSync(f.db), before);
@@ -105,6 +108,7 @@ test('receipt omits stored prediction extras, task/action data, labels and candi
     assert.equal(response.status, 0, response.stderr);
     for (const secret of ['PRIVATE_TASK','PRIVATE_ACTION','PRIVATE_PREDICTION','PRIVATE_LABEL','PRIVATE_CANDIDATE_PROSE'])
       assert.ok(!response.stdout.includes(secret));
+    assert.ok(!response.stdout.includes(toolPreflightPack.questions.intentMatch.instructions));
   }
 });
 
@@ -132,10 +136,10 @@ test('unknown, incomplete and invalid stored predictions are rejected', async t 
     assert.match(cli(...args(f)).stderr, /Completed prediction required/);
     db.prepare('UPDATE runs SET state=?,result=? WHERE key=?').run('completed',
       JSON.stringify({ verdict: { effect: 'allow', ruleId: 'test' } }), f.key);
-    assert.match(cli(...args(f)).stderr, /Completed prediction and valid matching candidate pack required/);
+    assert.match(cli(...args(f)).stderr, /Bound pack or recorded prediction is invalid/);
     db.prepare('UPDATE runs SET result=? WHERE key=?').run(JSON.stringify({
       verdict: { effect: 'allow', ruleId: 'test' }, provider: { model: 'fixture', answers: {} } }), f.key);
-    assert.match(cli(...args(f)).stderr, /Completed prediction and valid matching candidate pack required/);
+    assert.match(cli(...args(f)).stderr, /Bound pack or recorded prediction is invalid/);
   } finally { db.close(); }
 });
 
@@ -150,6 +154,28 @@ test('model drift in the stored prediction is not accepted as a bound replay', a
   assert.equal(response.status, 1);
   assert.equal(response.stdout, '');
   assert.ok(!response.stderr.includes('PRIVATE_OTHER_MODEL'));
+});
+
+test('replay refuses inconsistent original verdict and damaged bound source pack', async t => {
+  const f = await fixture(t), db = new DatabaseSync(f.db);
+  try {
+    const originalResult = db.prepare('SELECT result FROM runs WHERE key=?').get(f.key).result;
+    const changed = JSON.parse(originalResult);
+    changed.verdict = { effect: 'deny', ruleId: 'PRIVATE_FALSE_RULE' };
+    db.prepare('UPDATE runs SET result=? WHERE key=?').run(JSON.stringify(changed), f.key);
+    const verdictResponse = cli(...args(f), '--json');
+    assert.equal(verdictResponse.status, 1);
+    assert.equal(verdictResponse.stdout, '');
+    assert.ok(!verdictResponse.stderr.includes('PRIVATE_FALSE_RULE'));
+    db.prepare('UPDATE runs SET result=? WHERE key=?').run(originalResult, f.key);
+    const originalBody = db.prepare('SELECT body FROM packs').get().body;
+    db.prepare('UPDATE packs SET body=?').run('{"private":"PRIVATE_PACK_BODY"');
+    const packResponse = cli(...args(f), '--json');
+    assert.equal(packResponse.status, 1);
+    assert.equal(packResponse.stdout, '');
+    assert.ok(!packResponse.stderr.includes('PRIVATE_PACK_BODY'));
+    db.prepare('UPDATE packs SET body=?').run(originalBody);
+  } finally { db.close(); }
 });
 
 test('candidate input is a bounded regular JSON file and errors do not echo payloads', async t => {
@@ -196,5 +222,15 @@ test('schema-1 read-only replay works without migrating or reading other tables'
   const response = cli('--db', oldDb, '--key', f.key, '--candidate-pack', f.candidate, '--json');
   assert.equal(response.status, 0, response.stderr);
   assert.equal(JSON.parse(response.stdout).candidate.effect, 'escalate');
+  assert.equal(JSON.parse(response.stdout).originalSourceConsistency, 'legacy_unverified');
+  const human = cli('--db', oldDb, '--key', f.key, '--candidate-pack', f.candidate);
+  assert.equal(human.status, 0, human.stderr);
+  assert.match(human.stdout, /Original source consistency: legacy_unverified/);
   assert.deepEqual(readFileSync(oldDb), before);
+  const upgradedMarker = new DatabaseSync(oldDb);
+  upgradedMarker.exec('PRAGMA user_version=3');
+  upgradedMarker.close();
+  const damagedCurrent = cli('--db', oldDb, '--key', f.key, '--candidate-pack', f.candidate);
+  assert.equal(damagedCurrent.status, 1);
+  assert.match(damagedCurrent.stderr, /Bound source pack is unavailable for replay/);
 });

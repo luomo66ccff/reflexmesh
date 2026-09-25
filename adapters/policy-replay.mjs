@@ -40,6 +40,8 @@ export async function readCandidatePack(path) {
 
 export function policyReplayReceipt(record, candidatePack) {
   if (!record) throw new ContractError('Unknown evidence key');
+  if (!['verified', 'legacy_unverified'].includes(record.sourceConsistency))
+    throw new ContractError('Original source consistency is unavailable');
   let replay;
   try { replay = replayPolicy(record, candidatePack); }
   catch (error) {
@@ -58,6 +60,7 @@ export function policyReplayReceipt(record, candidatePack) {
   return {
     hypothetical: true,
     executionAllowed: false,
+    originalSourceConsistency: record.sourceConsistency,
     original: verdict(replay.original),
     candidate: verdict(replay.candidate),
     candidatePackDigest: replay.candidatePackDigest,
@@ -68,6 +71,9 @@ export function formatPolicyReplay(receipt) {
   const rule = value => `${JSON.stringify(value.ruleId)}${value.directive === undefined ? '' : `; directive: ${JSON.stringify(value.directive)}`}`;
   return [
     'ReflexMesh policy replay (read-only)',
+    `Original source consistency: ${receipt.originalSourceConsistency === 'verified'
+      ? 'verified against local bound pack (not authenticated)'
+      : 'legacy_unverified; original pack body unavailable'}`,
     `Decision change: ${receipt.original.effect} -> ${receipt.candidate.effect}`,
     `Original: ${receipt.original.effect}; rule: ${rule(receipt.original)}`,
     `Candidate: ${receipt.candidate.effect}; rule: ${rule(receipt.candidate)}`,
