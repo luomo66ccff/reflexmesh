@@ -1,14 +1,16 @@
 import type { AuditRecord, DecisionEvent, DecisionPack, DecisionProvider, Json, Ledger, Principal, ProposedAction, ProviderResult, RunResult, Tool, Verdict } from '../core/types.js';
 import { canonical, ContractError, fingerprint, positive, snapshot, validateEvent, validatePack, validateResult, assertJson } from '../core/validation.js';
 import { evaluatePolicy } from '../core/policy.js';
-import { withDeadline } from './deadline.js';
+import { assertDeadlineMs, withDeadline } from './deadline.js';
 import { snapshotProvider } from '../core/provider-capabilities.js';
 
 export interface MeshOptions {
   provider: DecisionProvider;
   ledger: Ledger;
   mode?: 'shadow' | 'active';
+  /** Integer milliseconds, 1..2_147_483_647; defaults to 3000. */
   decisionTimeoutMs?: number;
+  /** Integer milliseconds, 1..2_147_483_647; defaults to 5000. */
   actionTimeoutMs?: number;
   maxEventBytes?: number;
   maxRetainedEvents?: number;
@@ -22,11 +24,13 @@ export class ReflexMesh {
   readonly #runs = new Map<string, { request: string; result: Promise<RunResult> }>();
   readonly #options: Required<Omit<MeshOptions, 'authorize'>> & Pick<MeshOptions, 'authorize'>;
   constructor(options: MeshOptions) {
-    const decisionTimeoutMs = options.decisionTimeoutMs ?? 3000;
-    const actionTimeoutMs = options.actionTimeoutMs ?? 5000;
+    const decisionTimeoutMs = options.decisionTimeoutMs === undefined ? 3000 : options.decisionTimeoutMs;
+    const actionTimeoutMs = options.actionTimeoutMs === undefined ? 5000 : options.actionTimeoutMs;
     const maxEventBytes = options.maxEventBytes ?? 128_000;
     const maxRetainedEvents = options.maxRetainedEvents ?? 10_000;
-    for (const [n, v] of Object.entries({ decisionTimeoutMs, actionTimeoutMs, maxEventBytes, maxRetainedEvents })) positive(v, n);
+    assertDeadlineMs(decisionTimeoutMs, 'decisionTimeoutMs');
+    assertDeadlineMs(actionTimeoutMs, 'actionTimeoutMs');
+    for (const [n, v] of Object.entries({ maxEventBytes, maxRetainedEvents })) positive(v, n);
     if (!Number.isSafeInteger(maxRetainedEvents)) throw new ContractError('Invalid retained event limit');
     if (options.mode !== undefined && !['shadow', 'active'].includes(options.mode)) throw new ContractError('Invalid mode');
     this.#options = { ...options, provider: snapshotProvider(options.provider), mode: options.mode ?? 'shadow',

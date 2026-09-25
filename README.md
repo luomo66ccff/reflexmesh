@@ -33,6 +33,11 @@ available. See the [runtime requirement and manual upgrade guide](docs/SQLITE-RU
 TypeScript 5.8.3 is the sole build dependency; no third-party runtime packages
 are required. The adapter uses Node's built-in, experimental `node:sqlite` API
 on a **single machine / local filesystem**.
+For the in-process `ReflexMesh` API, `decisionTimeoutMs` and
+`actionTimeoutMs` must each be an integer from 1 to 2,147,483,647
+milliseconds. Invalid values fail during construction; they are never
+silently rounded into an unexpectedly short timer. The defaults remain
+3,000 and 5,000 milliseconds. See the [deadline validation](docs/VALIDATION-DEADLINE-RANGE-T001.md).
 
 Start with an account-free first-run check and synthetic evidence lesson:
 
