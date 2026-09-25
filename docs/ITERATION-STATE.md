@@ -12,6 +12,21 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
+## Latest local milestone: installed Codex Agent first-evidence loop
+
+On 2026-09-25, an opt-in probe exercised a logged-in installed Codex Agent
+against one fresh synthetic fixture: advisory `reflexmesh_assess`, one native
+read, then `reflexmesh_observe_outcome`. The seventh isolated attempt passed
+strict typed JSONL and public evidence CLI/direct SQLite readback. It recorded
+one ready task and one succeeded outcome with **model-reported** provenance,
+zero labels and no ReflexMesh provider egress. The earlier six attempts were
+retained as failures while the Windows shell-command verifier was corrected;
+they were not converted into passes. `npm run check` passed 903/905 tests with
+zero failures and two local symlink skips; `npm run demo` passed. See the
+[Agent validation](VALIDATION-CODEX-AGENT-T001.md) and
+[first-run guide](CODEX-FIRST-RUN.md). This is not a real user-profile install,
+host-authenticated outcome, full isolation, or broad host lifecycle coverage.
+
 ## Latest merged milestone: Codex first connection
 
 On 2026-09-25, the Codex path gained a read-only first-run doctor that generates
@@ -968,7 +983,7 @@ the following implementation and validation details remain historical evidence.
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
-| Easy onboarding | DeepSeek, Windows Claude and Codex read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Codex's generated fields pass an installed-CLI parser check and isolated production MCP evidence probe, not a real Agent/profile installation. Other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
+| Easy onboarding | DeepSeek, Windows Claude and Codex read-only first-run diagnostics are implemented. Claude's generated direct production hooks pass isolated installed-CLI checks in default-off and explicit-summary modes. Codex's generated fields pass an installed-CLI parser check and isolated production MCP evidence probe; an optional logged-in Codex Agent now passes one synthetic assess/read/outcome loop. Default-profile installation, other hosts/platforms and real user-profile first-run acceptance remain open. No silent credential/settings changes. |
 | Release confidence | No known unresolved blocker within declared support scope; tested exact heads, independent review and honest exclusions. Never claim absence of all possible bugs. |
 
 The independently labeled, separately bound comparison/report workflow is now

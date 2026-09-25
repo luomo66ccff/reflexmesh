@@ -64,8 +64,43 @@ overrides; it does not install the server. Codex may still read its existing
 local config during that parser check, so omit the option if you do not want
 that access. Neither check changes your user configuration.
 
-If you later opt in to an actual Codex Agent call, record that result
-separately. The MCP server's `reflexmesh_assess` input needs an explicit
+## Optional logged-in Agent check
+
+The next check is **not** part of the account-free setup probe. It invokes
+your logged-in Codex CLI and may use multiple underlying model requests;
+neither the request count nor account cost is capped by ReflexMesh. Run it
+only with an explicit `--execute` and a native Codex executable path:
+
+```powershell
+npm run compat:codex-agent -- --help
+npm run compat:codex-agent -- --execute --codex-executable "C:\path\to\codex.exe" --out-dir "C:\private\new-codex-evidence" --json
+```
+
+The output directory must not exist beforehand. Omit `--out-dir` for an
+automatically removed temporary test. The probe gives the Agent one synthetic
+task and a new fixture whose random contents are not included in its prompt.
+It checks typed Codex events for advisory assessment, one native read and a
+separate model-reported outcome, then checks the production ledger through the
+public read-only evidence CLI. An explicit output directory retains the
+synthetic ledger and a `START-HERE.md` with copyable inspection commands;
+neither raw Codex JSONL nor tool output is written into the repository.
+Do not rerun automatically if the host/model call fails or times out; first
+inspect the fixed failure reason and, if you chose `--out-dir`, the retained
+synthetic directory. A failed run may not have produced a complete ledger.
+
+The probe does not edit `config.toml`; it uses generated settings as one-run
+overrides. `--ignore-user-config` does not disable existing Codex login,
+and `--ephemeral` only avoids session rollout persistence. A read-only sandbox
+does not prove that the Agent could not read other local files. Run this only
+in a trusted local environment with a synthetic, non-sensitive fixture.
+Codex's own prompt/tool data can leave the machine even though the ReflexMesh
+decision provider is pinned to `abstain` with remote egress disabled. The
+model-supplied call identity is not authenticated host identity, and the
+outcome remains model-reported even if a separate Codex command event matches.
+See [OpenAI's non-interactive mode documentation](https://learn.chatgpt.com/docs/non-interactive-mode)
+for the CLI flags and JSONL event boundary.
+
+The MCP server's `reflexmesh_assess` input needs an explicit
 `call` identity; optional `userIntent` is a model-reported summary, not an
 authenticated user prompt or verified capture time. `reflexmesh_observe_outcome`
 records a model report, not observed execution. Use the read-only

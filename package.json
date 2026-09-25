@@ -24,6 +24,7 @@
     "demo:durable": "npm run build && node examples/durable-shadow.mjs",
     "compat:hosts": "npm run build && node scripts/real-host-compat.mjs",
     "compat:codex-setup": "npm run build && node scripts/codex-setup-probe.mjs",
+    "compat:codex-agent": "npm run build && node scripts/codex-agent-probe.mjs",
     "compat:claude-local": "npm run build && node scripts/claude-local-probe.mjs",
     "compat:claude-setup": "npm run build && node scripts/claude-setup-probe.mjs",
     "compat:claude-failure": "npm run build && node scripts/claude-failure-probe.mjs",

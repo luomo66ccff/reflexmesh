@@ -95,6 +95,10 @@ the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;
 isolation without an account. Both are described in the
 [Codex first-run guide](docs/CODEX-FIRST-RUN.md). This does not install a server
 or verify that a real Codex Agent chose to call it.
+For an explicitly opted-in synthetic Agent read, the separate
+`npm run compat:codex-agent -- --help` command describes its logged-in model
+request, read-only sandbox, retained-evidence option and limits. It does not
+change the advisory nature of the MCP server.
 
 Connecting Claude on Windows? `npm run doctor:claude -- --help` starts the
 [read-only setup guide](docs/CLAUDE-FIRST-RUN.md): explicit paths, seven generated
