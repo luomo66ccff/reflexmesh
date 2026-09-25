@@ -30,6 +30,14 @@ a synthetic Agent, and verifies its shadow ledger plus clean exit. It requests
 no paid model and does not target the real profile for writes. It intentionally executes those selected
 plugins, so read the [safety scope](DOCTOR.md#preview-an-existing-profile-without-editing-it)
 and [dated validation](VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md) first.
+For the actual selected `web` home, the additional
+`npm run compat:deepseek-real-profile -- --help` command requires a verified
+private archive and an explicit real-home-write acknowledgement. It redirects
+known fixture state and audits other non-dependency files, but still executes
+selected plugins with access to the user's real home. The installed profile
+passed its bounded synthetic tool check; see
+[real-home validation](VALIDATION-DEEPSEEK-REAL-PROFILE-T001.md). This does not
+install the observer or authorize a permanent profile change.
 
 Build ReflexMesh with `npm ci --ignore-scripts` and `npm run build`. Back up the
 profile you intend to change, then add an insertion to that profile's

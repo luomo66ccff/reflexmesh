@@ -119,6 +119,15 @@ abstain-only ledger, host-reported result and cleanup. It does not copy
 credential-store or conversation files or request a paid model. Selected
 third-party plugin code does execute and may have ambient/network access;
 see the [current scope and limits](docs/VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md).
+For an explicitly selected **real** `web` home, the separate opt-in
+`npm run compat:deepseek-real-profile -- --help` requires a verified private
+data archive and explicit acknowledgement before booting. It redirects the
+synthetic task's ledger, sessions, JSON storage and pet state to temporary
+files, audits other non-dependency home files, and still never makes a paid
+model request. It does execute selected plugins with access to real user data;
+do not run concurrently with another Harness process. The installed local
+profile passed 20/20 fixed checks, with a generated-root timestamp change;
+see the [real-home validation and limits](docs/VALIDATION-DEEPSEEK-REAL-PROFILE-T001.md).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;

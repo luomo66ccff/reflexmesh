@@ -14,7 +14,7 @@ const PREFIX = 'reflexmesh-dsh-selected-boot-';
 const PREFLIGHT_REASONS = new Set(['observer_already_present',
   'source_configuration_changed', 'temporary_profile_cleanup_unverified',
   'composed_config_unavailable', 'overlay_not_composed']);
-const CHECKS = Object.freeze(['startupCommitted', 'observerEntryActivated',
+export const SELECTED_TOOL_CHECKS = Object.freeze(['startupCommitted', 'observerEntryActivated',
   'overlayArgPresent', 'profileTreeBound', 'webServerReady',
   'observerDrainedAtExit', 'kernelClosedAtExit', 'naturalBeforeExit',
   'selectedWebBundleLoaded', 'nativeAgentLoopExercised',
@@ -65,14 +65,14 @@ function fixedReport() {
     hostBoot: 'not_started', modelInference: 'not_confirmed',
     harnessToolCalls: 'not_confirmed', sourceConfigurationUnchanged: null,
     temporaryProfileRemoved: 'not_created',
-    assertions: CHECKS.map(name => ({ name, passed: false })) };
+    assertions: SELECTED_TOOL_CHECKS.map(name => ({ name, passed: false })) };
 }
 
-function fixtureOverlay(config) {
+export function selectedFixtureOverlay(config) {
   const synthetic = { id: 'reflexmesh-synthetic-fixture',
     name: new URL('./fixtures/deepseek-agent-fixture.mjs', import.meta.url).href,
     config: { packageRoot: config.packageRoot, telemetryPath: config.syntheticTelemetryPath,
-      homePath: config.homePath, cwdPath: config.homePath,
+      homePath: config.homePath, cwdPath: config.cwdPath ?? config.homePath,
       overlayPath: config.observerOverlayPath, profileName: config.profile } };
   const row = { id: 'reflexmesh-selected-profile-boot-fixture',
     name: new URL('./fixtures/deepseek-selected-profile-boot-fixture.mjs', import.meta.url).href,
@@ -80,7 +80,7 @@ function fixtureOverlay(config) {
   return `- insert:\n  - ${JSON.stringify(synthetic)}\n  - ${JSON.stringify(row)}\n`;
 }
 
-function readSelectedEvidence(dbPath, synthetic) {
+export function readSelectedEvidence(dbPath, synthetic) {
   const kernel = new SqliteKernel(dbPath, { readOnly: true });
   try {
     const page = kernel.listEvidence({ limit: 2 });
@@ -104,6 +104,23 @@ function readSelectedEvidence(dbPath, synthetic) {
         && detail?.evidence?.taskEvidence?.scopeDigest === intentDigest(scope),
     };
   } finally { kernel.close(); }
+}
+
+export function selectedToolAssertions(received, synthetic, evidence) {
+  const checks = { ...received,
+    selectedWebBundleLoaded: synthetic.isolatedProfileLoaded === true
+      && synthetic.loaderProfileBound === true,
+    nativeAgentLoopExercised: received.agentTurnCompleted === true
+      && received.finalFixtureMarker === true
+      && synthetic.requests === 2 && synthetic.bodyCalls === 1,
+    syntheticToolAdvertised: synthetic.toolAdvertised === true,
+    exactFixtureScope: synthetic.toolHadAgent === true
+      && synthetic.toolArgsExact === true && synthetic.sessionConsistent === true
+      && Number.isSafeInteger(synthetic.toolCount) && synthetic.toolCount >= 1
+      && Number.isSafeInteger(synthetic.backgroundRequests)
+      && synthetic.backgroundRequests <= 2,
+    ...evidence };
+  return SELECTED_TOOL_CHECKS.map(name => ({ name, passed: checks[name] === true }));
 }
 
 export function selectedWebHostArgs({ binPath, profile, overlayPath, fixturePath }) {
@@ -184,7 +201,7 @@ export async function runSelectedProfileBoot(options, {
     const observer = loaderInsert({ dbPath, tenantId: 'isolated-fixture',
       scope: 'selected-profile-boot', intentMode: 'explicit-summary' });
     await writeFile(overlayPath, observer.yamlInsert, { flag: 'wx', mode: 0o600 });
-    await writeFile(fixturePath, fixtureOverlay({ telemetryPath, syntheticTelemetryPath,
+    await writeFile(fixturePath, selectedFixtureOverlay({ telemetryPath, syntheticTelemetryPath,
       packageRoot: installed.root, homePath: tempRoot,
       profile: options.profile, observerOverlayPath: overlayPath,
       fixtureOverlayPath: fixturePath }), { flag: 'wx', mode: 0o600 });
@@ -227,20 +244,7 @@ export async function runSelectedProfileBoot(options, {
       synthetic = JSON.parse(toolReceipt.bytes.toString('utf8'));
     } catch { throw new Error('startup_receipt_unavailable'); }
     const evidence = readEvidence(dbPath, synthetic);
-    const checks = { ...received,
-      selectedWebBundleLoaded: synthetic.isolatedProfileLoaded === true
-        && synthetic.loaderProfileBound === true,
-      nativeAgentLoopExercised: received.agentTurnCompleted === true
-        && received.finalFixtureMarker === true
-        && synthetic.requests === 2 && synthetic.bodyCalls === 1,
-      syntheticToolAdvertised: synthetic.toolAdvertised === true,
-      exactFixtureScope: synthetic.toolHadAgent === true
-        && synthetic.toolArgsExact === true && synthetic.sessionConsistent === true
-        && Number.isSafeInteger(synthetic.toolCount) && synthetic.toolCount >= 1
-        && Number.isSafeInteger(synthetic.backgroundRequests)
-        && synthetic.backgroundRequests <= 2,
-      ...evidence };
-    report.assertions = CHECKS.map(name => ({ name, passed: checks[name] === true }));
+    report.assertions = selectedToolAssertions(received, synthetic, evidence);
     report.status = report.assertions.every(item => item.passed) ? 'passed' : 'failed';
     report.reason = report.status === 'passed' ? 'selected_profile_synthetic_tool_passed'
       : 'selected_profile_assertion_failed';
