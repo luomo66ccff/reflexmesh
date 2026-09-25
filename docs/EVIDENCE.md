@@ -126,16 +126,23 @@ evidence that an action did or did not happen. Missing, incomplete, UNKNOWN or
 contract-mismatched records fail instead of inventing answers.
 
 The replay CLI accepts a bounded regular JSON file, not executable code. It reads only
-the selected run's replay fields, not the audit/observation/label bodies, and
+the selected run's replay fields and, when present, its bound source pack;
+it does not read the audit/observation/label bodies, and
 prints the original and candidate verdicts without prediction distributions,
 task summaries or tool arguments. Use `--json` for a machine-readable receipt;
 rule names and pack digests can still be sensitive metadata. This is
 a read-only application operation, subject to the SQLite WAL/SHM caveat below.
 Replay rejects a prediction whose model differs from the recorded deployment
-binding. Unlike source-pack export, replay does not independently reload the
-original pack body to recompute its original verdict; a locally modified ledger
-is not authenticated by either command. For a changed-policy review, export the
-bound source pack first and keep the ledger under trusted local access controls.
+binding. When the source-pack table exists, it also reads that pack in the same
+transaction as the selected run and recomputes the stored original verdict.
+The receipt reports `originalSourceConsistency: verified` only after those
+local consistency checks. A stripped schema-1 ledger without the pack table
+can still replay for compatibility, but reports `legacy_unverified` before
+displaying the stored original; that original verdict was not recomputed.
+Missing or damaged bound packs in a ledger that has the table fail closed.
+Neither command authenticates a locally modified ledger. Keep the database
+under trusted local access controls and use the source-pack export when
+reviewing a changed policy.
 
 ## Find evidence that needs attention
 

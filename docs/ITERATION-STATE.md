@@ -12,7 +12,20 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: Codex MCP process restart and task conflict
+## Latest local milestone: original-source-checked policy replay
+
+On 2026-09-25, a tamper regression showed that direct `evidence replay` could
+display a plausible original-versus-candidate change even after the original
+stored verdict or bound pack body was damaged. Replay now checks the selected
+run and its bound source pack in one read-only transaction and recomputes the
+original verdict before returning a `verified` consistency status. A stripped
+schema-1 ledger without a pack table remains readable, but visibly reports
+`legacy_unverified`; it cannot claim the stored original was recomputed.
+No provider, tool or ledger mutation is involved. See
+[local validation](VALIDATION-REPLAY-SOURCE-T001.md). This is local consistency,
+not authentication, and broader real-host and quality gates remain open.
+
+## Previous merged milestone: Codex MCP process restart and task conflict
 
 On 2026-09-25, the account-free Codex setup probe was extended to send the
 same model-reported call through a second production MCP process using the

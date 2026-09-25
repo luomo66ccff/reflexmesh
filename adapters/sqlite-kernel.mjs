@@ -441,9 +441,18 @@ export class SqliteKernel {
       'Stored replay evidence exceeds size limit');
       const row = this.#db.prepare('SELECT evidence,result FROM runs WHERE key=?').get(key);
       requireValue(row, 'Unknown evidence key');
-      try {
-        return { state: sizes.state, evidence: JSON.parse(row.evidence), result: JSON.parse(row.result) };
-      } catch { throw new ContractError('Stored replay evidence is invalid'); }
+      let evidence, result;
+      try { evidence = JSON.parse(row.evidence); result = JSON.parse(row.result); }
+      catch { throw new ContractError('Stored replay evidence is invalid'); }
+      const sourceTable = this.#db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='packs'").get();
+      if (!sourceTable) {
+        // An old stripped schema-1 fixture can still be replayed, but its
+        // stored original verdict must be visibly marked as unverified.
+        requireValue(this.#schemaVersion === 1, 'Bound source pack is unavailable for replay');
+        return { state: sizes.state, evidence, result, sourceConsistency: 'legacy_unverified' };
+      }
+      this.#boundPolicyPack(evidence, result);
+      return { state: sizes.state, evidence, result, sourceConsistency: 'verified' };
     });
   }
   policyPackTemplate(key) {
@@ -464,41 +473,45 @@ export class SqliteKernel {
       let evidence, result;
       try { evidence = JSON.parse(run.evidence); result = JSON.parse(run.result); }
       catch { throw new ContractError('Stored replay evidence is invalid'); }
-      requireValue(typeof result?.provider?.model === 'string',
-        'Bound pack or recorded prediction is invalid');
-      requireValue(typeof evidence?.binding?.modelId === 'string'
-        && result?.provider?.model === evidence.binding.modelId,
-      'Recorded provider binding mismatch');
-      const reference = evidence?.pack;
-      requireValue(reference && text(reference.id) && text(reference.version)
-        && hash(reference.digest) && hash(reference.questionsDigest)
-        && typeof evidence.eventType === 'string' && evidence.eventType.length > 0,
-      'Stored pack binding is invalid');
-      const stored = this.#db.prepare(`SELECT digest,
-        length(CAST(body AS BLOB)) AS body_bytes FROM packs WHERE id=? AND version=?`)
-        .get(reference.id, reference.version);
-      requireValue(stored && stored.body_bytes > 0 && stored.body_bytes <= 128 * 1024,
-        'Bound pack is unavailable or too large for replay');
-      requireValue(stored.digest === reference.digest, 'Bound pack digest mismatch');
-      const body = this.#db.prepare('SELECT body FROM packs WHERE id=? AND version=?')
-        .get(reference.id, reference.version)?.body;
-      let pack, expectedVerdict;
-      try {
-        pack = JSON.parse(body);
-        validatePack(pack);
-        const prediction = validateResult(pack.questions, result?.provider);
-        expectedVerdict = evaluatePolicy(pack, prediction.answers);
-      } catch { throw new ContractError('Bound pack or recorded prediction is invalid'); }
-      requireValue(pack.id === reference.id && pack.version === reference.version
-        && pack.eventType === evidence.eventType && digest(pack) === reference.digest
-        && digest(pack.questions) === reference.questionsDigest,
-      'Bound pack contract mismatch');
-      let verdictMatches = false;
-      try { verdictMatches = canonical(result?.verdict) === canonical(expectedVerdict); }
-      catch { /* Invalid stored verdict; do not expose its contents. */ }
-      requireValue(verdictMatches, 'Recorded policy verdict mismatch');
-      return { pack, sourceKey: key, sourcePackDigest: reference.digest };
+      const { pack, sourcePackDigest } = this.#boundPolicyPack(evidence, result);
+      return { pack, sourceKey: key, sourcePackDigest };
     });
+  }
+  #boundPolicyPack(evidence, result) {
+    requireValue(typeof result?.provider?.model === 'string',
+      'Bound pack or recorded prediction is invalid');
+    requireValue(typeof evidence?.binding?.modelId === 'string'
+      && result?.provider?.model === evidence.binding.modelId,
+      'Recorded provider binding mismatch');
+    const reference = evidence?.pack;
+    requireValue(reference && text(reference.id) && text(reference.version)
+      && hash(reference.digest) && hash(reference.questionsDigest)
+      && typeof evidence.eventType === 'string' && evidence.eventType.length > 0,
+      'Stored pack binding is invalid');
+    const stored = this.#db.prepare(`SELECT digest,
+      length(CAST(body AS BLOB)) AS body_bytes FROM packs WHERE id=? AND version=?`)
+      .get(reference.id, reference.version);
+    requireValue(stored && stored.body_bytes > 0 && stored.body_bytes <= 128 * 1024,
+      'Bound pack is unavailable or too large for replay');
+    requireValue(stored.digest === reference.digest, 'Bound pack digest mismatch');
+    const body = this.#db.prepare('SELECT body FROM packs WHERE id=? AND version=?')
+      .get(reference.id, reference.version)?.body;
+    let pack, expectedVerdict;
+    try {
+      pack = JSON.parse(body);
+      validatePack(pack);
+      const prediction = validateResult(pack.questions, result?.provider);
+      expectedVerdict = evaluatePolicy(pack, prediction.answers);
+    } catch { throw new ContractError('Bound pack or recorded prediction is invalid'); }
+    requireValue(pack.id === reference.id && pack.version === reference.version
+      && pack.eventType === evidence.eventType && digest(pack) === reference.digest
+      && digest(pack.questions) === reference.questionsDigest,
+      'Bound pack contract mismatch');
+    let verdictMatches = false;
+    try { verdictMatches = canonical(result?.verdict) === canonical(expectedVerdict); }
+    catch { /* Invalid stored verdict; do not expose its contents. */ }
+    requireValue(verdictMatches, 'Recorded policy verdict mismatch');
+    return { pack, sourcePackDigest: reference.digest };
   }
   evidenceSnapshot(key) {
     requireValue(text(key), 'Invalid evidence key');
