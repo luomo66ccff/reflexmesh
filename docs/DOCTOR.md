@@ -174,6 +174,18 @@ This checks a synthetic Agent tool turn, not browser user interaction, a paid
 model request or actual real-home/default-profile installation. See
 [local tool validation](VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md).
 
+For a separately authorized check of the **actual selected `web` home**,
+`npm run compat:deepseek-real-profile -- --help` requires an explicit current,
+private data archive and `--ack-real-home-writes`. It verifies the archive
+against every non-dependency ordinary file before launching, refuses a
+duplicate observer, redirects the synthetic task's ledger, sessions, JSON
+storage and pet state to temporary paths, and audits the real home afterward.
+The installed profile passed 20/20 checks; the host still updated the
+generated root's modification time. Do not run another Harness process on the
+same home concurrently. Selected plugins can access real credentials and
+conversations, and the probe is not a browser/paid-model acceptance. See
+[real-home validation](VALIDATION-DEEPSEEK-REAL-PROFILE-T001.md).
+
 SQLite can interact with WAL/SHM sidecars even during read-only inspection.
 Read-only application behavior is not a guarantee of byte-for-byte filesystem
 immutability, and bounded output does not promise constant-time queries on an

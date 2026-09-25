@@ -12,7 +12,25 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest milestone: copied selected DeepSeek web native tool round trip
+## Latest milestone: real selected DeepSeek web home synthetic tool round trip
+
+On 2026-09-25, a separate, explicit real-home check booted the installed
+0.1.2-rc.1 selected `web` profile with temporary CLI overlays. It required a
+private archive whose hash and all 28 ordinary non-dependency user-state files
+matched before startup, then drove one fixed in-memory native read through a
+synthetic Agent. ReflexMesh remained shadow/abstain with one matching
+host-reported result and zero labels. The first run correctly failed the
+real-home mutation gate: pet affinity/treat state and a synthetic projection
+cache changed. Both post-run artifacts were retained privately, pet bytes
+were restored from the archive, and all 28 ordinary files then matched their
+pre-run bytes. Redirecting pet and JSON-storage state as well as sessions
+fixed that side effect; the final real-home run passed **20/20** checks, with
+no other non-dependency file changes and temporary cleanup verified. The host
+still updated its generated root's timestamp, not its content. This does not
+test browser UI entry, paid model use, arbitrary plugin effects or other
+profiles. See [local validation](VALIDATION-DEEPSEEK-REAL-PROFILE-T001.md).
+
+## Previous merged milestone: copied selected DeepSeek web native tool round trip
 
 On 2026-09-25, the opt-in selected `web` check advanced from startup-only to
 one synthetic Agent turn inside the copied full Web bundle stack. A fixed

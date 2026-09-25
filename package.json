@@ -25,6 +25,7 @@
     "compat:hosts": "npm run build && node scripts/real-host-compat.mjs",
     "compat:deepseek-profile": "npm run build && node scripts/deepseek-profile-preview.mjs",
     "compat:deepseek-web-profile": "npm run build && node scripts/deepseek-selected-profile-boot.mjs",
+    "compat:deepseek-real-profile": "npm run build && node scripts/deepseek-real-profile-boot.mjs",
     "compat:codex-setup": "npm run build && node scripts/codex-setup-probe.mjs",
     "compat:codex-agent": "npm run build && node scripts/codex-agent-probe.mjs",
     "compat:claude-local": "npm run build && node scripts/claude-local-probe.mjs",
