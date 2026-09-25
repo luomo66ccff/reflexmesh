@@ -39,5 +39,9 @@ replay still reads only the selected run and does not independently reload
 its original pack body, including on legacy stripped-schema fixtures. The
 source-pack export performs the stronger original-pack check, but it is not
 authenticated evidence. All execution and host authorization remain outside
-policy replay. Exact-head PR CI and post-merge main CI must be checked
-separately before claiming integration.
+policy replay. The initial PR-head run had one unrelated Windows Node 22
+failure: its PowerShell-quoting test returned no exit status after a 5-second
+subprocess timeout. The test's cold-start budget was raised to 20 seconds
+without changing the production probe. That amended head needs a fresh CI
+run; the initial red run is not a passing result. Post-merge main CI must be
+checked separately before claiming integration.
