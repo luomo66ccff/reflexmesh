@@ -21,10 +21,12 @@ The validator requires ordered typed JSONL starts and completions for
 `reflexmesh_observe_outcome`, with matching call arguments and IDs. The native
 command must be a single `Get-Content -LiteralPath` of the newly created
 fixture, directly or through a narrowly recognized Windows PowerShell wrapper;
-its resolved path must match the fixture, exit code must be zero, and output
+its path resolved from the isolated working directory must match the fixture,
+exit code must be zero, and output
 must equal the random marker that was not placed in the prompt. The public
 evidence CLI and a separate read-only SQLite snapshot must agree. Unknown,
-failed, duplicate or extra tool events fail closed; model prose cannot stand
+failed, duplicate or extra tool events and a missing/failed turn completion
+fail closed; model prose cannot stand
 in for tool evidence.
 
 The first six retained synthetic attempts were not reported as passes.

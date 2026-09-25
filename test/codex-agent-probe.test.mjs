@@ -152,8 +152,10 @@ test('typed analyzer rejects unexpected tools, wrong path, and model prose spoof
     arguments: { call: expected.call, status: 'succeeded', evidence: { source: 'model-report' } } };
   const valid = [event('item.started', assess), event('item.completed', { ...assess, result: {} }),
     event('item.started', native), event('item.completed', { ...native, exit_code: 0, aggregated_output: 'random-marker\n' }),
-    event('item.started', outcome), event('item.completed', { ...outcome, result: {} })];
+    event('item.started', outcome), event('item.completed', { ...outcome, result: {} }), { type: 'turn.completed' }];
   assert.equal(analyzeCodexAgentJsonl(valid.map(line).join('\n'), expected).passed, true);
+  assert.equal(analyzeCodexAgentJsonl(valid.slice(0, -1).map(line).join('\n'), expected).reason, 'tool_sequence_invalid');
+  assert.equal(analyzeCodexAgentJsonl([...valid, { type: 'turn.failed' }].map(line).join('\n'), expected).reason, 'tool_sequence_invalid');
   const withNativeCommand = command => valid.map((record, index) =>
     index === 2 || index === 3 ? event(record.type, { ...record.item, command }) : record);
   const wrapped = `"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '${expected.command.replaceAll("'", "''")}'`;

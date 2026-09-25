@@ -304,6 +304,8 @@ export function analyzeCodexAgentJsonl(jsonl, expected) {
   if (nativeEnd.exit_code !== 0 || nativeEnd.status === 'failed') return result(false, 'native_read_failed');
   const output = nativeEnd.aggregated_output ?? nativeEnd.output;
   if (typeof output !== 'string' || output.trim() !== expected.marker) return result(false, 'native_output_mismatch');
+  if (diagnostics.turns.completed !== 1 || diagnostics.turns.failed !== 0)
+    return result(false, 'tool_sequence_invalid');
   return result(true, 'agent_evidence_passed');
 }
 
