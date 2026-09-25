@@ -63,23 +63,28 @@ function worker(path, { fixture = new URL('./fixtures/admission-racer.mjs', impo
   const closed = new Promise(resolve => child.once('close', () => { ended = true; finish(new Error(`Fixture exited before reply: ${stderr}`)); resolve(); }));
   child.on('error', error => finish(error));
   return {
-    async next() {
+    async next(phase = 'reply') {
       if (queued.length) return queued.shift();
       if (ended) throw new Error(`Fixture already exited: ${stderr}`);
       assert.equal(waiter, undefined);
-      return new Promise((resolve,reject) => { waiter = { resolve, reject, timer: setTimeout(() => finish(new Error(`Fixture IPC deadline: ${stderr}`)), 4000) }; });
+      // This fences a hung fixture, not SQLite's latency. Four competing OS processes can be
+      // descheduled on shared CI runners beyond the kernel's 2-second contention budget.
+      return new Promise((resolve,reject) => { waiter = { resolve, reject,
+        timer: setTimeout(() => finish(new Error(`Fixture IPC deadline (${phase}): ${stderr}`)), 12000) }; });
     },
     send() { child.send('go'); },
     async stop() { if (!ended) child.kill('SIGKILL'); await closed; },
   };
 }
-test('repeated fresh-database startup races still yield one admission across four OS processes', { timeout: 15000 }, async () => {
+test('repeated fresh-database startup races still yield one admission across four OS processes', { timeout: 120000 }, async () => {
   for (let round = 0; round < 8; round++) {
     const dir = await mkdtemp(join(tmpdir(), 'reflexmesh-startup-'));
     const workers = Array.from({ length: 4 }, () => worker(join(dir, 'state.sqlite')));
     try {
-      const ready = await Promise.all(workers.map(w => w.next())); assert.ok(ready.every(r => r.ready === true));
-      const replies = workers.map(w => w.next()); workers.forEach(w => w.send());
+      const ready = await Promise.all(workers.map((w, index) => w.next(`round ${round + 1} worker ${index + 1} ready`)));
+      assert.ok(ready.every(r => r.ready === true));
+      const replies = workers.map((w, index) => w.next(`round ${round + 1} worker ${index + 1} claim after ${ready[index].openElapsedMs}ms open`));
+      workers.forEach(w => w.send());
       const results = await Promise.all(replies);
       assert.deepEqual(results.map(r => r.kind).sort(), ['busy','busy','busy','claimed'], JSON.stringify(results));
     } finally { await Promise.all(workers.map(w => w.stop())); await removeStartupTempDir(dir); }
