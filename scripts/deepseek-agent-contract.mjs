@@ -1,6 +1,7 @@
 // A sanitized probe receipt, not an Agent/model production-certification claim.
 export const AGENT_ASSERTIONS = Object.freeze([
-  'isolated_cli_profile_loaded', 'observer_loaded_by_loader', 'native_agent_loop_exercised',
+  'isolated_cli_profile_loaded', 'observer_loaded_by_loader', 'observer_overlay_via_cli',
+  'native_agent_loop_exercised',
   'synthetic_adapter_only', 'host_identity_bound', 'selected_task_receipt_ready',
   'agent_dispatched_fixture_tool', 'native_tool_result_correlated', 'final_marker_from_agent',
   'observer_drained_before_exit', 'fixture_tool_scope_enforced', 'zero_labels',

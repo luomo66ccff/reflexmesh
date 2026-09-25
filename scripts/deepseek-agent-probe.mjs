@@ -9,6 +9,7 @@ import { AGENT_ASSERTIONS, AGENT_EVIDENCE, AGENT_FAILURES } from './deepseek-age
 import { processFailureReason, runBounded } from './real-host-compat.mjs';
 import { FIXTURE_MARKER } from './fixtures/deepseek-agent-fixture.mjs';
 import { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
+import { loaderInsert } from '../adapters/doctor.mjs';
 
 export { inspectAgentPackages } from '../adapters/deepseek-installation.mjs';
 const PROFILE = 'reflexmesh-probe';
@@ -18,9 +19,13 @@ const failed = (reason, hostVersion = 'unknown') => ({ schemaVersion: 1, ...AGEN
   reason: AGENT_FAILURES.includes(reason) ? reason : 'evidence_assertion_failed',
   assertions: AGENT_ASSERTIONS.map(name => ({ name, passed: false })) });
 
+export function observerOverlay(dbPath) {
+  return loaderInsert({ dbPath, tenantId: 'isolated-fixture', scope: 'agent-probe',
+    intentMode: 'explicit-summary' }).yamlInsert;
+}
+
 /** JSON flow rows are valid YAML; only the official lazy task expression needs a YAML tag. */
-export function isolatedPatch({ packageRoot, dbPath, telemetryPath, homePath, cwdPath }) {
-  const product = new URL('../adapters/deepseek-loader-plugin.mjs', import.meta.url).href;
+export function isolatedPatch({ packageRoot, telemetryPath, homePath, cwdPath, overlayPath }) {
   const fixture = new URL('./fixtures/deepseek-agent-fixture.mjs', import.meta.url).href;
   const rows = [
     { id: 'timer', name: '@deepseek-ai/cordis-plugin-timer' },
@@ -35,9 +40,8 @@ export function isolatedPatch({ packageRoot, dbPath, telemetryPath, homePath, cw
     { id: 'agent-default-model', name: '@deepseek-ai/dsh-agent-default-model', config: {
       provider: 'reflexmesh-synthetic', model: 'fixture-v1' } },
     { id: 'headless-startup', name: '@deepseek-ai/dsh-headless/startup' },
-    { id: 'reflexmesh-observer', name: product, config: {
-      dbPath, tenantId: 'isolated-fixture', scope: 'agent-probe', intentMode: 'explicit-summary' } },
-    { id: 'reflexmesh-synthetic-fixture', name: fixture, config: { packageRoot, telemetryPath, homePath, cwdPath } },
+    { id: 'reflexmesh-synthetic-fixture', name: fixture, config: {
+      packageRoot, telemetryPath, homePath, cwdPath, overlayPath } },
   ];
   return `- insert:\n${rows.map(row => `  - ${JSON.stringify(row)}`).join('\n')}\n`
     + '  - id: headless-runner\n'
@@ -68,17 +72,20 @@ export async function runDeepSeekAgentProbe(packageRoot) {
     const profile = join(home, 'profiles', PROFILE);
     const dbPath = join(root, 'ledger', 'agent.sqlite');
     const telemetryPath = join(root, 'fixture.json');
+    const overlayPath = join(root, 'observer.patch.yml');
     mkdirSync(profile, { recursive: true, mode: 0o700 });
     mkdirSync(cwd, { recursive: true, mode: 0o700 });
     writeFileSync(join(profile, 'package.json'), JSON.stringify({ private: true, type: 'module',
       dsh: { profile: { bundles: [], patchReload: 'startup' } } }), 'utf8');
     writeFileSync(join(profile, 'cordis.patch.yml'), isolatedPatch({ packageRoot: installed.root,
-      dbPath, telemetryPath, homePath: home, cwdPath: cwd }), 'utf8');
+      telemetryPath, homePath: home, cwdPath: cwd, overlayPath }), 'utf8');
+    writeFileSync(overlayPath, observerOverlay(dbPath), { encoding: 'utf8', flag: 'wx', mode: 0o600 });
     const env = Object.fromEntries(Object.entries({
       DSH_HOME: home, PATH: process.env.PATH, SystemRoot: process.env.SystemRoot,
       WINDIR: process.env.WINDIR, TEMP: root, TMP: root,
     }).filter(([, value]) => typeof value === 'string'));
-    const child = await runBounded(process.execPath, [join(installed.root, 'lib', 'bin.js'), '--profile', PROFILE, TASK], {
+    const child = await runBounded(process.execPath, [join(installed.root, 'lib', 'bin.js'),
+      '--profile', PROFILE, '--patch', overlayPath, TASK], {
       cwd, env, timeoutMs: 45_000, stdoutLimitBytes: 8192, stderrLimitBytes: 16_384,
     });
     if (!child.ok) return failed(processFailureReason(child), installed.hostVersion);
@@ -94,6 +101,7 @@ export async function runDeepSeekAgentProbe(packageRoot) {
     const checks = {
       isolated_cli_profile_loaded: telemetry.isolatedProfileLoaded === true && telemetry.loaderProfileBound === true,
       observer_loaded_by_loader: telemetry.observerEntryActivated === true && item !== null && item.run.mode === 'shadow',
+      observer_overlay_via_cli: telemetry.observerOverlayViaCli === true,
       native_agent_loop_exercised: telemetry.requests === 2 && telemetry.bodyCalls === 1 && typeof telemetry.modelSessionId === 'string',
       synthetic_adapter_only: telemetry.requests === 2 && item?.binding.providerId === 'abstain'
         && item?.binding.modelId === 'not-configured',

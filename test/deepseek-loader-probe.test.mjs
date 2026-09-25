@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { AGENT_ASSERTIONS, AGENT_EVIDENCE, evaluateAgentProbeOutput } from '../scripts/deepseek-agent-contract.mjs';
-import { inspectAgentPackages, isolatedPatch, runDeepSeekAgentProbe } from '../scripts/deepseek-agent-probe.mjs';
+import { inspectAgentPackages, isolatedPatch, observerOverlay, runDeepSeekAgentProbe } from '../scripts/deepseek-agent-probe.mjs';
 
 function cleanup(root) {
   const target = realpathSync(root);
@@ -53,10 +53,16 @@ test('installed package inspection rejects unknown versions before any host impo
 });
 
 test('isolated patch lists only fixed runtime rows and gate services', () => {
-  const patch = isolatedPatch({ packageRoot: '/synthetic/packages/dsh', dbPath: '/synthetic/db.sqlite',
-    telemetryPath: '/synthetic/telemetry.json', homePath: '/synthetic/home', cwdPath: '/synthetic/cwd' });
+  const patch = isolatedPatch({ packageRoot: '/synthetic/packages/dsh',
+    telemetryPath: '/synthetic/telemetry.json', homePath: '/synthetic/home', cwdPath: '/synthetic/cwd',
+    overlayPath: '/synthetic/observer.patch.yml' });
   assert.equal(patch.startsWith('- insert:\n'), true);
-  assert.match(patch, /"intentMode":"explicit-summary"/);
+  assert.doesNotMatch(patch, /reflexmesh-observer|deepseek-loader-plugin/);
+  const overlay = observerOverlay('/synthetic/db.sqlite');
+  assert.match(overlay, /"id":"reflexmesh-observer"/);
+  assert.match(overlay, /"intentMode":"explicit-summary"/);
+  assert.doesNotMatch(overlay, /reflexmesh-synthetic-fixture|headless-runner/);
+  assert.ok(AGENT_ASSERTIONS.includes('observer_overlay_via_cli'));
   assert.match(patch, /reflexmeshObserverReady, reflexmeshSyntheticFixtureReady/);
   assert.match(patch, /task: !!js ctx\.headlessStartup\.task/);
   assert.doesNotMatch(patch, /dsh-base|dsh-persistence|session-telemetry|REFLEXMESH_PROVIDER|TYPESAFE_API_KEY/);
