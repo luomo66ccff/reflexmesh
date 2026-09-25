@@ -227,6 +227,10 @@ An account-free [installed-host fence probe](docs/VALIDATION-DEEPSEEK-FENCE-HOST
 also exercises one deliberately delayed result-storage callback through the
 installed CLI/Loader/Agent. It checks safe observer unload and native Agent
 completion without treating the absent observer outcome as a failed tool.
+The separate [permanent-pending probe](docs/VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md)
+checks both an unresolved admission and an unresolved result continuation in
+that isolated installed host. It closes this built-in callback acceptance gap,
+not whole-host cancellation or default-profile compatibility.
 
 In-process DeepSeek and function-call observers also require a successful
 before-observation for that invocation before recording its outcome. Conflicting

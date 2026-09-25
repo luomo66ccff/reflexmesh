@@ -27,6 +27,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Add read-only DeepSeek first-run doctor separating prerequisites, historical evidence and unverified live loading; see [guide](DOCTOR.md).
 - [x] Preserve native DeepSeek post-dispatch cancellation as unknown and verify fixed installed-host parallel/task-replacement/cancel/followup scenarios with synthetic model transport; see [validation](VALIDATION-DEEPSEEK-LIFECYCLE.md).
 - [x] Preserve model-reported provenance for delegated DeepSeek summaries and verify official sequential spawn isolation with repeated call IDs and per-call result digests; see [validation](VALIDATION-DEEPSEEK-SUBAGENTS.md).
+- [x] Verify installed DeepSeek Loader unload against permanently pending built-in `before` and `after` storage continuations in an isolated synthetic Agent loop. This closes only the opt-in fenced async-callback boundary, not arbitrary host cancellation; see [validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md).
 - [x] Pair in-process DeepSeek/function-call outcomes with successful admission and reject mid-call identity/action changes; see [validation](VALIDATION-OUTCOME-ADMISSION.md).
 - [x] Persist Claude cross-process pre/post pairing, retain ambiguous outcomes with explicit warnings, and exercise duplicate/order/process-death boundaries without a model; see [protocol and limits](CLAUDE-HOOK-PAIRING.md).
 - [x] Offer an account-free installed Claude CLI/native Read/hook loop using strict synthetic localhost Messages, including duplicate-observer rejection; see [setup and limits](CLAUDE-LOCAL-LOOP.md).
@@ -206,9 +207,10 @@ and [main CI](https://github.com/luomo66ccff/reflexmesh/actions/runs/36032645585
 This is diagnosability, not a bounded total unload or cancellation protocol.
 
 **Next acceptance priority:** bounded host shutdown/cancellation and isolated
-first-run gaps within the existing adapters, especially permanent missing-result
-and hung-callback behavior with a safe storage-write barrier or isolation
-contract, followed by representative
+first-run gaps within the existing adapters. The opt-in built-in async
+`before`/`after` permanent-pending case now has one installed-host check;
+permanently missing native results, arbitrary callbacks and event-loop blocking
+remain open, followed by representative
 independent-model quality and larger operational tests. The merged first-run
 lesson does not close those gates or authorize a release, profile change or
 new paid model work.
@@ -226,8 +228,11 @@ scenarios, then representative independent-model quality. An isolated
 [installed-host fence probe](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md) now
 exercises one deliberately delayed `after` callback through the official
 Loader and native Agent; [PR #37 integration](VALIDATION-DEEPSEEK-FENCE-HOST-INTEGRATION-T001.md)
-is verified, but arbitrary or permanent hangs remain unproven.
+is verified, but that probe alone did not cover arbitrary or permanent hangs.
 This feature does not certify whole-host cancellation or arbitrary callbacks.
+The later [permanent-pending installed-host validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md)
+checks two never-resolved Loader-owned async continuations; it does not change
+the older fence report's scope or certify arbitrary callbacks.
 
 ## v0.3: memory governance and calibrated comparison
 

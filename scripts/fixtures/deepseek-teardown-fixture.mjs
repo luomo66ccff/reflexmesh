@@ -19,10 +19,13 @@ const plugin = {
   async apply(ctx, config) {
     if (!config || ['packageRoot', 'telemetryPath', 'homePath', 'cwdPath']
       .some(name => typeof config[name] !== 'string')) throw new TypeError('Synthetic teardown paths required');
-    if (config.scenario !== undefined && config.scenario !== 'fenced-after') {
+    if (config.scenario !== undefined && !['fenced-after', 'permanent-before', 'permanent-after'].includes(config.scenario)) {
       throw new TypeError('Unsupported synthetic teardown scenario');
     }
     const fenced = config.scenario === 'fenced-after';
+    const permanentBefore = config.scenario === 'permanent-before';
+    const permanentAfter = config.scenario === 'permanent-after';
+    const pendingAfter = fenced || permanentAfter;
     const profile = join(config.homePath, 'profiles', 'reflexmesh-probe');
     const manifest = JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8'));
     const profileFile = join(profile, 'cordis.yml');
@@ -47,6 +50,8 @@ const plugin = {
       afterEntered: false, afterPendingAtUnloadStart: false,
       storageRevokedAtUnload: false, detachedAfterAtUnload: null,
       lateWriteRejected: false, lateAttemptObserved: false,
+      beforeEntered: false, beforePendingAtUnloadStart: false,
+      detachedBeforeAtUnload: null, bodyEnteredAfterUnload: false,
     };
     const save = () => writeFileSync(config.telemetryPath, JSON.stringify(state), 'utf8');
     save();
@@ -57,16 +62,67 @@ const plugin = {
     const lateAttempt = new Promise(resolve => { markLateAttempt = resolve; });
     const unloadDone = new Promise((resolve, reject) => { completeUnload = resolve; failUnload = reject; });
     void unloadDone.catch(() => {});
+    const captureObserver = () => {
+      const loader = ctx.get('loader');
+      observerReady ??= ctx.get('reflexmeshObserverReady');
+      const entry = [...(loader?.entries() ?? [])].find(item => item.options?.id === 'reflexmesh-observer');
+      observerEntryId = entry?.id;
+      state.observerEntryActivated = entry?.options?.name
+        === new URL('../../adapters/deepseek-loader-plugin.mjs', import.meta.url).href
+        && entry.fiber?.state === 2 && entry.parent?.tree?.filename === profileFile;
+      save();
+      if (!state.observerEntryActivated || !observerReady || !entry?.id) {
+        throw new Error('Synthetic observer activation mismatch');
+      }
+      return { loader, entry };
+    };
+    const recordUnload = () => {
+      const drain = observerReady.shutdownDrain;
+      state.observerDrainedAtUnload = observerReady.observerDrained === true;
+      state.kernelClosedAtUnload = observerReady.kernelClosed === true;
+      state.missingResultsAtUnload = observerReady.shutdownMissingResults;
+      state.storageRevokedAtUnload = observerReady.storageRevoked === true;
+      state.detachedBeforeAtUnload = drain.detachedBefore;
+      state.detachedAfterAtUnload = drain.detachedAfter;
+      state.unloadCompleted = true;
+      save();
+    };
     // The installed Loader already owns this exact TaskAwareBoundary class.
-    // Delay its journal write until after official Loader unload, then prove
-    // the late continuation is fenced off from the closed SQLite connection.
+    // Fixture gates hold its before/after continuation at the built-in seam.
     const originalAfterDescriptor = Object.getOwnPropertyDescriptor(TaskAwareBoundary.prototype, 'after');
     const originalAfter = TaskAwareBoundary.prototype.after;
-    if (fenced) TaskAwareBoundary.prototype.after = async function(call, ...args) {
+    const originalBeforeDescriptor = Object.getOwnPropertyDescriptor(TaskAwareBoundary.prototype, 'before');
+    const originalBefore = TaskAwareBoundary.prototype.before;
+    if (permanentBefore) TaskAwareBoundary.prototype.before = async function(call, ...args) {
+      if (call.callId !== CALL_ID) return originalBefore.call(this, call, ...args);
+      state.beforeEntered = true;
+      save();
+      // The native pre-execute waterfall awaits this promise. Schedule unload
+      // independently so its progress cannot depend on the tool body running.
+      setImmediate(() => {
+        void (async () => {
+          try {
+            const { loader, entry } = captureObserver();
+            state.beforePendingAtUnloadStart = observerReady.shutdownDrain.pendingBefore === 1;
+            if (!state.beforePendingAtUnloadStart) throw new Error('Synthetic admission did not enter');
+            await loader.update(entry.id, { disabled: true });
+            recordUnload();
+            completeUnload();
+          } catch {
+            state.unloadFailed = true;
+            save();
+            failUnload(new Error('Synthetic permanent-before unload failed'));
+          }
+        })();
+      });
+      return new Promise(() => {});
+    };
+    if (pendingAfter) TaskAwareBoundary.prototype.after = async function(call, ...args) {
       if (call.callId !== CALL_ID) return originalAfter.call(this, call, ...args);
       state.afterEntered = true;
       save();
       markAfterEntered();
+      if (permanentAfter) return new Promise(() => {});
       await afterGate;
       try { return originalAfter.call(this, call, ...args); }
       catch (error) {
@@ -88,10 +144,11 @@ const plugin = {
       if (exec?.callId !== CALL_ID || exec?.agent?.id !== state.toolAgentId) return;
       state.nativeResults++;
       state.resultBeforeUnload ||= state.unloadCompleted !== true;
-      state.observerDisabledAtResult = observerReady?.observerDrained === true
-        && observerReady?.kernelClosed === true && result?.isError === false;
+      state.observerDisabledAtResult = observerReady?.kernelClosed === true
+        && (observerReady?.observerDrained === true || observerReady?.storageRevoked === true)
+        && result?.isError === false;
       save();
-      if (fenced && state.nativeResults === 1) setImmediate(() => {
+      if (pendingAfter && state.nativeResults === 1) setImmediate(() => {
         void (async () => {
           try {
             await afterEntered;
@@ -101,21 +158,16 @@ const plugin = {
               throw new Error('Synthetic result storage did not enter');
             }
             await loader.update(observerEntryId, { disabled: true });
-            const drain = observerReady.shutdownDrain;
-            state.observerDrainedAtUnload = observerReady.observerDrained === true;
-            state.kernelClosedAtUnload = observerReady.kernelClosed === true;
-            state.missingResultsAtUnload = observerReady.shutdownMissingResults;
-            state.storageRevokedAtUnload = observerReady.storageRevoked === true;
-            state.detachedAfterAtUnload = drain.detachedAfter;
-            state.unloadCompleted = true;
-            save();
-            releaseAfter();
-            await lateAttempt;
+            recordUnload();
+            if (fenced) {
+              releaseAfter();
+              await lateAttempt;
+            }
             completeUnload();
           } catch {
             state.unloadFailed = true;
             save();
-            releaseAfter();
+            releaseAfter?.();
             failUnload(new Error('Synthetic fenced unload failed'));
           }
         })();
@@ -139,7 +191,7 @@ const plugin = {
           yield { type: 'tool-call-delta', index: 0, id: CALL_ID,
             name: TEARDOWN_TOOL, argumentsDelta: JSON.stringify(ARGS) };
         } else {
-          if (fenced) await unloadDone;
+          if (pendingAfter || permanentBefore) await unloadDone;
           state.resultInModel = options.messages?.some(message => message.content?.some(block =>
             block.type === 'tool-result' && block.toolCallId === CALL_ID && block.isError === false
             && block.content?.some(part => part.type === 'text' && part.text === VALUE))) === true;
@@ -157,22 +209,19 @@ const plugin = {
       output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
       async execute(args, exec) {
         state.bodyCalls++;
+        if (permanentBefore) await unloadDone;
+        state.bodyEnteredAfterUnload = state.unloadCompleted === true;
         state.toolArgsExact = Object.keys(args).length === 1 && args.key === ARGS.key;
         state.toolSessionId = exec?.agent?.session?.id ?? null;
         state.toolAgentId = exec?.agent?.id ?? null;
-        const loader = ctx.get('loader');
-        observerReady = ctx.get('reflexmeshObserverReady');
-        const entry = [...(loader?.entries() ?? [])].find(item => item.options?.id === 'reflexmesh-observer');
-        observerEntryId = entry?.id;
-        state.observerEntryActivated = entry?.options?.name
-          === new URL('../../adapters/deepseek-loader-plugin.mjs', import.meta.url).href
-          && entry.fiber?.state === 2 && entry.parent?.tree?.filename === profileFile;
+        const observerWasUnloaded = permanentBefore && state.unloadCompleted;
+        const { loader, entry } = observerWasUnloaded ? { loader: null, entry: null } : captureObserver();
         save();
         if (!state.toolArgsExact || !state.observerEntryActivated || !observerReady
-          || state.toolAgentId !== state.toolSessionId || !entry?.id) {
+          || state.toolAgentId !== state.toolSessionId || (!observerWasUnloaded && !entry?.id)) {
           throw new Error('Synthetic observer or execution scope mismatch');
         }
-        if (fenced) return VALUE;
+        if (fenced || permanentBefore || permanentAfter) return VALUE;
         // The native ToolRuntime is awaiting this body, so no tools/result exists yet.
         // Unload only the observer via the official Loader, then release the body.
         let release, reject;
@@ -200,9 +249,14 @@ const plugin = {
     }));
     ctx.provide('reflexmeshSyntheticFixtureReady', true);
     return () => {
-      if (!fenced) return;
-      if (originalAfterDescriptor) Object.defineProperty(TaskAwareBoundary.prototype, 'after', originalAfterDescriptor);
-      else delete TaskAwareBoundary.prototype.after;
+      if (pendingAfter) {
+        if (originalAfterDescriptor) Object.defineProperty(TaskAwareBoundary.prototype, 'after', originalAfterDescriptor);
+        else delete TaskAwareBoundary.prototype.after;
+      }
+      if (permanentBefore) {
+        if (originalBeforeDescriptor) Object.defineProperty(TaskAwareBoundary.prototype, 'before', originalBeforeDescriptor);
+        else delete TaskAwareBoundary.prototype.before;
+      }
     };
   },
 };
