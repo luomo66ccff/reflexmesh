@@ -27,7 +27,14 @@ function fixture(t) {
 
 const telemetry = { startupCommitted: true, observerEntryActivated: true,
   overlayArgPresent: true, profileTreeBound: true, webServerReady: true,
-  observerDrainedAtExit: true, kernelClosedAtExit: true, naturalBeforeExit: true };
+  observerDrainedAtExit: true, kernelClosedAtExit: true, naturalBeforeExit: true,
+  agentTurnCompleted: true, finalFixtureMarker: true };
+const synthetic = { isolatedProfileLoaded: true, loaderProfileBound: true,
+  requests: 2, bodyCalls: 1, toolAdvertised: true, toolResultSeen: true,
+  toolHadAgent: true, toolArgsExact: true, sessionConsistent: true, toolCount: 5,
+  backgroundRequests: 1 };
+const evidence = () => ({ oneLedgerDecision: true, shadowBindingOnly: true,
+  nativeToolResultCorrelated: true, zeroLabels: true, hostIdentityBound: true });
 const preflight = async () => ({ status: 'passed', reason: 'overlay_composed',
   currentObserver: 'absent', overlay: 'composed_in_isolation', sourceConfigurationUnchanged: true,
   temporaryProfileRemoved: true });
@@ -71,16 +78,23 @@ test('selected-profile boot copies bounded config, applies CLI overlay, and clea
     inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
     previewProfile: preflight,
     linkModules: async (_source, target) => { mkdirSync(target); },
+    readEvidence: evidence,
     runHost: async ({ home, overlayPath, fixturePath, telemetryPath }) => {
       tempHome = home;
       assert.match(readFileSync(join(home, 'profiles', 'web', 'cordis.patch.yml'), 'utf8'), /existing-plugin/);
       assert.match(readFileSync(overlayPath, 'utf8'), /reflexmesh-observer/);
       assert.match(readFileSync(fixturePath, 'utf8'), /reflexmesh-selected-profile-boot-fixture/);
+      assert.match(readFileSync(fixturePath, 'utf8'), /reflexmesh-synthetic-fixture/);
       writeFileSync(telemetryPath, JSON.stringify(telemetry));
+      writeFileSync(join(home, 'synthetic-receipt.json'), JSON.stringify(synthetic));
       return { ok: true, stdout: '' };
     },
   });
   assert.equal(report.status, 'passed');
+  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.kind, 'deepseek_selected_profile_synthetic_tool');
+  assert.equal(report.assertions.length, 17);
+  assert.equal(report.harnessToolCalls, 'one_fixture_read');
   assert.ok(report.assertions.every(item => item.passed));
   assert.equal(report.sourceConfigurationUnchanged, true);
   assert.equal(report.temporaryProfileRemoved, true);
@@ -94,11 +108,13 @@ test('changed source or missing startup receipt cannot be certified', async t =>
     inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
     previewProfile: preflight,
     linkModules: async (_source, target) => { mkdirSync(target); },
+    readEvidence: evidence,
   };
   const changed = await runSelectedProfileBoot(f.options, { ...dependencies,
     runHost: async ({ telemetryPath }) => {
       writeFileSync(join(f.profile, 'cordis.yml'), '# CHANGED\n');
       writeFileSync(telemetryPath, JSON.stringify(telemetry));
+      writeFileSync(join(telemetryPath, '..', 'synthetic-receipt.json'), JSON.stringify(synthetic));
       return { ok: true, stdout: '' };
     },
   });
@@ -113,10 +129,29 @@ test('changed source or missing startup receipt cannot be certified', async t =>
   const unsafeListener = await runSelectedProfileBoot(f.options, { ...dependencies,
     runHost: async ({ telemetryPath }) => {
       writeFileSync(telemetryPath, JSON.stringify({ ...telemetry, webServerReady: false }));
+      writeFileSync(join(telemetryPath, '..', 'synthetic-receipt.json'), JSON.stringify(synthetic));
       return { ok: true, stdout: '' };
     },
   });
   assert.equal(unsafeListener.status, 'failed');
-  assert.equal(unsafeListener.reason, 'startup_assertion_failed');
+  assert.equal(unsafeListener.reason, 'selected_profile_assertion_failed');
   assert.equal(unsafeListener.assertions.find(item => item.name === 'webServerReady').passed, false);
+});
+
+test('missing tool-result evidence fails instead of certifying a startup-only boot', async t => {
+  const f = fixture(t);
+  const report = await runSelectedProfileBoot(f.options, {
+    inspectPackages: () => ({ ok: true, root: f.options.packageRoot, hostVersion: '0.1.2-rc.1' }),
+    previewProfile: preflight,
+    linkModules: async (_source, target) => { mkdirSync(target); },
+    readEvidence: () => ({ ...evidence(), nativeToolResultCorrelated: false }),
+    runHost: async ({ home, telemetryPath }) => {
+      writeFileSync(telemetryPath, JSON.stringify(telemetry));
+      writeFileSync(join(home, 'synthetic-receipt.json'), JSON.stringify(synthetic));
+      return { ok: true, stdout: '' };
+    },
+  });
+  assert.equal(report.status, 'failed');
+  assert.equal(report.reason, 'selected_profile_assertion_failed');
+  assert.equal(report.assertions.find(item => item.name === 'nativeToolResultCorrelated').passed, false);
 });
