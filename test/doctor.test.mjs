@@ -315,6 +315,27 @@ test('a completed shadow decision with an UNKNOWN reported host outcome still wa
   } finally { w.cleanup(); }
 });
 
+test('a completed shadow decision without host outcome is informational and distinct from run UNKNOWN', async () => {
+  const w = workspace();
+  try {
+    fakePackages(w.packageRoot);
+    database(w.db, 2, { key: 'missing-host-outcome', state: 'completed',
+      evidence: { mode: 'shadow', taskEvidence: { status: 'ready', coverage: 'summary-only' } },
+      result: { status: 'shadow', verdict: { effect: 'escalate' } } });
+    const { report, exitCode } = await diagnoseDoctor([...args(w), '--key', 'missing-host-outcome']);
+    assert.equal(exitCode, 0);
+    assert.equal(report.status, 'prerequisites_ready');
+    assert.equal(report.historicalEvidence.runState, 'completed');
+    assert.equal(report.historicalEvidence.outcomeStatus, 'missing');
+    assert.equal(report.historicalEvidence.outcomeCount, 0);
+    assert.deepEqual(report.historicalEvidence.outcomeByProvenance, []);
+    assert.ok(codes(report).includes('historical_outcome_missing'));
+    assert.ok(!codes(report).includes('historical_unknown_execution'));
+    assert.equal(report.liveHost, 'live_host_unverified');
+    assert.match(formatDoctor(report), /未收到宿主结果.*evidence attention\/inspect.*不能自动重试/);
+  } finally { w.cleanup(); }
+});
+
 test('historical summary distinguishes harness- and model-reported outcomes without authorizing execution', async () => {
   const w = workspace();
   try {

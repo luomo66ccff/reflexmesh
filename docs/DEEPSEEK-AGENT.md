@@ -159,6 +159,26 @@ the second keeps the admitted decision but leaves its unobserved result
 native tool or certify an event-loop-blocking callback, arbitrary custom
 storage, default-profile setup or real-model transport. See the
 [permanent-pending validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md).
+To examine the different case where a **native tool body itself does not
+return**, use the separately supervised, account-free check:
+
+```powershell
+node scripts/real-host-compat.mjs --host deepseek --deepseek-mode observer-missing-result --deepseek-package-root 'D:\DeepSeekHarness\app\node_modules\@deepseek-ai\dsh'
+```
+
+An optional `--out-dir ABSOLUTE_NEW_DIRECTORY` keeps a new, synthetic lesson directory with its
+ledger, receipt and copyable read-only `attention` / `inspect` commands; existing
+paths are never overwritten. Without this option the temporary fixture is
+removed after verification. The check requires a real admission and a pending
+native tool, then unloads the observer with a zero result-reception window. It
+reads the missing-outcome ledger both before and after its supervisor terminates
+**only the isolated child it started**. A passing observer check explicitly
+means the native tool and Agent did **not** complete naturally. Cancellation is
+not assumed to abandon the tool body, and a timeout, early exit or forced stop
+without confirmed readback is not a pass. This does not exercise a user profile,
+real model, arbitrary tool side effects or a general host timeout policy.
+See the [dated missing-result validation](VALIDATION-DEEPSEEK-MISSING-RESULT-T001.md)
+for the exact local evidence and exclusions.
 An integration that monitors unload should capture the readiness object
 **before** starting Loader disposal. Cordis may remove the service during
 unload, so a fresh `ctx.get('reflexmeshObserverReady')` is not a reliable way

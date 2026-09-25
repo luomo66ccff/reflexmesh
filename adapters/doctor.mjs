@@ -39,6 +39,7 @@ const MESSAGE = Object.freeze({
   abstain_only: '当前 DeepSeek 产品插件仅做 shadow 观察，决策 provider 固定 abstain。',
   historical_task_not_ready: '所选历史记录没有可用任务摘要；不代表当前安装失败。',
   historical_outcome_conflict: '所选历史结果互相冲突；不能选定成功或自动重试。',
+  historical_outcome_missing: '所选历史记录已有 shadow 决策，但未收到宿主结果；这不证明工具成功、失败或未执行。先核对宿主状态，再用 evidence attention/inspect 查看记录；不能自动重试。',
   historical_unknown_execution: '所选历史执行状态未知；必须独立核对，不得自动重试。',
   historical_hook_pairing_unavailable: '所选历史记录的 Claude 钩子关联未完成或有歧义；已有结果也不能证明属于该次调用，须独立核对，不得自动重试。',
   historical_evidence_only: '历史记录不证明当前插件已加载，也未证实属于本次 tenant/scope 配置。',
@@ -186,6 +187,8 @@ export async function diagnoseDoctor(argv, {
             add(diagnostics, 'historical_evidence_only');
             if (historicalEvidence.taskStatus !== 'ready') add(diagnostics, 'historical_task_not_ready');
             if (historicalEvidence.outcomeStatus === 'conflicting') add(diagnostics, 'historical_outcome_conflict');
+            if (historicalEvidence.runState === 'completed' && historicalEvidence.decisionEffect !== 'not_recorded'
+              && historicalEvidence.outcomeStatus === 'missing') add(diagnostics, 'historical_outcome_missing');
             if (['pending', 'blocked'].includes(historicalEvidence.hookPairingState)) add(diagnostics, 'historical_hook_pairing_unavailable');
             if (historicalEvidence.runState === 'unknown' || historicalEvidence.outcomeStatus === 'unknown'
               || historicalEvidence.recoveryRequired) add(diagnostics, 'historical_unknown_execution');
