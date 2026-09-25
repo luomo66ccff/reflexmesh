@@ -12,7 +12,26 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: bounded in-process deadlines
+## Latest local milestone: offline evidence story
+
+On 2026-09-25, retained synthetic first-run gained a self-contained, no-script
+`EVIDENCE-STORY.html` showing one bounded decision as task evidence, semantic
+policy, separately reported host outcome and independent labels. The explicit
+`evidence story --db PATH --key KEY --out NEW_FILE` path exports the same
+bounded projection from an existing local ledger to a new private file only;
+it cannot alter the ledger or authorize action/retry. Escaping, restrictive
+CSP, unknown/conflict warnings, new-only write/readback, privacy markers and
+Unicode/spaced paths are covered in tests. Local `npm run check` passed **972
+tests: 970 passed, 0 failed, 2 local Windows symlink-privilege skips**;
+`npm run demo` and a fresh synthetic first-run passed. Installed Edge rendered
+desktop and 390-px mobile layouts without horizontal overflow or external
+requests when the generated file was served over temporary loopback. The
+automation tool blocked direct `file://` navigation, so double-click acceptance
+is not claimed. See [local validation](VALIDATION-EVIDENCE-STORY-T001.md).
+This is an offline report, not a dashboard, real-host proof, user-data export
+recommendation or completion of the long-term objective.
+
+## Previous merged milestone: bounded in-process deadlines
 
 On 2026-09-25, [Issue #72](https://github.com/luomo66ccff/reflexmesh/issues/72)
 was reproduced on Node 24.19.0: an out-of-range timeout became a 1-ms Node

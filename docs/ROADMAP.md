@@ -21,6 +21,7 @@ The current incremental evidence and unfinished acceptance gates are tracked in
 - [x] Add 32 focused recovery/label tests and a credential-free recovery demo; see [validation scope](VALIDATION-RECOVERY.md).
 - [x] Add an isolated real-host probe and exercise pinned Codex and Claude smoke paths; see [validation](VALIDATION-REAL-HOSTS.md).
 - [x] Add a read-only evidence CLI and account-free explained walkthrough, with explicit task coverage and outcome provenance.
+- [x] Offer a static, no-script evidence story for retained synthetic first-run and explicit new-file export of one bounded local projection. This is an offline report, not a live dashboard, real-host proof or permission control; see the [evidence guide](EVIDENCE.md).
 - [x] Load the observer through installed DeepSeek/Cordis native tool components, including disposal and pre-dispatch cancellation; classification is synthetic.
 - [x] Exercise DeepSeek's CLI profile Loader and actual Agent loop with an isolated synthetic model adapter, bound task receipt and observed plugin cleanup; see [validation](VALIDATION-AGENT-LIFECYCLE.md).
 - [x] Exercise one authorized isolated real-model DeepSeek Agent/tool round trip with bounded official transport; see [t001 evidence and limits](VALIDATION-DEEPSEEK-REAL-MODEL-T001.md).

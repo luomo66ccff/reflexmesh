@@ -7,6 +7,7 @@ import { IntentCache } from '../adapters/intent-cache.mjs';
 import { TaskAwareBoundary } from '../adapters/task-boundary.mjs';
 import { SqliteKernel } from '../adapters/sqlite-kernel.mjs';
 import { formatEvidence } from '../adapters/evidence-cli.mjs';
+import { writeEvidenceStory } from '../adapters/evidence-story.mjs';
 import { assertSqliteWalRuntime, SqliteRuntimeError } from '../adapters/sqlite-runtime.mjs';
 import { isDirectRun } from '../adapters/direct-run.mjs';
 
@@ -15,7 +16,7 @@ const PRIVATE_BODY = 'PRIVATE_PROMPT_BODY_NOT_SELECTED';
 const USAGE = `Usage: node examples/task-intent.mjs [--summary | --explain] [--out-dir NEW_DIRECTORY]
        npm run first-run [-- --out-dir NEW_DIRECTORY]
 Runs only synthetic evidence fixtures; no model, user profile or host tool is used.
-Without --out-dir, temporary databases are removed. A retained lesson contains ledger.sqlite, candidate-pack.json and START-HERE.md.
+Without --out-dir, temporary databases are removed. A retained lesson contains ledger.sqlite, candidate-pack.json, START-HERE.md and EVIDENCE-STORY.html.
 For paths with spaces, build first and pass the quoted path directly to node.
 `;
 
@@ -77,7 +78,7 @@ function startHere(directory, selectedKey) {
     command('replay', ` --key ${shellQuote(selectedKey)} --candidate-pack ${shellQuote(candidate)}`),
     command('pack-template', ` --key ${shellQuote(selectedKey)} --out ${shellQuote(sourcePack)}`)];
   const shell = process.platform === 'win32' ? 'powershell' : 'sh';
-  return `# Synthetic evidence lesson\n\nThis is an **account-free synthetic fixture**, not a real host session or user ledger. No model or host tool ran. The task-summary cache is outside this directory; only a successful first-run exit confirms its cleanup. Raw task text is not retained here.\n\nFrom the ReflexMesh repository root, steps 1-4 keep the ledger and directory application-read-only. Step 5 writes only a new, explicitly named local file. None of these commands calls a provider, runs a tool, retries an action or changes a ledger record. SQLite may create or interact with WAL/SHM sidecars; read-only access is not a byte-for-byte filesystem immutability guarantee.\n\n1. List the synthetic decisions and copy one exact key from the output.\n\n${markdownFence(commands[0], shell)}\n\n2. Find records needing attention. Missing reports in this fixture are expected; they do not imply a crash or non-execution.\n\n${markdownFence(commands[1], shell)}\n\n3. Inspect a decision by replacing KEY_FROM_LIST with a key from list. The report keeps the decision, host outcome and labels separate.\n\n${markdownFence(commands[2], shell)}\n\n4. Replay only the policy for the selected synthetic decision. The provided candidate keeps the exact question contract but changes the intent-match threshold from 0.90 to 0.99. Its old allow becomes a hypothetical escalate; neither verdict authorizes the host tool.\n\n${markdownFence(commands[3], shell)}\n\n5. Optionally export the exact source pack bound to this synthetic decision into a new file. Its full question instructions stay in that file, not the terminal; this command refuses an existing destination. An unchanged source pack replays to the same effect.\n\n${markdownFence(commands[4], shell)}\n\nFor a real ledger, review the exported pack privately, change its version and rules in the copy, then use replay with that candidate file. Neither command proves model quality or grants retry permission.\n\nThis directory was created only if it did not already exist. Keep or remove this synthetic lesson as you prefer; it grants no permission to act on a real system.\n`;
+  return `# Synthetic evidence lesson\n\nThis is an **account-free synthetic fixture**, not a real host session or user ledger. No model or host tool ran. The task-summary cache is outside this directory; only a successful first-run exit confirms its cleanup. Raw task text is not retained here.\n\nOpen EVIDENCE-STORY.html locally for a static, no-script visual walkthrough of one selected decision. The page separates task evidence, semantic policy, host reports and independent labels; it does not prove execution or grant permission. Keep even synthetic identifiers private.\n\nFrom the ReflexMesh repository root, steps 1-4 keep the ledger and directory application-read-only. Step 5 writes only a new, explicitly named local file. None of these commands calls a provider, runs a tool, retries an action or changes a ledger record. SQLite may create or interact with WAL/SHM sidecars; read-only access is not a byte-for-byte filesystem immutability guarantee.\n\n1. List the synthetic decisions and copy one exact key from the output.\n\n${markdownFence(commands[0], shell)}\n\n2. Find records needing attention. Missing reports in this fixture are expected; they do not imply a crash or non-execution.\n\n${markdownFence(commands[1], shell)}\n\n3. Inspect a decision by replacing KEY_FROM_LIST with a key from list. The report keeps the decision, host outcome and labels separate.\n\n${markdownFence(commands[2], shell)}\n\n4. Replay only the policy for the selected synthetic decision. The provided candidate keeps the exact question contract but changes the intent-match threshold from 0.90 to 0.99. Its old allow becomes a hypothetical escalate; neither verdict authorizes the host tool.\n\n${markdownFence(commands[3], shell)}\n\n5. Optionally export the exact source pack bound to this synthetic decision into a new file. Its full question instructions stay in that file, not the terminal; this command refuses an existing destination. An unchanged source pack replays to the same effect.\n\n${markdownFence(commands[4], shell)}\n\nFor a real ledger, review the exported pack privately, change its version and rules in the copy, then use replay with that candidate file. You can export any selected bounded view with evidence story --db PATH --key KEY --out NEW_FILE.html. Neither command proves model quality or grants retry permission.\n\nThis directory was created only if it did not already exist. Keep or remove this synthetic lesson as you prefer; it grants no permission to act on a real system.\n`;
 }
 
 function removeOwnedDirectory(path, ownership) {
@@ -99,7 +100,8 @@ function removeTemporaryDirectory(path, prefix, tempRoot) {
   } catch { throw new DemoCleanupError('Temporary cleanup could not be verified'); }
 }
 
-function retainInstructions(directory, selectedKey) {
+async function retainInstructions(directory, selectedKey, snapshot) {
+  await writeEvidenceStory(join(directory, 'EVIDENCE-STORY.html'), snapshot, { synthetic: true });
   writeFileSync(join(directory, 'candidate-pack.json'), `${JSON.stringify(lessonCandidatePack(), null, 2)}\n`,
     { encoding: 'utf8', flag: 'wx', mode: 0o600 });
   const content = startHere(directory, selectedKey);
@@ -120,7 +122,7 @@ function summaryOutput({ runtime, report, outputDir, retained }) {
     'No model, external provider, user profile or host tool was accessed.',
   ];
   if (retained) lines.push(`Synthetic ledger retained at ${JSON.stringify(join(outputDir, 'ledger.sqlite'))}.`,
-    'Next: open START-HERE.md there for copyable ledger-read-only commands and an optional new-file pack export.');
+    'Next: open EVIDENCE-STORY.html there for the offline visual walkthrough, then START-HERE.md for copyable ledger-read-only commands and an optional new-file pack export.');
   else lines.push('Temporary ledger and task-summary cache were removed.',
     'Next: npm run demo:evidence for the detailed walkthrough, or rerun with -- --out-dir NEW_DIRECTORY to inspect a retained fixture.');
   return lines.join('\n') + '\n';
@@ -190,7 +192,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
 
     cache.close(); cache = undefined;
     kernel.close(); kernel = undefined;
-    if (retained) retainInstructions(outputDir, assessed.decisionId);
+    if (retained) await retainInstructions(outputDir, assessed.decisionId, afterOutcome);
     successful = true;
 
     if (options.mode === 'summary') completionText = summaryOutput({ runtime, report, outputDir, retained });
@@ -207,7 +209,7 @@ export async function main(argv = process.argv.slice(2), output = process.stdout
         ]) output.write(title + '\n' + formatEvidence(snapshot ?? view.evidenceSnapshot(key), 'inspect'));
       } finally { view.close(); }
       output.write(`Fixture provider calls: ${predictions}; duplicate replayed: ${replay.replayed}; labels created: ${receipt.labels.length}.\n`);
-      completionText = retained ? `Synthetic lesson retained in ${JSON.stringify(outputDir)}; see START-HERE.md for read-only commands.\n`
+      completionText = retained ? `Synthetic lesson retained in ${JSON.stringify(outputDir)}; open EVIDENCE-STORY.html and see START-HERE.md for read-only commands.\n`
         : 'The temporary ledger and summary cache are removed when this walkthrough exits.\n';
     } else completionText = JSON.stringify(report, null, 2) + '\n';
   } finally {
