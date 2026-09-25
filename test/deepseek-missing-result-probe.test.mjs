@@ -125,7 +125,8 @@ test('START-HERE preserves Windows paths and quotes through PowerShell', { skip:
   const quoted = quoteProbeCommandArg(dbPath);
   assert.equal(quoted, "'C:\\Users\\fixture\\folder''s space\\ledger.sqlite'");
   const result = spawnSync('powershell', ['-NoProfile', '-Command', `[Console]::Write(${quoted})`],
-    { encoding: 'utf8', timeout: 5000 });
+    // Cold Windows CI can take more than five seconds to start PowerShell under load.
+    { encoding: 'utf8', timeout: 20_000 });
   assert.equal(result.status, 0);
   assert.equal(result.stdout, dbPath);
   const guide = missingResultStartHere({ dbPath, installedRoot: 'D:\\DeepSeekHarness\\dsh', key: 'fixture-key' });

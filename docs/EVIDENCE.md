@@ -96,8 +96,10 @@ node adapters/evidence-cli.mjs pack-template --db /private/path/shadow.sqlite --
 ```
 
 The export is not a generic dump: it reads only the selected run and its bound
-pack, not audit, observation or label bodies. The full pack **may contain
-sensitive question instructions**. It is written with a restrictive new-file
+pack, not audit, observation or label bodies. It also recomputes the original
+policy verdict from the recorded prediction and refuses an inconsistent stored
+verdict. The full pack **may contain sensitive question instructions**. It is
+written with a restrictive new-file
 mode where supported and is never printed to stdout or JSON; the containing
 directory's ACLs still matter, especially on Windows. If writing or readback
 fails, the new file may be incomplete; inspect it before continuing. No
@@ -129,6 +131,11 @@ prints the original and candidate verdicts without prediction distributions,
 task summaries or tool arguments. Use `--json` for a machine-readable receipt;
 rule names and pack digests can still be sensitive metadata. This is
 a read-only application operation, subject to the SQLite WAL/SHM caveat below.
+Replay rejects a prediction whose model differs from the recorded deployment
+binding. Unlike source-pack export, replay does not independently reload the
+original pack body to recompute its original verdict; a locally modified ledger
+is not authenticated by either command. For a changed-policy review, export the
+bound source pack first and keep the ledger under trusted local access controls.
 
 ## Find evidence that needs attention
 

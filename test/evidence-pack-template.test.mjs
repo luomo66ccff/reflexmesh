@@ -96,6 +96,21 @@ test('unknown, UNKNOWN and invalid predictions do not publish a template', async
   } finally { db.close(); }
 });
 
+test('a stored verdict inconsistent with the bound source pack cannot be exported', async t => {
+  const f = await fixture(t), db = new DatabaseSync(f.db);
+  try {
+    const result = JSON.parse(db.prepare('SELECT result FROM runs WHERE key=?').get(f.key).result);
+    result.verdict = { effect: 'deny', ruleId: 'PRIVATE_FALSE_RULE' };
+    db.prepare('UPDATE runs SET result=? WHERE key=?').run(JSON.stringify(result), f.key);
+  } finally { db.close(); }
+  const response = cli(...exportArgs(f), '--json');
+  assert.equal(response.status, 1);
+  assert.equal(response.stdout, '');
+  assert.equal(existsSync(f.out), false);
+  assert.match(response.stderr, /Recorded policy verdict mismatch/);
+  assert.ok(!response.stderr.includes('PRIVATE_FALSE_RULE'));
+});
+
 test('tampered pack binding, body and digest fail before output without echoing contents', async t => {
   const f = await fixture(t);
   const db = new DatabaseSync(f.db);
