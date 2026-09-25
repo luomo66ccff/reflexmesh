@@ -20,6 +20,7 @@ import { SUBAGENT_EVIDENCE, evaluateSubagentProbeOutput } from './deepseek-subag
 import { TEARDOWN_EVIDENCE, evaluateTeardownProbeOutput } from './deepseek-teardown-contract.mjs';
 import { FENCE_EVIDENCE, evaluateFenceProbeOutput } from './deepseek-fence-contract.mjs';
 import { permanentPendingEvidence, evaluatePermanentPendingProbeOutput } from './deepseek-permanent-pending-contract.mjs';
+import { MISSING_RESULT_EVIDENCE, evaluateMissingResultProbeOutput } from './deepseek-missing-result-contract.mjs';
 
 const HOSTS = new Set(['codex', 'claude', 'deepseek', 'all']);
 const CODEX_MARKER = 'REFLEXMESH_CODEX_COMPAT_OK';
@@ -42,6 +43,7 @@ const ARGUMENTS = Object.freeze({
   '--deepseek-command': 'deepseekCommand',
   '--deepseek-package-root': 'deepseekPackageRoot',
   '--deepseek-mode': 'deepseekMode',
+  '--out-dir': 'outDir',
   '--node-command': 'nodeCommand',
   '--timeout-ms': 'timeoutMs',
   '--version-timeout-ms': 'versionTimeoutMs',
@@ -81,6 +83,7 @@ export function parseArgs(argv, defaults = {}) {
     deepseekCommand: null,
     deepseekPackageRoot: null,
     deepseekMode: 'native',
+    outDir: null,
     nodeCommand: process.execPath,
     codexCommandArgs: [],
     claudeCommandArgs: [],
@@ -89,9 +92,14 @@ export function parseArgs(argv, defaults = {}) {
     ...DEFAULT_LIMITS,
     ...defaults,
   };
+  let outDirSeen = false;
   for (let index = 0; index < argv.length;) {
     const current = optionValue(argv, index);
     index += current.consumed;
+    if (current.name === '--out-dir') {
+      if (outDirSeen) throw new Error('duplicate_out_dir');
+      outDirSeen = true;
+    }
     const scalar = ARGUMENTS[current.name];
     const repeated = PREFIX_ARGUMENTS[current.name];
     if (!scalar && !repeated) throw new Error('unknown_option');
@@ -100,8 +108,13 @@ export function parseArgs(argv, defaults = {}) {
   }
   if (!HOSTS.has(parsed.host)) throw new Error('invalid_host');
   if (!['native', 'agent-cli', 'lifecycle-matrix', 'subagent-isolation', 'observer-teardown', 'observer-fence',
-    'observer-pending-before', 'observer-pending-after'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
+    'observer-pending-before', 'observer-pending-after', 'observer-missing-result'].includes(parsed.deepseekMode)) throw new Error('invalid_deepseek_mode');
   if (parsed.deepseekMode !== 'native' && !parsed.deepseekPackageRoot) throw new Error('deepseek_package_root_required');
+  if (parsed.outDir !== null && (parsed.host !== 'deepseek' || parsed.deepseekMode !== 'observer-missing-result')) {
+    throw new Error('out_dir_requires_missing_result_mode');
+  }
+  if (parsed.outDir !== null && (!parsed.outDir || !isAbsolute(parsed.outDir)
+    || parsed.outDir.length > 4096)) throw new Error('invalid_out_dir');
   parsed.timeoutMs = boundedInteger(String(parsed.timeoutMs), 'timeout_ms', 1_000, 600_000);
   parsed.versionTimeoutMs = boundedInteger(String(parsed.versionTimeoutMs), 'version_timeout_ms', 500, 60_000);
   parsed.stdoutLimitBytes = boundedInteger(String(parsed.stdoutLimitBytes), 'stdout_limit_bytes', 1_024, 16 * 1024 * 1024);
@@ -110,6 +123,7 @@ export function parseArgs(argv, defaults = {}) {
   parsed.mcpServer = resolve(parsed.mcpServer ?? join(parsed.repoRoot, 'adapters', 'mcp-server.mjs'));
   parsed.claudeHook = resolve(parsed.claudeHook ?? join(parsed.repoRoot, 'adapters', 'claude-task-hook.mjs'));
   if (parsed.deepseekPackageRoot !== null) parsed.deepseekPackageRoot = resolve(parsed.deepseekPackageRoot);
+  if (parsed.outDir !== null) parsed.outDir = resolve(parsed.outDir);
   return parsed;
 }
 
@@ -666,20 +680,25 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   const pendingScenario = options.deepseekMode === 'observer-pending-before' ? 'permanent-before'
     : options.deepseekMode === 'observer-pending-after' ? 'permanent-after' : null;
   const pendingMode = pendingScenario !== null;
-  const agentLike = agentMode || lifecycleMode || subagentMode || teardownMode || fenceMode || pendingMode;
-  const requestedLevel = pendingMode ? permanentPendingEvidence(pendingScenario).evidenceLevel
+  const missingResultMode = options.deepseekMode === 'observer-missing-result';
+  const agentLike = agentMode || lifecycleMode || subagentMode || teardownMode || fenceMode || pendingMode || missingResultMode;
+  const requestedLevel = missingResultMode ? MISSING_RESULT_EVIDENCE.evidenceLevel
+    : pendingMode ? permanentPendingEvidence(pendingScenario).evidenceLevel
     : fenceMode ? 'cli_agent_observer_fence' : teardownMode ? 'cli_agent_observer_teardown' : subagentMode ? 'cli_agent_subagent_isolation'
     : lifecycleMode ? 'cli_agent_lifecycle_matrix' : agentMode ? 'cli_agent_loop' : 'native_tool_pipeline';
-  const extra = { ...(pendingMode ? permanentPendingEvidence(pendingScenario) : fenceMode ? FENCE_EVIDENCE : teardownMode ? TEARDOWN_EVIDENCE : subagentMode ? SUBAGENT_EVIDENCE : lifecycleMode ? LIFECYCLE_EVIDENCE : agentMode ? AGENT_EVIDENCE
+  const extra = { ...(missingResultMode ? MISSING_RESULT_EVIDENCE : pendingMode ? permanentPendingEvidence(pendingScenario) : fenceMode ? FENCE_EVIDENCE : teardownMode ? TEARDOWN_EVIDENCE : subagentMode ? SUBAGENT_EVIDENCE : lifecycleMode ? LIFECYCLE_EVIDENCE : agentMode ? AGENT_EVIDENCE
     : { agentE2E: false, classification: 'synthetic_classification' }),
     evidenceLevel: 'none', requestedEvidenceLevel: requestedLevel,
-    ...(agentLike ? { agentLoopExercised: false } : {}) };
+    ...(agentLike ? { agentLoopExercised: false } : {}),
+    ...(missingResultMode ? { nativeToolBodyEntered: false, nativeResultReceived: null,
+      agentCompleted: null, exitKind: 'unverified' } : {}) };
   const spec = processSpec(options.nodeCommand, options.nodeCommandArgs, 'node', process.env);
   if (!spec) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'node_command_not_found', [], started, extra);
-  const script = fenceMode || teardownMode || pendingMode ? 'deepseek-teardown-probe.mjs' : subagentMode ? 'deepseek-subagent-probe.mjs' : lifecycleMode ? 'deepseek-lifecycle-probe.mjs'
+  const script = missingResultMode ? 'deepseek-missing-result-probe.mjs' : fenceMode || teardownMode || pendingMode ? 'deepseek-teardown-probe.mjs' : subagentMode ? 'deepseek-subagent-probe.mjs' : lifecycleMode ? 'deepseek-lifecycle-probe.mjs'
     : agentMode ? 'deepseek-agent-probe.mjs' : 'deepseek-runtime-probe.mjs';
   const child = await runBounded(spec.executable, [...spec.prefixArgs, join(options.repoRoot, 'scripts', script), options.deepseekPackageRoot,
-    ...(pendingMode ? [pendingScenario] : fenceMode ? ['fenced-after'] : [])], {
+    ...(missingResultMode && options.outDir ? ['--out-dir', options.outDir]
+      : pendingMode ? [pendingScenario] : fenceMode ? ['fenced-after'] : [])], {
     cwd: options.repoRoot,
     env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR },
     timeoutMs: options.timeoutMs,
@@ -690,7 +709,8 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   if (!child.ok && !(child.kind === 'nonzero_exit' && typeof child.stdout === 'string')) {
     return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', processFailureReason(child), [], started, extra);
   }
-  const assessed = pendingMode ? evaluatePermanentPendingProbeOutput(child.stdout, pendingScenario)
+  const assessed = missingResultMode ? evaluateMissingResultProbeOutput(child.stdout)
+    : pendingMode ? evaluatePermanentPendingProbeOutput(child.stdout, pendingScenario)
     : fenceMode ? evaluateFenceProbeOutput(child.stdout) : teardownMode ? evaluateTeardownProbeOutput(child.stdout) : subagentMode ? evaluateSubagentProbeOutput(child.stdout) : lifecycleMode ? evaluateLifecycleProbeOutput(child.stdout)
     : agentMode ? evaluateAgentProbeOutput(child.stdout) : evaluateDeepSeekProbeOutput(child.stdout);
   if (!assessed) return hostReport(host, testedAt, 'unknown', adapterVersion, 'failed', 'probe_output_invalid', [], started, extra);
@@ -698,7 +718,11 @@ async function runDeepSeekRuntime(options, adapterVersion, testedAt, started) {
   const hostVersion = assessed.version === 'unknown' ? 'unknown' : `DeepSeek Harness ${assessed.version}`;
   return hostReport(host, testedAt, hostVersion, adapterVersion, assessed.status, assessed.reason, assessed.assertions, started,
     { ...extra, evidenceLevel: assessed.status === 'passed' ? requestedLevel : 'none',
-      ...(agentLike ? { agentLoopExercised: assessed.status === 'passed' } : {}) });
+      ...(agentLike ? { agentLoopExercised: assessed.status === 'passed' } : {}),
+      ...(missingResultMode ? { nativeToolBodyEntered: assessed.status === 'passed',
+        nativeResultReceived: assessed.status === 'passed' ? false : null,
+        agentCompleted: assessed.status === 'passed' ? false : null,
+        exitKind: assessed.status === 'passed' ? 'supervisor_terminated' : 'unverified' } : {}) });
 }
 
 async function runDeepSeek(options, adapterVersion) {
@@ -758,6 +782,11 @@ export async function runCompatibilityProbe(options) {
     ...(results.length === 1 && results[0].host === 'deepseek'
       ? { evidenceLevel: results[0].evidenceLevel, agentE2E: false,
         ...(results[0].classification ? { classification: results[0].classification } : {}),
+        ...(options.deepseekMode === 'observer-missing-result' ? {
+          nativeToolBodyEntered: results[0].nativeToolBodyEntered,
+          nativeResultReceived: results[0].nativeResultReceived,
+          agentCompleted: results[0].agentCompleted, exitKind: results[0].exitKind,
+        } : {}),
         ...(Object.hasOwn(results[0], 'agentLoopExercised') ? {
           agentLoopExercised: results[0].agentLoopExercised,
           modelInference: false, modelTransport: 'synthetic_adapter',

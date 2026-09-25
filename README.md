@@ -231,6 +231,11 @@ The separate [permanent-pending probe](docs/VALIDATION-DEEPSEEK-PERMANENT-PENDIN
 checks both an unresolved admission and an unresolved result continuation in
 that isolated installed host. It closes this built-in callback acceptance gap,
 not whole-host cancellation or default-profile compatibility.
+For a native tool body that does not return, the separate
+[missing-result self-check](docs/VALIDATION-DEEPSEEK-MISSING-RESULT-T001.md) verifies bounded observer
+unload and a truthful missing-outcome ledger in an isolated synthetic profile.
+Its supervisor stops its own hanging fixture after readback; it does not claim
+that the host finished the tool or that cancellation undid any effects.
 
 In-process DeepSeek and function-call observers also require a successful
 before-observation for that invocation before recording its outcome. Conflicting

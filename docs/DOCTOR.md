@@ -72,6 +72,12 @@ is safe to retry.
 A completed shadow decision and an unknown reported host outcome can coexist.
 Doctor warns about that unknown outcome even when the decision row is completed;
 it does not turn the row into an execution tombstone or enable recovery/retry.
+Likewise, `historical_outcome_missing` means an earlier shadow decision has no
+recorded host result. It does not mean the tool failed, did not run or can be
+retried. Check the host's own status first, then use `evidence attention` and
+`evidence inspect --key KEY` for the selected row. This informational diagnostic
+does not make an otherwise ready installation fail its prerequisite check and
+does not relabel the durable run as `unknown`.
 
 A selected Claude record also exposes `historicalEvidence.hookPairingState`.
 Pending or blocked association emits `historical_hook_pairing_unavailable`,
