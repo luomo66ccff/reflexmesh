@@ -12,7 +12,7 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Current local candidate: honest first-result scoring
+## Latest merged milestone: honest first-result scoring
 
 On 2026-09-25, the only scoring entrypoint still required two deployments,
 even when an operator had just made a first bounded prediction run. The new
@@ -25,10 +25,15 @@ failure and seven unattempted cases. No new model request ran. Local checks
 passed 878/880 tests with two Windows symlink-privilege skips and the default
 demo passed. See the
 [local validation](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-T001.md).
+[PR #53](https://github.com/luomo66ccff/reflexmesh/pull/53) merged the
+reviewed tree `6f07e0d01c3002b1029d0c894cb112d1e313f250` unchanged;
+all five configured jobs passed on both the PR head and main merge commit.
+See the separate
+[integration readback](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-INTEGRATION-T001.md).
 Real-user usefulness, representative labels, Jev comparison and broad host
 acceptance remain open.
 
-## Latest merged milestone: account-listed DeepSeek evaluation gate
+## Previous merged milestone: account-listed DeepSeek evaluation gate
 
 On 2026-09-25, a small synthetic intent/scope slice exposed a real operator
 trap: the installed Harness default named an older DeepSeek alias, while the

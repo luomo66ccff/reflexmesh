@@ -89,6 +89,8 @@ The [single-side score increment](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-T001.m
 lets a first provider run show honest coverage and available labeled-case
 metrics without fabricating a comparison side. Representative paired quality
 and real-user usefulness remain open.
+Its [PR/main integration readback](VALIDATION-EVALUATION-SINGLE-SIDE-SCORE-INTEGRATION-T001.md)
+records the reviewed tree and CI separately from the private local receipts.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
