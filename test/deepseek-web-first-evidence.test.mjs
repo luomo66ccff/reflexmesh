@@ -84,8 +84,9 @@ function dependencies(f, { final = finished, onLaunch = () => {},
 
 test('Web first-evidence CLI refuses missing acknowledgement, unsafe profile and duplicate flags', () => {
   assert.deepEqual(parseWebFirstArgs(['--help']), { help: true });
-  const args = ['--deepseek-package-root', 'C:/installed', '--dsh-home', 'C:/home',
-    '--profile', 'web', '--out-dir', 'C:/output'];
+  const args = ['--deepseek-package-root', join(tmpdir(), 'installed'),
+    '--dsh-home', join(tmpdir(), 'home'), '--profile', 'web',
+    '--out-dir', join(tmpdir(), 'output')];
   assert.equal(parseWebFirstArgs(args).invalid, true);
   assert.equal(parseWebFirstArgs([...args, '--ack-selected-plugins']).ack, true);
   assert.equal(parseWebFirstArgs([...args, '--ack-selected-plugins', '--ack-selected-plugins']).invalid, true);
