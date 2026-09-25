@@ -71,7 +71,9 @@ test('explicit installed-CLI list check distinguishes absent, matching and confl
   assert.ok(absent.report.setup.registration);
   assert.equal(absent.report.setup.registration.command, process.execPath);
   assert.ok(absent.report.setup.registration.powershell.includes(process.execPath));
-  assert.ok(formatCodexDoctor(absent.report).includes(absent.report.setup.registration.powershell));
+  const expectedShellCommand = process.platform === 'win32'
+    ? absent.report.setup.registration.powershell : absent.report.setup.registration.posix;
+  assert.ok(formatCodexDoctor(absent.report).includes(expectedShellCommand));
   assert.equal(calls, 1);
   const matching = await diagnoseCodexDoctor(codexArgs, { runRegistrationList: run([{
     name: 'reflexmesh-shadow', enabled: true,
