@@ -105,6 +105,10 @@ After a successful preview, optional `--out-overlay ABS_NEW_FILE` exports the
 proposed patch to a new file outside the profile home for private review. It
 never applies that patch or starts the host; see the
 [export validation](docs/VALIDATION-DEEPSEEK-PROFILE-PREVIEW-T002.md).
+The account-free [installed CLI/Agent probe](docs/DEEPSEEK-AGENT.md#reproduce-the-isolated-cliagent-probe)
+now loads a row from the same Loader-row generator via a separate `--patch` overlay and
+checks native tool/outcome evidence. It uses an isolated empty-bundle profile,
+not your selected or default profile; see the [overlay-boot result](docs/VALIDATION-DEEPSEEK-OVERLAY-BOOT-T001.md).
 
 Connecting Codex for the first time? `npm run doctor:codex -- --help` explains
 the explicit Node, ledger and scope inputs for a reviewable STDIO MCP snippet;

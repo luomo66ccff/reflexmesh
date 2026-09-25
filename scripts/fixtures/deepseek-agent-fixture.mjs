@@ -13,7 +13,8 @@ const plugin = {
   inject: ['llm', 'tools', 'reflexmeshObserverReady'],
   async apply(ctx, config) {
     if (!config || typeof config.packageRoot !== 'string' || typeof config.telemetryPath !== 'string'
-      || typeof config.homePath !== 'string' || typeof config.cwdPath !== 'string') {
+      || typeof config.homePath !== 'string' || typeof config.cwdPath !== 'string'
+      || typeof config.overlayPath !== 'string') {
       throw new TypeError('Synthetic fixture paths required');
     }
     const profileManifest = JSON.parse(readFileSync(join(config.homePath, 'profiles', 'reflexmesh-probe', 'package.json'), 'utf8'));
@@ -27,6 +28,14 @@ const plugin = {
     const observerEntry = [...(ctx.get('loader')?.entries() ?? [])].find(entry => entry.options?.id === 'reflexmesh-observer');
     const observerEntryActivated = observerEntry?.options?.name === expectedObserverUrl
       && observerEntry.fiber?.state === 2 && observerEntry.parent?.tree?.filename === profileFile;
+    const profilePatch = readFileSync(join(config.homePath, 'profiles', 'reflexmesh-probe', 'cordis.patch.yml'), 'utf8');
+    const overlayPatch = readFileSync(config.overlayPath, 'utf8');
+    const patchArg = process.argv.indexOf('--patch');
+    const observerOverlayViaCli = observerEntryActivated && patchArg >= 0
+      && process.argv[patchArg + 1] === config.overlayPath
+      && !profilePatch.includes('reflexmesh-observer')
+      && overlayPatch.includes('"id":"reflexmesh-observer"')
+      && overlayPatch.includes(expectedObserverUrl);
     const sibling = name => join(dirname(config.packageRoot), name);
     // Exact installed modules are supplied by the isolated probe, never ambient resolution.
     const llmManifest = JSON.parse(readFileSync(join(sibling('dsh-llm'), 'package.json'), 'utf8'));
@@ -40,6 +49,7 @@ const plugin = {
       import(pathToFileURL(join(sibling('dsh-tools'), 'lib', 'index.js')).href),
     ]);
     const state = { isolatedProfileLoaded, loaderProfileBound, observerEntryActivated,
+      observerOverlayViaCli,
       naturalBeforeExit: false, observerDrainedAtExit: false, kernelClosedAtExit: false,
       requests: 0, bodyCalls: 0, toolAdvertised: false, toolCount: 0,
       toolHadAgent: false, toolArgsExact: false, toolResultSeen: false, sessionConsistent: false,
