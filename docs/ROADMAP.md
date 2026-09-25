@@ -79,6 +79,10 @@ settings before an opted-in paid run. Existing plan/route guards keep their
 narrower meanings; this fingerprint is not remote identity, cost or approval.
 Its [PR/main integration readback](VALIDATION-EVALUATION-WIRE-GUARD-INTEGRATION-T001.md)
 records the exact reviewed tree and CI results separately from local evidence.
+The next [catalog-gated live evaluation](VALIDATION-EVALUATION-CATALOG-LIVE-T001.md)
+checks a current account-listed DeepSeek route before an optional paid run;
+the eight-case synthetic intent slice is a plumbing check, not representative
+quality or default-profile acceptance.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to

@@ -132,6 +132,23 @@ checks actual input and body limits before each request, and provider/network
 failures still stop without automatic retry. Hashes are fingerprints, not
 anonymization; review the dataset before sending it.
 
+An account's current model catalog can differ from a locally configured host
+default or a legacy alias. For DeepSeek only, add `--require-listed-model` to
+an opted-in `run` that already has a route or wire guard. After those offline
+digests match and `REFLEXMESH_ALLOW_REMOTE=true` is checked, the CLI makes one
+authenticated, bounded `GET https://api.deepseek.com/models` with the same
+key that the provider will use. If the exact model ID is absent, the catalog
+request fails, or the response is invalid, it rejects before provider
+construction, completion requests and output-file reservation. This GET is
+**outside** `--max-requests`, which counts completion invocations only. The
+flag does not read a host profile or label file; without it, existing run
+behavior is unchanged. An account-listed ID is a point-in-time routing check,
+not proof of immutable weights, sufficient balance, future availability,
+request acceptance, model quality or a monetary ceiling. Some accepted legacy
+aliases may be absent from the catalog; an operator may deliberately omit the
+flag but then owns that route uncertainty. See the
+[official model-list API](https://api-docs.deepseek.com/api/list-models/).
+
 ## Three separate input artifacts
 
 All schemas have `schemaVersion: 1`, exact fields and finite plain JSON.
@@ -210,6 +227,8 @@ The sample is not a real plan digest and cannot be used as one.
 If you also supplied `--model-id` and `--provider-revision` to the plan,
 prefer `--expect-route-plan-digest SHA256_FROM_ROUTE_PLAN` for the stronger
 declared-route mismatch check. Its sample placeholder is not a real digest.
+For a DeepSeek account-route check, add `--require-listed-model` as well; this
+adds one catalog GET before any completion and does not change the request cap.
 
 The example's output-token flag is DeepSeek-only. Jev rejects that flag rather
 than pretending to enforce it. Both providers require an explicitly selected

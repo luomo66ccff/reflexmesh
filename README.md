@@ -144,6 +144,11 @@ request bodies or DeepSeek output-token limits before credential access.
 Use the same `--max-output-tokens N` in plan and run when overriding the
 512-token default. This binds the reviewed local request shape, not the
 remote endpoint, billed cost or permission to send data.
+For DeepSeek, an opted-in `run --require-listed-model` additionally checks
+the chosen model ID against the current account's `GET /models` catalog before
+provider construction or output reservation. It requires a route or wire
+guard and makes one extra authenticated, non-completion request outside the
+completion cap. A listed ID is not a weight pin, cost limit or quality proof.
 Validate and compare stay offline; paid runs need explicit opt-in and budgets.
 See the [paired comparison guide](docs/PROVIDER-COMPARISON.md). No automatic
 winner, calibration transfer, model promotion or tool execution is implied.

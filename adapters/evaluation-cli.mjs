@@ -4,16 +4,18 @@ import { compareEvaluations } from './evaluation-report.mjs';
 import { evaluationDatasetDigest, validateEvaluationDataset, validateEvaluationLabels } from './evaluation-contract.mjs';
 import { readEvaluationJson, reserveEvaluationOutput } from './evaluation-files.mjs';
 import { EVALUATION_PROVIDER_IDS, planEvaluation } from './evaluation-plan.mjs';
+import { requireListedDeepSeekModel } from './evaluation-model-catalog.mjs';
 import { isDirectRun } from './direct-run.mjs';
 
 const USAGE = `ReflexMesh evaluation: paired evidence, not automatic model promotion
   npm run evaluation -- validate --dataset FILE [--labels FILE] [--json]
   npm run evaluation -- plan --dataset FILE --provider deepseek|jev --max-requests N [--model-id ID --provider-revision REV [--max-output-tokens N]] [--json]
-  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--expect-wire-plan-digest SHA256] [--timeout-ms 15000] [--max-output-tokens N]
+  npm run evaluation -- run --dataset FILE --deployment-id ID --id RUN_ID --out NEW_FILE --max-requests N --allow-remote [--expect-plan-digest SHA256] [--expect-route-plan-digest SHA256] [--expect-wire-plan-digest SHA256] [--require-listed-model] [--timeout-ms 15000] [--max-output-tokens N]
   npm run evaluation -- compare --dataset FILE --labels FILE --champion FILE --challenger FILE [--bins 10] [--json] [--out NEW_FILE]
 Validate/plan/compare are local only. A plan without a declared route checks capabilities only; a route also checks local request-body size, not model quality, endpoint availability or cost.
 Run requires explicit provider/model/revision/key and REFLEXMESH_ALLOW_REMOTE=true.
 Run never reads labels, loads a host profile or executes tools. Each case keeps its full question contract.
+--require-listed-model adds one authenticated DeepSeek GET /models before provider construction; it requires a route guard and is outside the completion request cap.
 Outputs must be new files. Interrupted/failed remote requests are never retried automatically.
 Comparison uses only the same labeled cases where both sides succeeded; missing/failure coverage stays visible.
 Labels and provider origins are operator declarations, not verified provenance. Synthetic demos are not model-quality evidence.
@@ -24,14 +26,14 @@ export function parseEvaluationOptions(argv) {
   const [command, ...args] = argv;
   const allowed = { validate: ['dataset', 'labels', 'json'],
     plan: ['dataset', 'provider', 'max-requests', 'model-id', 'provider-revision', 'max-output-tokens', 'json'],
-    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'expect-wire-plan-digest', 'timeout-ms', 'max-output-tokens'],
+    run: ['dataset', 'deployment-id', 'id', 'out', 'max-requests', 'allow-remote', 'expect-plan-digest', 'expect-route-plan-digest', 'expect-wire-plan-digest', 'require-listed-model', 'timeout-ms', 'max-output-tokens'],
     compare: ['dataset', 'labels', 'champion', 'challenger', 'bins', 'json', 'out'] }[command];
   if (!allowed) fail('Expected validate, plan, run or compare; use --help');
   const options = { command };
   for (let i = 0; i < args.length; i++) {
     const key = args[i].startsWith('--') ? args[i].slice(2) : '';
     if (!allowed.includes(key) || Object.hasOwn(options, key)) fail('Unknown or duplicate evaluation option');
-    if (['json', 'allow-remote'].includes(key)) options[key] = true;
+    if (['json', 'allow-remote', 'require-listed-model'].includes(key)) options[key] = true;
     else { const value = args[++i]; if (!value || value.startsWith('--')) fail('Missing evaluation option value'); options[key] = value; }
   }
   const required = { validate: ['dataset'], plan: ['dataset', 'provider', 'max-requests'],
@@ -55,6 +57,9 @@ export function parseEvaluationOptions(argv) {
   if (command === 'plan' && options['max-output-tokens'] !== undefined
     && (options.provider !== 'deepseek' || options['model-id'] === undefined))
     fail('DeepSeek output token limit requires a declared route');
+  if (command === 'run' && options['require-listed-model']
+    && options['expect-route-plan-digest'] === undefined && options['expect-wire-plan-digest'] === undefined)
+    fail('Listed model check requires a declared route guard');
   return options;
 }
 const quote = value => JSON.stringify(value);
@@ -87,7 +92,7 @@ export function formatEvaluationReport(report) {
   return lines.join('\n') + '\n';
 }
 
-export async function evaluationMain(argv, output = process.stdout, { env = process.env, createProvider, signal } = {}) {
+export async function evaluationMain(argv, output = process.stdout, { env = process.env, createProvider, modelCatalogFetch, signal } = {}) {
   const options = parseEvaluationOptions(argv);
   if (options.help) { output.write(USAGE); return 0; }
   const dataset = validateEvaluationDataset(readEvaluationJson(options.dataset));
@@ -150,6 +155,17 @@ export async function evaluationMain(argv, output = process.stdout, { env = proc
         [modelKey]: { value: modelId, enumerable: true },
       });
     }
+  }
+  if (options['require-listed-model']) {
+    if (expectedRoute.providerId !== EVALUATION_PROVIDER_IDS.deepseek)
+      throw new ContractError('Listed model check supports DeepSeek only; no evaluation request or output opened');
+    if (providerEnv.REFLEXMESH_ALLOW_REMOTE !== 'true')
+      throw new ContractError('Remote evaluation is not enabled; no model catalog or output opened');
+    const apiKey = providerEnv.DEEPSEEK_API_KEY;
+    await requireListedDeepSeekModel({ apiKey, modelId: expectedRoute.modelId,
+      ...(modelCatalogFetch ? { fetch: modelCatalogFetch } : {}), signal });
+    // The account checked above must be the account used by the provider factory.
+    Object.defineProperty(providerEnv, 'DEEPSEEK_API_KEY', { value: apiKey, enumerable: true });
   }
   const factory = createProvider ?? (await import('./evaluation-provider.mjs')).createEvaluationProvider;
   const selected = await factory(providerEnv, { maxOutputTokens: options['max-output-tokens'] });
