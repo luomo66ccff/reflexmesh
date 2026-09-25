@@ -10,22 +10,27 @@ import { isDirectRun } from '../adapters/direct-run.mjs';
 import { processFailureReason, runBounded } from './real-host-compat.mjs';
 import { TEARDOWN_ASSERTIONS, TEARDOWN_EVIDENCE, TEARDOWN_FAILURES } from './deepseek-teardown-contract.mjs';
 import { FENCE_ASSERTIONS, FENCE_EVIDENCE } from './deepseek-fence-contract.mjs';
+import { PERMANENT_PENDING, permanentPendingEvidence } from './deepseek-permanent-pending-contract.mjs';
 import { TEARDOWN_MARKER, TEARDOWN_TASK, TEARDOWN_TOOL } from './fixtures/deepseek-teardown-fixture.mjs';
 
 const PROFILE = 'reflexmesh-probe';
 const ARGS = Object.freeze({ key: 'synthetic-only' });
+const SCENARIOS = Object.freeze(['late-result', 'fenced-after', ...Object.keys(PERMANENT_PENDING)]);
+const evidenceFor = scenario => PERMANENT_PENDING[scenario]
+  ? permanentPendingEvidence(scenario) : scenario === 'fenced-after' ? FENCE_EVIDENCE : TEARDOWN_EVIDENCE;
+const assertionsFor = scenario => PERMANENT_PENDING[scenario]?.assertions
+  ?? (scenario === 'fenced-after' ? FENCE_ASSERTIONS : TEARDOWN_ASSERTIONS);
 const failed = (reason, hostVersion = 'unknown', scenario = 'late-result') => ({ schemaVersion: 1,
-  ...(scenario === 'fenced-after' ? FENCE_EVIDENCE : TEARDOWN_EVIDENCE),
+  ...evidenceFor(scenario),
   agentLoopExercised: false, hostVersion, status: 'failed',
   reason: TEARDOWN_FAILURES.includes(reason) ? reason : 'evidence_assertion_failed',
-  assertions: (scenario === 'fenced-after' ? FENCE_ASSERTIONS : TEARDOWN_ASSERTIONS)
-    .map(name => ({ name, passed: false })) });
+  assertions: assertionsFor(scenario).map(name => ({ name, passed: false })) });
 
 /** Fixed official runtime rows, with no default bundles, credentials, or model transport. */
 export function isolatedTeardownPatch({ packageRoot, dbPath, telemetryPath, homePath, cwdPath,
   scenario = 'late-result' }) {
-  if (!['late-result', 'fenced-after'].includes(scenario)) throw new TypeError('Unsupported probe scenario');
-  const fenced = scenario === 'fenced-after';
+  if (!SCENARIOS.includes(scenario)) throw new TypeError('Unsupported probe scenario');
+  const fenced = scenario !== 'late-result';
   const product = new URL('../adapters/deepseek-loader-plugin.mjs', import.meta.url).href;
   const fixture = new URL('./fixtures/deepseek-teardown-fixture.mjs', import.meta.url).href;
   const rows = [
@@ -65,8 +70,10 @@ function safeRemove(root) {
 }
 
 export async function runDeepSeekTeardownProbe(packageRoot, scenario = 'late-result') {
-  if (!['late-result', 'fenced-after'].includes(scenario)) return failed('evidence_assertion_failed');
+  if (!SCENARIOS.includes(scenario)) return failed('evidence_assertion_failed');
   const fenced = scenario === 'fenced-after';
+  const permanentBefore = scenario === 'permanent-before';
+  const permanentAfter = scenario === 'permanent-after';
   const installed = inspectAgentPackages(packageRoot);
   if (!installed.ok) return failed(installed.reason, installed.hostVersion, scenario);
   let root, kernel;
@@ -124,7 +131,39 @@ export async function runDeepSeekTeardownProbe(packageRoot, scenario = 'late-res
         && JSON.stringify(attention.items[0].attention.reasons.map(reason => reason.code))
           === JSON.stringify(['shadow_outcome_missing']),
     };
-    const checks = fenced ? {
+    const checks = permanentBefore || permanentAfter ? {
+      isolated_cli_profile_and_loader: telemetry.isolatedProfileLoaded === true
+        && telemetry.observerEntryActivated === true,
+      native_tool_result_delivered_once: telemetry.requests === 2 && telemetry.toolCount === 1
+        && telemetry.toolAdvertised === true && telemetry.bodyCalls === 1
+        && telemetry.toolArgsExact === true && telemetry.nativeResults === 1
+        && telemetry.resultInModel === true
+        && telemetry.resultBeforeUnload === permanentAfter
+        && telemetry.observerDisabledAtResult === permanentBefore,
+      pending_at_unload: permanentBefore
+        ? telemetry.beforeEntered === true && telemetry.beforePendingAtUnloadStart === true
+          && telemetry.afterEntered === false && telemetry.bodyEnteredAfterUnload === true
+        : telemetry.afterEntered === true && telemetry.afterPendingAtUnloadStart === true
+          && telemetry.beforeEntered === false && telemetry.bodyEnteredAfterUnload === false,
+      fenced_unload_completed: telemetry.unloadCompleted === true
+        && telemetry.unloadFailed === false && telemetry.observerDrainedAtUnload === false
+        && telemetry.kernelClosedAtUnload === true && telemetry.storageRevokedAtUnload === true
+        && telemetry.detachedBeforeAtUnload === (permanentBefore ? 1 : 0)
+        && telemetry.detachedAfterAtUnload === (permanentAfter ? 1 : 0)
+        && telemetry.missingResultsAtUnload === 0,
+      truthful_ledger: permanentBefore
+        ? page.items.length === 0 && page.nextCursor === null
+          && attention.items.length === 0 && attention.nextCursor === null
+        : page.items.length === 1 && page.nextCursor === null
+          && common.host_identity_and_task_bound && common.missing_result_remains_missing,
+      agent_received_result_without_retry: telemetry.bodyCalls === 1
+        && telemetry.nativeResults === 1 && child.stdout.trim() === TEARDOWN_MARKER,
+      zero_labels_and_no_remote_model: permanentBefore ? page.items.length === 0
+        : item?.binding.providerId === 'abstain'
+          && item.binding.modelId === 'not-configured' && item.labelCount === 0,
+      natural_host_exit: telemetry.naturalBeforeExit === true
+        && telemetry.observerDrainedAtExit === false && telemetry.kernelClosedAtExit === true,
+    } : fenced ? {
       isolated_cli_profile_and_loader: common.isolated_cli_profile_and_loader,
       native_tool_result_delivered: telemetry.requests === 2 && telemetry.toolCount === 1
         && telemetry.toolAdvertised === true && telemetry.bodyCalls === 1
@@ -167,12 +206,13 @@ export async function runDeepSeekTeardownProbe(packageRoot, scenario = 'late-res
       natural_host_exit: telemetry.naturalBeforeExit === true
         && telemetry.observerDrainedAtExit === true && telemetry.kernelClosedAtExit === true,
     };
-    const assertions = (fenced ? FENCE_ASSERTIONS : TEARDOWN_ASSERTIONS)
+    const assertions = assertionsFor(scenario)
       .map(name => ({ name, passed: checks[name] === true }));
     const passed = assertions.every(value => value.passed);
-    return { schemaVersion: 1, ...(fenced ? FENCE_EVIDENCE : TEARDOWN_EVIDENCE), agentLoopExercised: passed,
+    return { schemaVersion: 1, ...evidenceFor(scenario), agentLoopExercised: passed,
       hostVersion: installed.hostVersion, status: passed ? 'passed' : 'failed',
-      reason: passed ? (fenced ? 'cli_observer_fence_passed' : 'cli_observer_teardown_passed')
+      reason: passed ? (PERMANENT_PENDING[scenario]?.reason
+        ?? (fenced ? 'cli_observer_fence_passed' : 'cli_observer_teardown_passed'))
         : 'evidence_assertion_failed', assertions };
   } catch { return failed('isolated_cli_boot_failed', installed.hostVersion, scenario); }
   finally {

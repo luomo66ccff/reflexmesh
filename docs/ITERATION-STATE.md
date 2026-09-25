@@ -12,7 +12,22 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: installed Codex Agent first-evidence loop
+## Latest milestone: installed DeepSeek permanent-pending observer unload
+
+On 2026-09-25, the installed DeepSeek Harness `0.1.2-rc.1` Loader/Agent loop
+passed two isolated, account-free scenarios in which its built-in `before` or
+`after` storage continuation never resolves. Both used the explicit fenced
+drain deadline and passed 8/8 fixed assertions with a single native tool
+result and natural Agent exit. The detached `before` left no decision or false
+missing-result count; the detached `after` retained its prior shadow decision
+with a missing observer outcome visible in attention. Existing fence and
+teardown host probes stayed 10/10 and 9/9. `npm run check` passed 907/909 tests
+with zero failures and two local symlink skips; `npm run demo` passed. See the
+[t001 validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md) and
+[Loader guide](DEEPSEEK-AGENT.md). This is not default-profile, real-model,
+arbitrary callback, native-tool cancellation or blocked-event-loop evidence.
+
+## Previous merged milestone: installed Codex Agent first-evidence loop
 
 On 2026-09-25, an opt-in probe exercised a logged-in installed Codex Agent
 against one fresh synthetic fixture: advisory `reflexmesh_assess`, one native
@@ -26,8 +41,12 @@ zero failures and two local symlink skips; `npm run demo` passed. See the
 [Agent validation](VALIDATION-CODEX-AGENT-T001.md) and
 [first-run guide](CODEX-FIRST-RUN.md). This is not a real user-profile install,
 host-authenticated outcome, full isolation, or broad host lifecycle coverage.
+[PR #57](https://github.com/luomo66ccff/reflexmesh/pull/57) merged the tested
+tree `e40368503115ca9c7608f22f8a4c270f6926a8a1` unchanged; all five
+configured jobs passed on the PR head and on
+[main](https://github.com/luomo66ccff/reflexmesh/actions/runs/36088648306).
 
-## Latest merged milestone: Codex first connection
+## Earlier merged milestone: Codex first connection
 
 On 2026-09-25, the Codex path gained a read-only first-run doctor that generates
 an explicit, reviewable STDIO MCP fragment with a private ledger, tenant and
@@ -979,7 +998,7 @@ the following implementation and validation details remain historical evidence.
 
 | Gate | Remaining work |
 | --- | --- |
-| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation and observer unload while a native result is still absent, followed by a late result; one separate authorized real-model round trip is also recorded. Live, payload-free drain diagnostics fix the waiting-period missing-count misreport but do not safely terminate an arbitrary callback. Permanent result absence, hung admission/storage callbacks and host-tool timeout policy remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
+| Actual host lifecycle | Default-profile compatibility; cross-host concurrency, cancellation, restart, shutdown and full subagent identity matrix. DeepSeek has fixed synthetic-transport parallel/cancel/task-replacement/followup, official sequential spawn isolation, observer unload before a late native result, and one separate authorized real-model round trip. Live, payload-free drain diagnostics fix the waiting-period missing-count misreport. An isolated installed-host probe now covers the Loader's own permanently pending asynchronous `before`/`after` storage callbacks under an opt-in SQLite fence; it does not safely terminate arbitrary callbacks. Permanent native result absence, caller-owned or event-loop-blocking callbacks, and host-tool timeout policy remain open. In-process rejected admissions and observed Claude cross-process pairing conflicts are covered, with explicit pre-reservation limits. Installed Claude native Read/prompt/pre/post/Stop, injected duplicate-observer rejection, overlapping fixed MCP success/failure, and pinned isolated two-process cold resume with an explicit new prompt pass with local synthetic transport. Real cancellation/missing-hook paths beyond the tested kill barrier, broader concurrency/subagents, forked/resumed children and unattended/cross-host restart remain open. |
 | Independent providers | Immutable declarations, independent DeepSeek binary estimate transport, fail-before-egress conformance and binding propagation are implemented and narrowly tested. Paired report tooling is implemented; representative independent-model quality/calibration, real Jev acceptance, broader host latency and migration remain open. See [contract](PROVIDER-CONFORMANCE.md). |
 | Useful comparison | Versioned datasets, separate operator-declared independent labels, usable eval/compare reports and separately bound champion/challenger deployments are implemented. A real same-route synthetic smoke passes; distinct real provider/model comparisons, representative held-out labels and statistical uncertainty/quality acceptance remain open. No automatic truth labels or promotion. |
 | Safe operations | Read-only diagnostics, consistent backup/verification, isolated synthetic restore/no-retry validation, all-record compaction and explicit audit-only archival with coverage/lookup are implemented. Pruning other evidence requires further ID/body/version guards; production restoration with newer-guard reconciliation, independently authenticated recovery evidence, lease/cancellation budgets, broader migration and privacy/load testing remain open. Compaction is not logical evidence deletion; archive verification is not freshness, external-chain availability or restore authority. |
@@ -990,8 +1009,9 @@ The independently labeled, separately bound comparison/report workflow is now
 implemented with an explicit provenance and descriptive-only boundary. The
 reviewed stack now reaches the default branch, with a fresh-clone offline
 first-run check. Next prioritize bounded host shutdown/cancellation and isolated
-first-run gaps within the existing adapters, especially permanent missing-result
-and hung-callback boundaries, keeping isolated synthetic transport distinct
+first-run gaps within the existing adapters, especially permanently missing
+native results and callbacks outside the fenced built-in boundary, keeping
+isolated synthetic transport distinct
 from real-model and default-profile acceptance. Audit archival/lookup is implemented, while
 other evidence-body retention and broader operational acceptance remain open,
 alongside remaining lifecycle evidence;

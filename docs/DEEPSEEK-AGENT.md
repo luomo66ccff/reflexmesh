@@ -149,6 +149,16 @@ observer-fence --deepseek-package-root PATH_TO_DSH` after `npm run build`.
 The [installed-host report](VALIDATION-DEEPSEEK-FENCE-HOST-T001.md) describes
 the injected pending result-storage callback, the native Agent result and
 the evidence limits. This probe uses only a disposable synthetic profile.
+To test callbacks that **never** resolve, run the same command with
+`--deepseek-mode observer-pending-before` and then
+`--deepseek-mode observer-pending-after`. Both use the installed Loader in a
+disposable profile and require the Agent to exit naturally. The first checks
+that a detached admission creates no decision or false missing-result count;
+the second keeps the admitted decision but leaves its unobserved result
+`missing` and visible to `evidence attention`. These checks do not cancel a
+native tool or certify an event-loop-blocking callback, arbitrary custom
+storage, default-profile setup or real-model transport. See the
+[permanent-pending validation](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md).
 An integration that monitors unload should capture the readiness object
 **before** starting Loader disposal. Cordis may remove the service during
 unload, so a fresh `ctx.get('reflexmeshObserverReady')` is not a reliable way

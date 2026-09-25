@@ -66,14 +66,20 @@ loaded by these minimal scenarios. The host must quiesce its own work before
 unloading the observer. ReflexMesh now has a separate bounded result-reception
 window during observer shutdown: after its deadline, an accepted call without
 `tools/result` stays **missing** and gets a fixed diagnostic. This is not an
-`ABORTED` report, proof of absent effects or permission to retry. Already
-running admission/result-storage callbacks still drain before the kernel
-closes; one that never settles can still leave shutdown pending. The bounded
+`ABORTED` report, proof of absent effects or permission to retry. Without the
+separate opt-in fenced deadline, already running admission/result-storage
+callbacks still drain before the kernel closes; one that never settles can
+leave shutdown pending. The bounded
 window is covered by synthetic observer/Loader tests, not these installed-host
 scenarios. The separate [installed observer-teardown probe](VALIDATION-DEEPSEEK-TEARDOWN-T001.md)
 now exercises that absence **at unload** with a late host result and natural
 Agent exit. It does not test permanent result absence or indefinitely hung
-admission/storage callbacks. See [shutdown validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
+admission/storage callbacks. The Loader's separate opt-in, fenced drain
+deadline can detach its own pending SQLite continuations; the
+[installed permanent-pending probe](VALIDATION-DEEPSEEK-PERMANENT-PENDING-T001.md)
+exercises this narrower boundary. It is not host-tool cancellation or a hard
+deadline for a blocked event loop. See
+[shutdown validation](VALIDATION-DEEPSEEK-SHUTDOWN-T001.md).
 
 Existing historical observations are not migrated or reclassified. The new
 ABORTED mapping applies only to newly observed results. Use independent host
