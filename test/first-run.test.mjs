@@ -114,14 +114,15 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.match(output.text, /Fixture host report: missing -> succeeded \(1 observation\); labels created: 0/);
   assert.match(output.text, /After task clear -> escalate; coverage: none \(old summary not reused\)/);
   assert.match(output.text, /A shadow allow is not host permission/);
-  assert.match(output.text, /Next: open START-HERE\.md/);
+  assert.match(output.text, /Next: open EVIDENCE-STORY\.html/);
   assert.match(output.text, /optional new-file pack export/);
   assert.match(output.text, /No model, external provider, user profile or host tool was accessed/);
-  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
+  assert.deepEqual(readdirSync(outputDir).sort(), ['EVIDENCE-STORY.html', 'START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
   if (process.platform !== 'win32') {
     assert.equal(statSync(outputDir).mode & 0o077, 0);
     assert.equal(statSync(join(outputDir, 'ledger.sqlite')).mode & 0o077, 0);
     assert.equal(statSync(join(outputDir, 'candidate-pack.json')).mode & 0o077, 0);
+    assert.equal(statSync(join(outputDir, 'EVIDENCE-STORY.html')).mode & 0o077, 0);
   }
 
   const databasePath = join(outputDir, 'ledger.sqlite');
@@ -139,6 +140,16 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.ok(guide.includes(outputDir));
   assert.equal(guide.includes('Read README without editing files'), false);
   assert.equal(guide.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'), false);
+  const story = readFileSync(join(outputDir, 'EVIDENCE-STORY.html'), 'utf8');
+  assert.match(story, /Synthetic lesson/);
+  assert.match(story, /A shadow allow is not host permission/);
+  assert.match(story, /test-oracle/);
+  assert.match(story, /Independent labels/);
+  assert.match(story, /No scripts, external assets, network requests/);
+  assert.ok(!story.includes('Read README without editing files'));
+  assert.ok(!story.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
+  assert.ok(!story.includes('<script'));
+  assert.ok(!story.includes('https://'));
 
   const listOutput = sink();
   await evidenceMain(['list', '--db', databasePath, '--json'], listOutput);
@@ -166,6 +177,17 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   assert.equal(inspected.hostOutcome.status, 'succeeded');
   assert.equal(inspected.labelCount, 0);
   assert.equal(inspected.recovery.executionAllowed, false);
+  const storyOutput = sink(), storyPath = join(outputDir, 'real export.html');
+  await evidenceMain(['story', '--db', databasePath, '--key', key, '--out', storyPath, '--json'], storyOutput);
+  const storyReceipt = JSON.parse(storyOutput.text);
+  assert.equal(storyReceipt.executionAllowed, false);
+  assert.equal(storyReceipt.outputPath, storyPath);
+  assert.equal(readFileSync(storyPath, 'utf8').includes('Synthetic lesson'), false);
+  assert.ok(!storyOutput.text.includes('PRIVATE_PROMPT_BODY_NOT_SELECTED'));
+  const missingStory = join(outputDir, 'missing key.html');
+  await assert.rejects(evidenceMain(['story', '--db', databasePath, '--key', 'absent-key', '--out', missingStory], sink()),
+    /Unknown evidence key/);
+  assert.equal(existsSync(missingStory), false);
   const replayOutput = sink();
   await evidenceMain(['replay', '--db', databasePath, '--key', key,
     '--candidate-pack', join(outputDir, 'candidate-pack.json'), '--json'], replayOutput);
@@ -190,13 +212,17 @@ test('retained lesson is private, read-only inspectable synthetic evidence and n
   const guideBefore = readFileSync(join(outputDir, 'START-HERE.md'));
   const candidateBefore = readFileSync(join(outputDir, 'candidate-pack.json'));
   const sourceBefore = readFileSync(sourcePath);
+  const storyBefore = readFileSync(storyPath);
+  await assert.rejects(evidenceMain(['story', '--db', databasePath, '--key', key, '--out', storyPath], sink()),
+    /Destination already exists/);
+  assert.deepEqual(readFileSync(storyPath), storyBefore);
   await assert.rejects(main(['--out-dir', outputDir], sink()));
   assert.deepEqual(readFileSync(databasePath), ledger);
   assert.deepEqual(readFileSync(join(outputDir, 'START-HERE.md')), guideBefore);
   assert.deepEqual(readFileSync(join(outputDir, 'candidate-pack.json')), candidateBefore);
   assert.deepEqual(readFileSync(sourcePath), sourceBefore);
   assert.deepEqual(readdirSync(outputDir).filter(name => !['ledger.sqlite-shm', 'ledger.sqlite-wal'].includes(name)).sort(),
-    ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite', 'source-pack.json']);
+    ['EVIDENCE-STORY.html', 'START-HERE.md', 'candidate-pack.json', 'ledger.sqlite', 'real export.html', 'source-pack.json']);
 });
 
 test('npm first-run forwards a Unicode/spaced output path and leaves no task-summary cache', t => {
@@ -211,6 +237,6 @@ test('npm first-run forwards a Unicode/spaced output path and leaves no task-sum
   assert.match(result.stdout, /Synthetic evidence: 3 decisions, 1 fixture prediction, 0 labels/);
   assert.match(result.stdout, /Fixture host report: missing -> succeeded \(1 observation\)/);
   assert.equal(result.stdout.includes('SYNTHETIC-SECRET'), false);
-  assert.deepEqual(readdirSync(outputDir).sort(), ['START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
+  assert.deepEqual(readdirSync(outputDir).sort(), ['EVIDENCE-STORY.html', 'START-HERE.md', 'candidate-pack.json', 'ledger.sqlite']);
   assert.equal(lstatSync(outputDir).isSymbolicLink(), false);
 });

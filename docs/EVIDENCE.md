@@ -39,7 +39,7 @@ npm run first-run -- --out-dir evidence-lesson
 ```
 
 The command refuses any existing target and writes `ledger.sqlite`, a synthetic
-`candidate-pack.json` and `START-HERE.md`; the selected task-summary cache is
+`candidate-pack.json`, `START-HERE.md` and `EVIDENCE-STORY.html`; the selected task-summary cache is
 temporary and removed. The guide includes copyable `list`, `attention`,
 `inspect` and policy-only `replay` commands. It never
 opens or changes a real ledger. Read-only SQLite access can still create or
@@ -47,6 +47,11 @@ interact with WAL/SHM sidecars; it is not a byte-for-byte filesystem
 immutability guarantee. On Windows, quote paths with spaces; after the build,
 direct invocation is available as
 `node examples/task-intent.mjs --summary --out-dir "NEW DIRECTORY"`.
+
+The HTML is an offline, self-contained, no-script walkthrough of one synthetic
+decision. It visibly keeps task evidence, semantic policy, separately reported
+host outcome and independent labels apart. Open it locally in a browser; it is
+not a live dashboard or a real-host acceptance test.
 
 ## Inspect your own local shadow deployment
 
@@ -58,6 +63,23 @@ npm run build
 npm run evidence -- list --db /private/path/shadow.sqlite
 npm run evidence -- inspect --db /private/path/shadow.sqlite --key KEY_FROM_LIST
 ```
+
+To view one existing decision as the same bounded offline page, choose a new
+private destination:
+
+```bash
+npm run evidence -- story --db /private/path/shadow.sqlite --key KEY_FROM_LIST --out /private/path/evidence-story.html
+```
+
+The command requires an exact key and refuses an existing output file. It
+reads one `evidenceSnapshot` projection and writes a new HTML file with
+readback; it does not read raw transcript, tool-output or audit bodies, call a
+provider, execute a tool, change the ledger or authorize a retry. Like `inspect`,
+its bounded IDs, reasons and provenance are potentially sensitive metadata.
+Protect the destination directory, especially on Windows. If a write fails,
+the new file might be incomplete; inspect it before reuse. The HTML contains
+no script or external asset. SQLite read-only access retains the WAL/SHM
+caveat above.
 
 List output includes the full call key, recorded run state, policy effect,
 reported outcome and its source, and task coverage. Inspect adds the exact pack
