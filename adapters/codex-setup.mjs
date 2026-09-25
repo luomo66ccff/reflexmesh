@@ -7,6 +7,8 @@ const PLACEHOLDER = /[$%`]/u;
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/u;
 const PARENT_SEGMENT = /(?:^|[\\/])\.\.?(?=[\\/]|$)/u;
 const SERVER_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/u;
+const powershellQuote = value => `'${value.replaceAll("'", "''")}'`;
+const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 
 const plainFields = (value, allowed) => value !== null && typeof value === 'object'
   && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value))
@@ -56,5 +58,27 @@ export function createCodexSetup(input) {
   const toml = [`[${heading}]`, `command = ${JSON.stringify(nodePath)}`,
     `args = [${JSON.stringify(MCP_ENTRY)}]`, '', `[${heading}.env]`,
     ...Object.entries(env).map(([key, value]) => `${key} = ${JSON.stringify(value)}`), ''].join('\n');
-  return deepFreeze({ command: nodePath, args, env, toml });
+  // A command is only a reviewable suggestion. It must never run here or silently overwrite an existing row.
+  const registrationArgs = ['mcp', 'add', serverName,
+    ...Object.entries(env).flatMap(([key, value]) => ['--env', `${key}=${value}`]),
+    '--', nodePath, MCP_ENTRY];
+  const registration = registrationArgs.some(value => value.includes('"')) ? null : {
+    command: 'codex', args: registrationArgs,
+    powershell: `codex mcp add ${powershellQuote(serverName)} ${Object.entries(env).map(([key, value]) =>
+      `--env ${powershellQuote(`${key}=${value}`)}`).join(' ')} -- ${powershellQuote(nodePath)} ${powershellQuote(MCP_ENTRY)}`,
+    posix: `codex mcp add ${posixQuote(serverName)} ${Object.entries(env).map(([key, value]) =>
+      `--env ${posixQuote(`${key}=${value}`)}`).join(' ')} -- ${posixQuote(nodePath)} ${posixQuote(MCP_ENTRY)}`,
+    changesUserConfigIfRun: true,
+  };
+  return deepFreeze({ command: nodePath, args, env, toml, registration });
+}
+
+/** Bind a suggested command to the exact Codex CLI that was inspected, never to PATH lookup. */
+export function bindCodexRegistration(registration, executablePath) {
+  if (!registration || !isSafeCodexPath(executablePath)) throw new TypeError('Invalid Codex registration');
+  const powershell = `& ${powershellQuote(executablePath)} ${registration.args.map((arg, index) =>
+    index < 2 || arg === '--env' || arg === '--' ? arg : powershellQuote(arg)).join(' ')}`;
+  const posix = `${posixQuote(executablePath)} ${registration.args.map((arg, index) =>
+    index < 2 || arg === '--env' || arg === '--' ? arg : posixQuote(arg)).join(' ')}`;
+  return deepFreeze({ ...registration, command: executablePath, powershell, posix });
 }

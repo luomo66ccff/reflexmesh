@@ -1,17 +1,19 @@
 import { lstatSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { createCodexSetup, isSafeCodexPath } from './codex-setup.mjs';
+import { bindCodexRegistration, createCodexSetup, isSafeCodexPath } from './codex-setup.mjs';
 import { historicalProjection } from './doctor.mjs';
 import { inspectSqliteRuntime } from './sqlite-runtime.mjs';
 
 const BUILD_ENTRY = new URL('../dist/index.js', import.meta.url);
 const MCP_ENTRY = new URL('./mcp-server.mjs', import.meta.url);
-const OPTIONS = new Set(['node-executable', 'db', 'tenant', 'scope', 'key', 'json']);
+const OPTIONS = new Set(['node-executable', 'codex-executable', 'db', 'tenant', 'scope', 'key', 'json']);
 const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u206f]/u;
 const ACTIONS = new Set(['invalid_arguments', 'missing_executable', 'missing_db', 'missing_tenant',
   'missing_scope', 'invalid_executable_path', 'executable_missing', 'executable_not_regular',
   'invalid_configuration', 'invalid_key', 'node_unsupported', 'sqlite_wal_runtime_unsupported',
-  'build_required', 'mcp_entry_missing', 'database_invalid', 'internal_error']);
+  'build_required', 'mcp_entry_missing', 'database_invalid', 'invalid_codex_executable',
+  'codex_executable_unavailable', 'registration_inspection_unavailable', 'registration_conflict', 'internal_error']);
 const note = code => ({ code, severity: ACTIONS.has(code) ? 'action' : 'info' });
 const add = (items, code) => { if (!items.some(item => item.code === code)) items.push(note(code)); };
 const safeText = (value, max) => typeof value === 'string' && value.length > 0
@@ -32,12 +34,28 @@ const supportedNode = version => {
   return Number.isSafeInteger(major) && Number.isSafeInteger(minor)
     && (major > 22 || major === 22 && minor >= 16);
 };
+const runCodexList = executable => spawnSync(executable, ['mcp', 'list', '--json'], {
+  encoding: 'utf8', timeout: 30_000, maxBuffer: 256 * 1024, windowsHide: true,
+});
+const exactRegistration = (row, setup) => {
+  const transport = row?.transport;
+  return row?.enabled === true && transport?.type === 'stdio'
+    && transport.command === setup.command
+    && Array.isArray(transport.args) && JSON.stringify(transport.args) === JSON.stringify(setup.args)
+    && (transport.cwd === null || transport.cwd === undefined)
+    && (transport.env_vars === null || transport.env_vars === undefined
+      || Array.isArray(transport.env_vars) && transport.env_vars.length === 0)
+    && transport.env !== null && typeof transport.env === 'object' && !Array.isArray(transport.env)
+    && Object.keys(transport.env).length === Object.keys(setup.env).length
+    && Object.entries(setup.env).every(([key, value]) => transport.env[key] === value);
+};
 
 export const CODEX_DOCTOR_USAGE = `ReflexMesh Codex first-run doctor (read-only)
-  node adapters/codex-doctor-cli.mjs --node-executable ABS --db ABS --tenant ID --scope ID [--key KEY] [--json]
+  node adapters/codex-doctor-cli.mjs --node-executable ABS --db ABS --tenant ID --scope ID [--key KEY] [--codex-executable ABS] [--json]
   node adapters/codex-doctor-cli.mjs --help
-No profile, credential, Codex host, model, provider or tool access; no database or settings write.
-Review and manually merge the suggested Codex MCP configuration.
+By default, no profile, credential, Codex host, model, provider or tool access.
+--codex-executable opts into a read-only "mcp list --json" registration check; private values are not printed.
+No database or settings write. A suggested "codex mcp add" command is never executed by doctor.
 `;
 
 const MESSAGES = Object.freeze({
@@ -62,13 +80,17 @@ const MESSAGES = Object.freeze({
   database_live_wal_unavailable: 'WAL 旁文件存在或无法确认不存在；doctor 跳过历史检查以保持无写入。',
   database_changed_during_inspection: '历史检查期间文件元数据或 WAL 旁文件状态发生变化；结果已丢弃。',
   abstain_only: '建议配置固定 abstain；MCP 仅提供咨询性 shadow 证据。',
-  manual_merge_required: '请审阅并手动合并 TOML；doctor 未修改设置。',
+  manual_merge_required: '请审阅 TOML；doctor 未修改设置。',
+  invalid_codex_executable: 'Codex CLI 路径必须是安全的本机绝对路径。',
+  codex_executable_unavailable: '显式指定的 Codex CLI 必须是可读取的普通文件。',
+  registration_inspection_unavailable: 'Codex 注册信息未能安全读取；没有使用或打印 CLI 的原始输出。',
+  registration_conflict: '同名 MCP 配置已存在但与建议不一致；不要覆盖，请先私下检查当前配置。',
   historical_task_not_ready: '所选历史记录没有可用任务摘要；不代表当前安装失败。',
   historical_outcome_conflict: '所选历史结果互相冲突；不能选定成功或自动重试。',
   historical_unknown_execution: '所选历史执行状态未知；须独立核对，不得自动重试。',
   historical_hook_pairing_unavailable: '所选历史钩子关联未完成或有歧义；已有结果不能证明属于该次调用。',
   historical_evidence_only: '历史记录不证明当前配置、Codex 加载或此次 tenant/scope。',
-  live_host_unverified: 'doctor 未启动 Codex；实际加载和模型行为尚未验证。',
+  live_host_unverified: 'doctor 未启动 Codex Agent 或 MCP 服务；可选 CLI 列表检查不证明实际加载和模型行为。',
   internal_error: 'doctor 无法完成固定范围的检查。',
 });
 
@@ -102,6 +124,7 @@ export async function diagnoseCodexDoctor(argv, {
   mcpEntry = MCP_ENTRY,
   openKernel = openReadOnlyKernel,
   inspectRuntime = inspectSqliteRuntime,
+  runRegistrationList = runCodexList,
 } = {}) {
   const parsed = parseCodexDoctorOptions(argv);
   if (parsed.help) return { help: true, exitCode: 0 };
@@ -144,6 +167,32 @@ export async function diagnoseCodexDoctor(argv, {
     catch { add(diagnostics, 'invalid_configuration'); }
   }
   if (setup) { add(diagnostics, 'abstain_only'); add(diagnostics, 'manual_merge_required'); }
+
+  let registration = { status: 'not_requested' };
+  if (input['codex-executable'] !== undefined) {
+    const codexPath = input['codex-executable'];
+    if (!isSafeCodexPath(codexPath)) {
+      registration = { status: 'invalid_executable' }; add(diagnostics, 'invalid_codex_executable');
+    } else if (!isRegularFile(codexPath)) {
+      registration = { status: 'executable_unavailable' }; add(diagnostics, 'codex_executable_unavailable');
+    } else if (!setup) {
+      registration = { status: 'prerequisites_blocked' };
+    } else {
+      try {
+        const result = runRegistrationList(codexPath);
+        if (result.status !== 0 || result.error || typeof result.stdout !== 'string'
+          || Buffer.byteLength(result.stdout, 'utf8') > 256 * 1024) throw new Error('Unavailable');
+        const rows = JSON.parse(result.stdout);
+        if (!Array.isArray(rows) || rows.length > 200) throw new Error('Invalid list');
+        const matches = rows.filter(row => row && typeof row === 'object' && row.name === 'reflexmesh-shadow');
+        registration = { status: matches.length === 0 ? 'not_registered'
+          : matches.length === 1 && exactRegistration(matches[0], setup) ? 'matching_config' : 'different_config' };
+        if (registration.status === 'different_config') add(diagnostics, 'registration_conflict');
+      } catch {
+        registration = { status: 'unavailable' }; add(diagnostics, 'registration_inspection_unavailable');
+      }
+    }
+  }
 
   let database = 'not_requested';
   let historicalEvidence = { status: 'not_requested' };
@@ -207,13 +256,17 @@ export async function diagnoseCodexDoctor(argv, {
   }
   add(diagnostics, 'live_host_unverified');
   const status = diagnostics.some(item => item.severity === 'action') ? 'action_required' : 'prerequisites_ready';
+  const reportSetup = setup && registration.status === 'not_registered' && status === 'prerequisites_ready'
+    && setup.registration
+    ? { ...setup, registration: bindCodexRegistration(setup.registration, input['codex-executable']) }
+    : setup ? { ...setup, registration: null } : null;
   return { exitCode: status === 'prerequisites_ready' ? 0 : 1, report: {
     schemaVersion: 1, kind: 'codex_first_run_doctor', status,
     prerequisites: { node: nodeReady ? 'supported' : 'unsupported', sqliteRuntime,
       build: built ? 'ready' : 'missing', mcpEntry: entryReady ? 'ready' : 'missing',
       executable: { status: executable, version: 'unverified' },
       configuration: setup ? 'ready' : 'incomplete', database },
-    setup, historicalEvidence, liveHost: 'live_host_unverified', diagnostics,
+    setup: reportSetup, registration, historicalEvidence, liveHost: 'live_host_unverified', diagnostics,
   } };
 }
 
@@ -222,7 +275,15 @@ export function formatCodexDoctor(report) {
   const runtime = report.prerequisites.sqliteRuntime;
   if (runtime) lines.push(`当前进程：Node ${runtime.nodeVersion}; SQLite ${runtime.sqliteVersion ?? 'unknown'}; WAL-reset fix=${runtime.walResetFix}。`);
   for (const diagnostic of report.diagnostics) lines.push(`- ${MESSAGES[diagnostic.code] ?? MESSAGES.internal_error}`);
-  if (report.setup) lines.push('只读建议片段（请审阅并手动合并）：', report.setup.toml.trimEnd());
+  if (report.setup) lines.push('只读建议片段（请审阅）：', report.setup.toml.trimEnd());
+  if (report.registration?.status === 'not_registered' && report.status === 'prerequisites_ready'
+    && report.setup?.registration) lines.push('当前 Codex CLI 未注册同名行；以下命令仅供审阅和手动运行，会修改个人配置：',
+    process.platform === 'win32' ? report.setup.registration.powershell : report.setup.registration.posix,
+    '运行后请用 codex mcp list 核对，并重启 Codex 会话；注册不证明工具调用或宿主权限。');
+  else if (report.registration?.status === 'matching_config')
+    lines.push('当前 Codex CLI 的同名配置与建议字段一致；这不证明运行中的 Codex 会话已加载它。');
+  else if (report.registration?.status === 'not_requested')
+    lines.push('若要生成安全的注册命令，先用 --codex-executable ABS 显式检查同名 MCP 行；请勿覆盖已有配置。');
   if (report.historicalEvidence.status === 'historical_evidence') {
     const item = report.historicalEvidence;
     lines.push(`历史记录（非实时）：run=${item.runState}; decision=${item.decisionEffect}; task=${item.taskStatus}; REPORTED outcome=${item.outcomeStatus}; pairing=${item.hookPairingState}。`);
@@ -237,6 +298,6 @@ export function internalCodexDoctorFailure() {
     prerequisites: { node: 'unverified', build: 'unverified', mcpEntry: 'unverified',
       executable: { status: 'not_checked', version: 'unverified' },
       configuration: 'unverified', database: 'not_requested' },
-    setup: null, historicalEvidence: { status: 'not_requested' }, liveHost: 'live_host_unverified',
+    setup: null, registration: { status: 'not_requested' }, historicalEvidence: { status: 'not_requested' }, liveHost: 'live_host_unverified',
     diagnostics: [note('internal_error'), note('live_host_unverified')] };
 }

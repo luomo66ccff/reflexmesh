@@ -12,7 +12,23 @@ harnesses**. Its practical value is explaining what was decided, from which
 limited task evidence, under which immutable provider/pack binding, separately
 from what a host reports happened. Replaying policy must never run a tool.
 
-## Latest local milestone: offline evidence story
+## Latest local milestone: reviewable Codex registration path
+
+On 2026-09-25, the Codex first-run doctor gained an explicit, optional CLI
+registration check. It reads the selected CLI's bounded `mcp list --json`
+output and reports only whether the default `reflexmesh-shadow` row is absent,
+matches recommended STDIO fields, or conflicts. Only a confirmed absent row
+with ready prerequisites receives a copyable, shell-quoted `codex mcp add`
+command. The doctor never executes it or writes the profile. An installed
+Codex CLI 0.155.0-alpha.16.4 check found no same-name row; `config.toml` hash
+was unchanged and no database was created. The installed parser/two-process
+MCP probe passed; `npm run check` reported **975 tests: 973 passed, 0 failed,
+2 local Windows symlink-privilege skips**. See [local validation](VALIDATION-CODEX-REGISTRATION-PREVIEW-T001.md).
+Actual installation, running-session load, alternate-name detection and
+real Agent behavior remain open. This is a safe onboarding option, not
+default-profile acceptance or completion of the long-term objective.
+
+## Previous merged milestone: offline evidence story
 
 On 2026-09-25, retained synthetic first-run gained a self-contained, no-script
 `EVIDENCE-STORY.html` showing one bounded decision as task evidence, semantic
