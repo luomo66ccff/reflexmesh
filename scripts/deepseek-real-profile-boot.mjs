@@ -149,7 +149,7 @@ function defaultRunHost({ binPath, home, cwd, profile, overlayPath, fixturePath,
   });
 }
 
-function installedHostIdle(binPath) {
+export function installedHostIdle(binPath) {
   if (process.platform !== 'win32') throw new Error('host_idle_unverified');
   const quoted = binPath.replaceAll("'", "''");
   const command = `$ErrorActionPreference='Stop';$needle='${quoted}';`

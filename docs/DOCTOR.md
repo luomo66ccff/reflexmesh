@@ -174,6 +174,25 @@ This checks a synthetic Agent tool turn, not browser user interaction, a paid
 model request or actual real-home/default-profile installation. See
 [local tool validation](VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md).
 
+To send that fixed synthetic task through the actual Web UI and keep the first
+inspectable ledger, use the separate opt-in copied-profile command:
+
+```powershell
+npm run compat:deepseek-web-first-evidence -- --deepseek-package-root 'D:\DeepSeekHarness\app\node_modules\@deepseek-ai\dsh' --dsh-home 'D:\DeepSeekHarness\data' --profile web --out-dir 'C:\ReflexMeshData\web-evidence-t001' --ack-selected-plugins
+```
+
+Choose a **new, private output directory** outside the selected home. The
+command prints a private temporary URL-file path, not the authenticated URL;
+open that URL locally, select the temporary workspace, confirm **read-only**
+access and `reflexmesh-synthetic/fixture-v1`, then send the exact two-line
+task printed by the command once. When the browser shows
+`REFLEXMESH_SYNTHETIC_AGENT_OK`, press Enter in the command's terminal. A
+successful run reports 21/21 checks and writes `START-HERE.md` plus a
+synthetic SQLite ledger to the new directory. Do not share the temporary URL,
+selected patch files or failure directories. This executes selected plugins
+with ambient access, and it does not establish real-home installation,
+real-model quality or universal bug-freedom. See [browser validation](VALIDATION-DEEPSEEK-WEB-FIRST-EVIDENCE-T001.md).
+
 For a separately authorized check of the **actual selected `web` home**,
 `npm run compat:deepseek-real-profile -- --help` requires an explicit current,
 private data archive and `--ack-real-home-writes`. It verifies the archive

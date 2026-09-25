@@ -71,6 +71,10 @@ const plugin = {
       try { save(); } catch {}
     });
     class SyntheticAdapter extends LlmAdapter {
+      listModels(provider) {
+        return Promise.resolve(provider === PROVIDER
+          ? [{ id: MODEL, name: 'ReflexMesh synthetic fixture' }] : []);
+      }
       async *stream(options) {
         state.totalRequests += 1;
         options.signal?.throwIfAborted();

@@ -119,6 +119,12 @@ abstain-only ledger, host-reported result and cleanup. It does not copy
 credential-store or conversation files or request a paid model. Selected
 third-party plugin code does execute and may have ambient/network access;
 see the [current scope and limits](docs/VALIDATION-DEEPSEEK-SELECTED-WEB-TOOL-T002.md).
+To check the first inspectable evidence through the actual selected Web UI,
+`npm run compat:deepseek-web-first-evidence -- --help` provides a separate
+opt-in, copied-profile walkthrough. You send one fixed synthetic task in the
+browser; the command then retains a new-only local ledger and an inspect
+command. It never sends a paid-model request. See the
+[browser validation and privacy limits](docs/VALIDATION-DEEPSEEK-WEB-FIRST-EVIDENCE-T001.md).
 For an explicitly selected **real** `web` home, the separate opt-in
 `npm run compat:deepseek-real-profile -- --help` requires a verified private
 data archive and explicit acknowledgement before booting. It redirects the
