@@ -23,8 +23,9 @@ records and explicit partial-coverage flags. Candidate policy evaluation is
 hypothetical; it calls no provider or host tool and grants no execution or
 retry permission. The retained first-run lesson now includes a copyable impact
 step. See the [guide](EVIDENCE.md#preview-historical-policy-impact) and
-[local validation](VALIDATION-POLICY-IMPACT-T001.md). Remote PR/main CI for this
-increment remains pending until publication. Representative model-quality
+[local validation](VALIDATION-POLICY-IMPACT-T001.md). Remote PR/main CI are
+separate acceptance gates and are not covered by this local milestone.
+Representative model-quality
 labels, default-profile host acceptance and broad bug-free claims remain open.
 
 [PR #78](https://github.com/luomo66ccff/reflexmesh/pull/78) merged at
