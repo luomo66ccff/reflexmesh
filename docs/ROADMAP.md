@@ -83,6 +83,8 @@ The next [catalog-gated live evaluation](VALIDATION-EVALUATION-CATALOG-LIVE-T001
 checks a current account-listed DeepSeek route before an optional paid run;
 the eight-case synthetic intent slice is a plumbing check, not representative
 quality or default-profile acceptance.
+Its [PR/main integration readback](VALIDATION-EVALUATION-CATALOG-LIVE-INTEGRATION-T001.md)
+keeps remote CI evidence separate from the local paid-run receipt.
 
 **2026-09-22 sequencing decision:** after the bounded Claude cold-resume and
 read-only attention increment, the next implementation milestone moves to
