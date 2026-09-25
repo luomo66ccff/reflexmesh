@@ -144,6 +144,16 @@ Neither command authenticates a locally modified ledger. Keep the database
 under trusted local access controls and use the source-pack export when
 reviewing a changed policy.
 
+When the original source pack is verified, `replay` also reports `policyChanges`:
+counts of added, removed and structurally modified rules, whether the relative
+order of rules shared by both packs changed, whether fallback changed, and
+`structureUnchanged`. A version-only change therefore reports no policy-body
+edit. The summary compares rule conditions, effects and directives without
+printing their values or source question instructions. It is not causal
+attribution: several edits may contribute to a changed verdict, and a reported
+structural edit may not affect this recorded prediction. For a stripped schema-1
+ledger the field is `{ "status": "legacy_unverified" }`, not a guessed diff.
+
 ## Find evidence that needs attention
 
 ```bash

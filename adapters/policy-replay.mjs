@@ -1,10 +1,36 @@
 import { lstat, open } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { ContractError } from '../dist/index.js';
+import { canonical, ContractError } from '../dist/index.js';
 import { replayPolicy } from './durable-mesh.mjs';
 
 const MAX_CANDIDATE_BYTES = 128 * 1024;
 const EFFECTS = new Set(['allow', 'deny', 'confirm', 'escalate']);
+
+function policyChanges(record, candidatePack) {
+  if (record.sourceConsistency === 'legacy_unverified') return { status: 'legacy_unverified' };
+  const source = record.sourcePolicy;
+  if (!source || !Array.isArray(source.rules) || typeof source.fallback !== 'string')
+    throw new ContractError('Original policy structure is unavailable');
+  const oldRules = new Map(source.rules.map(rule => [rule.id, rule]));
+  const newRules = new Map(candidatePack.rules.map(rule => [rule.id, rule]));
+  if (oldRules.size !== source.rules.length || newRules.size !== candidatePack.rules.length)
+    throw new ContractError('Policy rule identity is invalid');
+  const oldShared = source.rules.filter(rule => newRules.has(rule.id)).map(rule => rule.id);
+  const newShared = candidatePack.rules.filter(rule => oldRules.has(rule.id)).map(rule => rule.id);
+  const logic = rule => canonical({
+    all: rule.all.map(condition => ({ answer: condition.answer, metric: condition.metric,
+      op: condition.op, value: condition.value })), effect: rule.effect,
+    ...(rule.directive === undefined ? {} : { directive: rule.directive }) });
+  const rulesAdded = candidatePack.rules.length - newShared.length;
+  const rulesRemoved = source.rules.length - oldShared.length;
+  const rulesModified = oldShared.filter(id => logic(oldRules.get(id)) !== logic(newRules.get(id))).length;
+  const sharedRuleOrderChanged = canonical(oldShared) !== canonical(newShared);
+  const fallbackChanged = source.fallback !== candidatePack.fallback;
+  return { status: 'verified', rulesAdded, rulesRemoved, rulesModified,
+    sharedRuleOrderChanged, fallbackChanged,
+    structureUnchanged: rulesAdded === 0 && rulesRemoved === 0 && rulesModified === 0
+      && !sharedRuleOrderChanged && !fallbackChanged };
+}
 
 export async function readCandidatePack(path) {
   if (typeof path !== 'string' || !path || path.includes('\0'))
@@ -61,6 +87,7 @@ export function policyReplayReceipt(record, candidatePack) {
     hypothetical: true,
     executionAllowed: false,
     originalSourceConsistency: record.sourceConsistency,
+    policyChanges: policyChanges(record, candidatePack),
     original: verdict(replay.original),
     candidate: verdict(replay.candidate),
     candidatePackDigest: replay.candidatePackDigest,
@@ -69,11 +96,22 @@ export function policyReplayReceipt(record, candidatePack) {
 
 export function formatPolicyReplay(receipt) {
   const rule = value => `${JSON.stringify(value.ruleId)}${value.directive === undefined ? '' : `; directive: ${JSON.stringify(value.directive)}`}`;
+  const changes = receipt.policyChanges;
+  const changeLine = changes.status === 'verified'
+    ? changes.structureUnchanged
+      ? 'Policy changes: none in rules, order or fallback (pack metadata may differ)'
+      : `Policy changes: ${changes.rulesModified} modified rule${changes.rulesModified === 1 ? '' : 's'}, `
+        + `${changes.rulesAdded} added, ${changes.rulesRemoved} removed; `
+        + `shared-rule order ${changes.sharedRuleOrderChanged ? 'changed' : 'unchanged'}; `
+        + `fallback ${changes.fallbackChanged ? 'changed' : 'unchanged'}`
+    : 'Policy changes: unavailable; legacy original pack body absent';
   return [
     'ReflexMesh policy replay (read-only)',
     `Original source consistency: ${receipt.originalSourceConsistency === 'verified'
       ? 'verified against local bound pack (not authenticated)'
       : 'legacy_unverified; original pack body unavailable'}`,
+    changeLine,
+    'Policy changes describe structure, not which edit caused a decision.',
     `Decision change: ${receipt.original.effect} -> ${receipt.candidate.effect}`,
     `Original: ${receipt.original.effect}; rule: ${rule(receipt.original)}`,
     `Candidate: ${receipt.candidate.effect}; rule: ${rule(receipt.candidate)}`,
